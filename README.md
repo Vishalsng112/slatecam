@@ -82,21 +82,26 @@ Flutter (Dart)            Kotlin (single source of truth)
   └─ device reports    ←   GPU texture preview (never pixel data)
 ```
 
-Planned module layout (monolithic modular, single Gradle build):
+Planned layout (monolithic modular, Flutter-first — the Gradle root is
+`android/`, not the repository root):
 
 ```
-:app            thin Android shell, wires the Flutter engine
-:ui             Flutter module (Dart only)
-:bridge         Pigeon + EventChannel contracts
-:core:common    units, timecode, Result, JSON helpers
-:core:probe     capability prober + versioned schema
-:core:camera    Camera2 sessions, state machine, quirks table
-:core:gpu       EGL/GLES pipeline, shaders, 10-bit path
-:core:codec     MediaCodec / MediaMuxer, audio
-:core:profile   log curve, LUTs, color science
-:core:storage   MediaStore, free space, thermal guard
-:feature:*      capture, playback, device reports
+lib/                     Dart UI only
+android/app              Flutter host, wiring only
+android/bridge           Pigeon + EventChannel contracts
+android/core/common      units, timecode, Result, JSON helpers
+android/core/probe       capability prober + versioned schema
+android/core/camera      Camera2 sessions, state machine, quirks table
+android/core/gpu         EGL/GLES pipeline, shaders, 10-bit path
+android/core/codec       MediaCodec / MediaMuxer, audio
+android/core/profile     log curve, LUTs, color science (pure Kotlin)
+android/core/storage     MediaStore, free space, thermal guard
+android/feature/*        capture, playback, device reports
 ```
+
+Dependencies point downward only (`app → feature → core`); a `checkModuleGraph`
+task fails the build otherwise. See
+[docs/adr/0003-modules.md](docs/adr/0003-modules.md).
 
 ## Roadmap
 
