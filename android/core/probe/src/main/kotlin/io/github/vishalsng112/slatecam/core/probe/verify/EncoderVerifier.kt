@@ -29,6 +29,9 @@ class EncoderVerifier {
         val check: VerificationCheck,
         /** Codec name that produced output, or null on failure. */
         val passingCodec: String?,
+        /** Size that actually encoded; 0 when nothing succeeded. */
+        val width: Int = 0,
+        val height: Int = 0,
     )
 
     fun verifyHevcMain10(): Outcome {
@@ -43,29 +46,34 @@ class EncoderVerifier {
         if (candidates.isEmpty()) return Outcome(failure("no hardware HEVC encoder", started), null)
 
         val errors = mutableListOf<String>()
-        for (name in candidates) {
-            val outcome = runCatching { attempt(name) }
-            outcome.onSuccess { detail ->
-                return Outcome(
-                    check = VerificationCheck(
-                        id = CHECK_ID,
-                        status = "pass",
-                        detail = detail,
-                        durationMs = System.currentTimeMillis() - started,
-                    ),
-                    passingCodec = name,
-                )
-            }
-            outcome.onFailure { error ->
-                errors += "$name: ${error.message ?: error.javaClass.simpleName}"
+        // Largest first: verifying UHD is the answer that matters. Falling back
+        // to FHD still proves the Main10 path, just at a smaller preset.
+        for ((width, height) in TEST_SIZES) {
+            for (name in candidates) {
+                val attempt = runCatching { encode(name, width, height) }
+                attempt.onSuccess { detail ->
+                    return Outcome(
+                        check = VerificationCheck(
+                            id = CHECK_ID,
+                            status = "pass",
+                            detail = detail,
+                            durationMs = System.currentTimeMillis() - started,
+                        ),
+                        passingCodec = name,
+                        width = width,
+                        height = height,
+                    )
+                }
+                attempt.onFailure { error ->
+                    errors += "${width}x$height/$name: " +
+                        (error.message ?: error.javaClass.simpleName)
+                }
             }
         }
         return Outcome(failure(errors.joinToString(" | "), started), null)
     }
 
-    private fun attempt(codecName: String): String {
-        val width = 640
-        val height = 360
+    private fun encode(codecName: String, width: Int, height: Int): String {
         val codec = MediaCodec.createByCodecName(codecName)
         var window: EglWindow? = null
         try {
@@ -228,7 +236,9 @@ class EncoderVerifier {
     private companion object {
         const val CHECK_ID = "hevc_main10_encode"
         const val FRAME_COUNT = 10
-        const val DRAIN_TIMEOUT_MS = 10_000L
+        const val DRAIN_TIMEOUT_MS = 15_000L
+
+        val TEST_SIZES = listOf(3840 to 2160, 1920 to 1080, 1280 to 720)
 
         // Not exposed by android.opengl.EGL14.
         const val EGL_GL_COLORSPACE_KHR = 0x309D

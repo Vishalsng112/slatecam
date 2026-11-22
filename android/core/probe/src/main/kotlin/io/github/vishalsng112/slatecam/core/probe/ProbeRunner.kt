@@ -1,6 +1,7 @@
 package io.github.vishalsng112.slatecam.core.probe
 
 import android.content.Context
+import io.github.vishalsng112.slatecam.core.probe.eval.PresetCatalog
 import io.github.vishalsng112.slatecam.core.probe.eval.TierEvaluator
 import io.github.vishalsng112.slatecam.core.probe.eval.TierInput
 import io.github.vishalsng112.slatecam.core.probe.model.ProbeReport
@@ -56,16 +57,28 @@ class ProbeRunner(private val context: Context) {
             }
         }
 
-        val camerasWithVerification = if (encodeCheck == null) {
-            cameras
-        } else {
-            cameras.map { camera ->
-                camera.copy(
-                    presets = camera.presets.mapValues { (id, preset) ->
-                        if (id.endsWith("_10bit")) preset.copy(verified = main10Verified) else preset
-                    },
-                )
-            }
+        val verifiedWidth = encodeOutcome?.width ?: 0
+        val verifiedHeight = encodeOutcome?.height ?: 0
+        val camerasWithVerification = cameras.map { camera ->
+            camera.copy(
+                presets = camera.presets.mapValues { (id, preset) ->
+                    val spec = PresetCatalog.v1.firstOrNull { it.id == id }
+                    val sameSize = spec != null &&
+                        spec.width == verifiedWidth &&
+                        spec.height == verifiedHeight
+                    // A verdict only covers a preset this camera actually offers
+                    // at the size that encoded successfully.
+                    val promotable = preset.supported &&
+                        spec != null &&
+                        spec.width == verifiedWidth &&
+                        spec.height == verifiedHeight
+                    if (id.endsWith("_10bit") && promotable && main10Verified == "pass") {
+                        preset.copy(verified = "pass")
+                    } else {
+                        preset
+                    }
+                },
+            )
         }
 
         val hardwareHevc = encoders.any { it.mime == "video/hevc" && it.hardware }

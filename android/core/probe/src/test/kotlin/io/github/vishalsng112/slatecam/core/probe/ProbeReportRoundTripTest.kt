@@ -94,13 +94,21 @@ class ProbeReportRoundTripTest {
     }
 
     @Test
-    fun `verification promotes ten-bit presets from capability only to pass`() {
+    fun `verification promotes only supported presets at the encoded size`() {
         val report = ProbeRunner.json.decodeFromString<ProbeReport>(verified())
         val back = report.cameras.first { it.facing == "back" }
-        val preset = back.presets.getValue("uhd30_10bit")
 
-        assertTrue(preset.supported)
-        assertEquals("capability_only", preset.basis)
-        assertEquals("pass", preset.verified)
+        // The encode ran at 3840x2160, which covers the UHD ten-bit presets.
+        val uhd = back.presets.getValue("uhd30_10bit")
+        assertTrue(uhd.supported)
+        assertEquals("capability_only", uhd.basis)
+        assertEquals("pass", uhd.verified)
+
+        // Unsupported modes must never inherit a pass.
+        assertFalse(back.presets.getValue("uhd60_10bit").supported)
+        assertEquals("not_run", back.presets.getValue("uhd60_10bit").verified)
+
+        // Other sizes were not exercised, so they stay unverified.
+        assertEquals("not_run", back.presets.getValue("fhd30_10bit").verified)
     }
 }

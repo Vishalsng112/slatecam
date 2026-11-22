@@ -50,9 +50,9 @@ Prober 1.0.0, app 0.1.0, Android 16 (`BP2A.250605.031.A3`), SoC `MT6897`.
 | Camera set | only IDs `0` and `1`, no physical IDs, no logical multi-camera |
 | 4K | 30 fps maximum; `uhd60_*` correctly reported unsupported |
 | 1080p | 120 fps available through constrained high-speed streams |
-| 10-bit | claimed at UHD and FHD 24/25/30, `basis: capability_only`, then `verified: pass` |
+| 10-bit | claimed at UHD and FHD 24/25/30; UHD then **verified** at 3840×2160 |
 | HEVC encoders | `c2.mtk.hevc.encoder`, `OMX.MTK.VIDEO.ENCODER.HEVC`, secure variants: all claim profile `main` only |
-| Verification encode | `c2.mtk.hevc.encoder`, 11 frames, `profile=2` (Main10), `transfer=7` (HLG), 149 ms |
+| Verification encode | `c2.mtk.hevc.encoder`, 3840×2160, 11 frames, 75,341 bytes, `profile=2` (Main10), `transfer=7` (HLG), 495 ms |
 | Display | 120 Hz, wide gamut, HDR10 / HLG / HDR10+ / Dolby Vision, 500 nits |
 | Audio | 48 kHz, 24-bit PCM supported, not low-latency |
 | Native page size | 4 KB |
@@ -76,5 +76,7 @@ Prober 1.0.0, app 0.1.0, Android 16 (`BP2A.250605.031.A3`), SoC `MT6897`.
   advertises no Main10 profile.
 - A verdict is credited only to the codec that produced output. The other HEVC
   encoders stay `not_run` rather than inheriting a pass.
+- A preset verdict covers only the size that actually encoded. The 4K pass does
+  not promote FHD, and an unsupported mode never inherits a pass.
 - The device database stores both the claim and the verification result, because
   they disagree on this device and probably on many more.

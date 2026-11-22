@@ -3,11 +3,11 @@
     "schema_version": "1.1.0",
     "kind": "summary",
     "report": {
-        "id": "d7de8267-7a10-466b-9455-01dbc9ea93a8",
-        "created_at": "2026-11-22T21:16:08.401Z",
+        "id": "9c486008-b007-4bf2-99d2-5a4ef85091d0",
+        "created_at": "2026-11-22T21:18:39.403Z",
         "prober_version": "1.0.0",
         "app_version": "0.1.0",
-        "duration_ms": 281
+        "duration_ms": 528
     },
     "device": {
         "device_key": "xiaomi/duchamp",
@@ -233,7 +233,7 @@
                     "detail": "max 30.0 fps at 3840x2160",
                     "profiles": [],
                     "basis": "stream_map",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "dci4k24_10bit": {
                     "supported": false,
@@ -241,7 +241,7 @@
                     "detail": "4096x2160 is not offered by this camera",
                     "profiles": [],
                     "basis": "stream_map",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "fhd24_8bit": {
                     "supported": true,
@@ -275,7 +275,7 @@
                         "hlg10"
                     ],
                     "basis": "capability_only",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "fhd25_10bit": {
                     "supported": true,
@@ -285,7 +285,7 @@
                         "hlg10"
                     ],
                     "basis": "capability_only",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "fhd30_10bit": {
                     "supported": true,
@@ -295,7 +295,7 @@
                         "hlg10"
                     ],
                     "basis": "capability_only",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "fhd60_8bit": {
                     "supported": false,
@@ -432,7 +432,7 @@
                     "detail": "3840x2160 is not offered by this camera",
                     "profiles": [],
                     "basis": "stream_map",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "uhd25_10bit": {
                     "supported": false,
@@ -440,7 +440,7 @@
                     "detail": "3840x2160 is not offered by this camera",
                     "profiles": [],
                     "basis": "stream_map",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "uhd30_10bit": {
                     "supported": false,
@@ -448,7 +448,7 @@
                     "detail": "3840x2160 is not offered by this camera",
                     "profiles": [],
                     "basis": "stream_map",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "uhd24_8bit": {
                     "supported": false,
@@ -488,7 +488,7 @@
                     "detail": "3840x2160 is not offered by this camera",
                     "profiles": [],
                     "basis": "stream_map",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "dci4k24_10bit": {
                     "supported": false,
@@ -496,7 +496,7 @@
                     "detail": "4096x2160 is not offered by this camera",
                     "profiles": [],
                     "basis": "stream_map",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "fhd24_8bit": {
                     "supported": true,
@@ -530,7 +530,7 @@
                         "hlg10"
                     ],
                     "basis": "capability_only",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "fhd25_10bit": {
                     "supported": true,
@@ -540,7 +540,7 @@
                         "hlg10"
                     ],
                     "basis": "capability_only",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "fhd30_10bit": {
                     "supported": true,
@@ -550,7 +550,7 @@
                         "hlg10"
                     ],
                     "basis": "capability_only",
-                    "verified": "pass"
+                    "verified": "not_run"
                 },
                 "fhd60_8bit": {
                     "supported": false,
@@ -811,8 +811,8 @@
             {
                 "id": "hevc_main10_encode",
                 "status": "pass",
-                "detail": "c2.mtk.hevc.encoder: 11 frames, 2580 bytes, profile=2, transfer=7",
-                "duration_ms": 149
+                "detail": "c2.mtk.hevc.encoder: 11 frames, 75341 bytes, profile=2, transfer=7",
+                "duration_ms": 264
             }
         ]
     },
