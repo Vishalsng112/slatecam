@@ -1,0 +1,821 @@
+{
+    "schema": "slatecam.probe",
+    "schema_version": "1.1.0",
+    "kind": "summary",
+    "report": {
+        "id": "d7de8267-7a10-466b-9455-01dbc9ea93a8",
+        "created_at": "2026-11-22T21:16:08.401Z",
+        "prober_version": "1.0.0",
+        "app_version": "0.1.0",
+        "duration_ms": 281
+    },
+    "device": {
+        "device_key": "xiaomi/duchamp",
+        "manufacturer": "Xiaomi",
+        "brand": "POCO",
+        "model": "2311DRK48I",
+        "device": "duchamp",
+        "product": "duchamp_in",
+        "board": "duchamp",
+        "hardware": "mt6897",
+        "fingerprint": "POCO/duchamp_in/duchamp:16/BP2A.250605.031.A3/OS3.0.302.0.WNLINXM:user/release-keys",
+        "build_id": "BP2A.250605.031.A3",
+        "android_release": "16",
+        "sdk": 36,
+        "security_patch": "2026-08-01",
+        "soc_manufacturer": "Mediatek",
+        "soc_model": "MT6897",
+        "abis": [
+            "arm64-v8a"
+        ],
+        "is_emulator": false,
+        "is_low_ram": false,
+        "reported_by": "owner"
+    },
+    "system": {
+        "thermal_status": "none",
+        "total_ram_mb": 11323,
+        "free_storage_mb": 234514,
+        "native_page_size_kb": 4
+    },
+    "displays": [
+        {
+            "id": 0,
+            "refresh_hz": 120,
+            "wide_color_gamut": true,
+            "hdr_types": [
+                "dolby_vision",
+                "hdr10",
+                "hlg",
+                "hdr10_plus"
+            ],
+            "max_luminance_nits": 500.0
+        }
+    ],
+    "cameras": [
+        {
+            "id": "0",
+            "facing": "back",
+            "hardware_level": "level_3",
+            "logical_multi_camera": false,
+            "physical_ids": [],
+            "concurrent_with": [
+                "1"
+            ],
+            "capabilities": [
+                "backward_compatible",
+                "manual_sensor",
+                "manual_post_processing",
+                "read_sensor_settings",
+                "raw",
+                "burst_capture",
+                "private_reprocessing",
+                "yuv_reprocessing",
+                "constrained_high_speed_video",
+                "offline_processing",
+                "dynamic_range_ten_bit"
+            ],
+            "sensor": {
+                "pixel_array": [
+                    4624,
+                    3472
+                ],
+                "active_array": [
+                    4624,
+                    3472
+                ],
+                "physical_size_mm": [
+                    6.49,
+                    4.87
+                ],
+                "orientation_deg": 90,
+                "color_filter": "bayer",
+                "timestamp_source": "realtime",
+                "iso_range": [
+                    50,
+                    6400
+                ],
+                "exposure_time_range_ns": [
+                    30833,
+                    30000000000
+                ],
+                "black_level": 64,
+                "white_level": 1023
+            },
+            "lenses": [
+                {
+                    "focal_length_mm": 4.71,
+                    "aperture": 1.7,
+                    "min_focus_distance_diopters": 0.0,
+                    "hyperfocal": 0.0
+                }
+            ],
+            "zoom": {
+                "max_digital": 10.0,
+                "available_focal_lengths_mm": [
+                    4.71
+                ]
+            },
+            "controls": {
+                "ae_modes": [
+                    "off",
+                    "on",
+                    "on_auto_flash",
+                    "on_always_flash"
+                ],
+                "af_modes": [
+                    "off",
+                    "auto",
+                    "macro",
+                    "continuous_video",
+                    "continuous_picture"
+                ],
+                "awb_modes": [
+                    "off",
+                    "auto",
+                    "incandescent",
+                    "fluorescent",
+                    "warm_fluorescent",
+                    "daylight",
+                    "cloudy",
+                    "twilight",
+                    "shade"
+                ],
+                "ois_modes": [
+                    "off",
+                    "on"
+                ],
+                "ois_available": [
+                    "off",
+                    "on"
+                ],
+                "video_stabilization_modes": [
+                    "off",
+                    "on"
+                ],
+                "video_stabilization_available": [
+                    "off",
+                    "on"
+                ]
+            },
+            "dynamic_range": {
+                "ten_bit_streams": true,
+                "profiles": [
+                    "hlg10"
+                ]
+            },
+            "presets": {
+                "uhd24_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "uhd25_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "uhd30_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "uhd24_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "uhd25_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "uhd30_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "uhd60_8bit": {
+                    "supported": false,
+                    "reason": "fps_out_of_range",
+                    "detail": "max 30.0 fps at 3840x2160",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "uhd60_10bit": {
+                    "supported": false,
+                    "reason": "fps_out_of_range",
+                    "detail": "max 30.0 fps at 3840x2160",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "pass"
+                },
+                "dci4k24_10bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "4096x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "pass"
+                },
+                "fhd24_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "fhd25_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "fhd30_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "fhd24_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "fhd25_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "fhd30_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "fhd60_8bit": {
+                    "supported": false,
+                    "reason": "fps_out_of_range",
+                    "detail": "max 30.0 fps at 1920x1080",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "fhd120_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "hd240_8bit": {
+                    "supported": false,
+                    "reason": "fps_out_of_range",
+                    "detail": "high-speed max 120 fps at 1280x720",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                }
+            }
+        },
+        {
+            "id": "1",
+            "facing": "front",
+            "hardware_level": "level_3",
+            "logical_multi_camera": false,
+            "physical_ids": [],
+            "concurrent_with": [
+                "0"
+            ],
+            "capabilities": [
+                "backward_compatible",
+                "manual_sensor",
+                "manual_post_processing",
+                "read_sensor_settings",
+                "raw",
+                "burst_capture",
+                "private_reprocessing",
+                "yuv_reprocessing",
+                "offline_processing",
+                "dynamic_range_ten_bit"
+            ],
+            "sensor": {
+                "pixel_array": [
+                    2304,
+                    1728
+                ],
+                "active_array": [
+                    2304,
+                    1728
+                ],
+                "physical_size_mm": [
+                    4.66,
+                    3.5
+                ],
+                "orientation_deg": 270,
+                "color_filter": "bayer",
+                "timestamp_source": "realtime",
+                "iso_range": [
+                    50,
+                    3200
+                ],
+                "exposure_time_range_ns": [
+                    68000,
+                    278443000
+                ],
+                "black_level": 64,
+                "white_level": 1023
+            },
+            "lenses": [
+                {
+                    "focal_length_mm": 3.27,
+                    "aperture": 2.4,
+                    "min_focus_distance_diopters": 0.0,
+                    "hyperfocal": 0.0
+                }
+            ],
+            "zoom": {
+                "max_digital": 10.0,
+                "available_focal_lengths_mm": [
+                    3.27
+                ]
+            },
+            "controls": {
+                "ae_modes": [
+                    "off",
+                    "on",
+                    "on_external_flash"
+                ],
+                "af_modes": [
+                    "off"
+                ],
+                "awb_modes": [
+                    "off",
+                    "auto",
+                    "incandescent",
+                    "fluorescent",
+                    "warm_fluorescent",
+                    "daylight",
+                    "cloudy",
+                    "twilight",
+                    "shade"
+                ],
+                "ois_modes": [
+                    "off"
+                ],
+                "ois_available": [
+                    "off"
+                ],
+                "video_stabilization_modes": [
+                    "off",
+                    "on"
+                ],
+                "video_stabilization_available": [
+                    "off",
+                    "on"
+                ]
+            },
+            "dynamic_range": {
+                "ten_bit_streams": true,
+                "profiles": [
+                    "hlg10"
+                ]
+            },
+            "presets": {
+                "uhd24_10bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "3840x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "pass"
+                },
+                "uhd25_10bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "3840x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "pass"
+                },
+                "uhd30_10bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "3840x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "pass"
+                },
+                "uhd24_8bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "3840x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "uhd25_8bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "3840x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "uhd30_8bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "3840x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "uhd60_8bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "3840x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "uhd60_10bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "3840x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "pass"
+                },
+                "dci4k24_10bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "4096x2160 is not offered by this camera",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "pass"
+                },
+                "fhd24_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "fhd25_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "fhd30_8bit": {
+                    "supported": true,
+                    "format": "yuv420_flexible",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "fhd24_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "fhd25_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "fhd30_10bit": {
+                    "supported": true,
+                    "format": "p010",
+                    "min_frame_duration_ns": 33333333,
+                    "profiles": [
+                        "hlg10"
+                    ],
+                    "basis": "capability_only",
+                    "verified": "pass"
+                },
+                "fhd60_8bit": {
+                    "supported": false,
+                    "reason": "fps_out_of_range",
+                    "detail": "max 30.0 fps at 1920x1080",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "fhd120_8bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "no high-speed stream at 1920x1080",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                },
+                "hd240_8bit": {
+                    "supported": false,
+                    "reason": "no_stream_config",
+                    "detail": "no high-speed stream at 1280x720",
+                    "profiles": [],
+                    "basis": "stream_map",
+                    "verified": "not_run"
+                }
+            }
+        }
+    ],
+    "encoders": [
+        {
+            "mime": "video/avc",
+            "name": "c2.mtk.avc.encoder",
+            "hardware": true,
+            "software_only": false,
+            "vendor": true,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "baseline",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "high",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "main",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "profile_16",
+                    "level": "5.2"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "not_run",
+            "max_instances": 10
+        },
+        {
+            "mime": "video/avc",
+            "name": "OMX.MTK.VIDEO.ENCODER.AVC",
+            "hardware": true,
+            "software_only": false,
+            "vendor": true,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "baseline",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "high",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "main",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "profile_16",
+                    "level": "5.2"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "not_run",
+            "max_instances": 10
+        },
+        {
+            "mime": "video/avc",
+            "name": "c2.mtk.avc.encoder.secure",
+            "hardware": true,
+            "software_only": false,
+            "vendor": true,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "baseline",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "high",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "main",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "profile_16",
+                    "level": "5.2"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "not_run",
+            "max_instances": 10
+        },
+        {
+            "mime": "video/hevc",
+            "name": "c2.mtk.hevc.encoder",
+            "hardware": true,
+            "software_only": false,
+            "vendor": true,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "main",
+                    "level": "level_131072"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "pass",
+            "max_instances": 10
+        },
+        {
+            "mime": "video/hevc",
+            "name": "OMX.MTK.VIDEO.ENCODER.HEVC",
+            "hardware": true,
+            "software_only": false,
+            "vendor": true,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "main",
+                    "level": "level_131072"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "not_run",
+            "max_instances": 10
+        },
+        {
+            "mime": "video/hevc",
+            "name": "c2.mtk.hevc.encoder.secure",
+            "hardware": true,
+            "software_only": false,
+            "vendor": true,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "main",
+                    "level": "level_131072"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "not_run",
+            "max_instances": 10
+        },
+        {
+            "mime": "video/avc",
+            "name": "c2.android.avc.encoder",
+            "hardware": false,
+            "software_only": true,
+            "vendor": false,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "baseline",
+                    "level": "5"
+                },
+                {
+                    "profile": "constrained_baseline",
+                    "level": "5"
+                },
+                {
+                    "profile": "main",
+                    "level": "5"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "not_run",
+            "max_instances": 32
+        },
+        {
+            "mime": "video/avc",
+            "name": "OMX.google.h264.encoder",
+            "hardware": false,
+            "software_only": true,
+            "vendor": false,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "baseline",
+                    "level": "5"
+                },
+                {
+                    "profile": "constrained_baseline",
+                    "level": "5"
+                },
+                {
+                    "profile": "main",
+                    "level": "5"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "not_run",
+            "max_instances": 32
+        },
+        {
+            "mime": "video/hevc",
+            "name": "c2.android.hevc.encoder",
+            "hardware": false,
+            "software_only": true,
+            "vendor": false,
+            "surface_input": true,
+            "profiles": [
+                {
+                    "profile": "main",
+                    "level": "5.2"
+                },
+                {
+                    "profile": "profile_4",
+                    "level": "5.2"
+                }
+            ],
+            "main10_claimed": false,
+            "main10_verified": "not_run",
+            "max_instances": 32
+        }
+    ],
+    "audio": {
+        "sample_rates": [
+            48000,
+            44100
+        ],
+        "max_input_channels": 2,
+        "pcm_24bit": true,
+        "low_latency": false
+    },
+    "tier": {
+        "name": "cinema",
+        "missing": [],
+        "unverified": [],
+        "reasons": []
+    },
+    "verification": {
+        "ran": true,
+        "checks": [
+            {
+                "id": "hevc_main10_encode",
+                "status": "pass",
+                "detail": "c2.mtk.hevc.encoder: 11 frames, 2580 bytes, profile=2, transfer=7",
+                "duration_ms": 149
+            }
+        ]
+    },
+    "quirks_applied": [],
+    "warnings": []
+}

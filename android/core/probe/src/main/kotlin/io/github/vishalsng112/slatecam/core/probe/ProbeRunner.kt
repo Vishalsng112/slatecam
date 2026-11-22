@@ -13,6 +13,7 @@ import io.github.vishalsng112.slatecam.core.probe.source.DeviceSource
 import io.github.vishalsng112.slatecam.core.probe.source.DisplaySource
 import io.github.vishalsng112.slatecam.core.probe.source.EncoderSource
 import io.github.vishalsng112.slatecam.core.probe.source.SystemSource
+import io.github.vishalsng112.slatecam.core.probe.verify.EncoderVerifier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -26,7 +27,7 @@ import java.util.UUID
  */
 class ProbeRunner(private val context: Context) {
 
-    fun run(kind: String = "summary"): ProbeReport {
+    fun run(kind: String = "summary", verify: Boolean = true): ProbeReport {
         val startedAt = System.currentTimeMillis()
         val warnings = mutableListOf<String>()
 
@@ -37,25 +38,45 @@ class ProbeRunner(private val context: Context) {
         val encoders = EncoderSource().read(warnings)
         val audio = AudioSource.read(context)
 
+        val encodeOutcome = if (verify) EncoderVerifier().verifyHevcMain10() else null
+        val encodeCheck = encodeOutcome?.check
+        val main10Verified = encodeCheck?.status ?: "not_run"
+
+        val encodersWithVerification = encoders.map { encoder ->
+            if (encoder.mime == "video/hevc") {
+                val verified = if (encoder.name == encodeOutcome?.passingCodec) {
+                    main10Verified
+                } else {
+                    // Not exercised: claiming a verdict for this codec would lie.
+                    "not_run"
+                }
+                encoder.copy(main10Verified = verified)
+            } else {
+                encoder
+            }
+        }
+
+        val camerasWithVerification = if (encodeCheck == null) {
+            cameras
+        } else {
+            cameras.map { camera ->
+                camera.copy(
+                    presets = camera.presets.mapValues { (id, preset) ->
+                        if (id.endsWith("_10bit")) preset.copy(verified = main10Verified) else preset
+                    },
+                )
+            }
+        }
+
         val hardwareHevc = encoders.any { it.mime == "video/hevc" && it.hardware }
         val hardwareHevcMain10 = encoders.any {
             it.mime == "video/hevc" && it.hardware && it.main10Claimed
         }
-        val main10Verified = encoders
-            .filter { it.mime == "video/hevc" && it.main10Claimed }
-            .map { it.main10Verified }
-            .let { statuses ->
-                when {
-                    statuses.any { it == "pass" } -> "pass"
-                    statuses.isNotEmpty() && statuses.all { it == "fail" } -> "fail"
-                    else -> "not_run"
-                }
-            }
 
-        val primaryCamera = cameras
+        val primaryCamera = camerasWithVerification
             .filter { it.facing == "back" }
             .minByOrNull { it.id.toIntOrNull() ?: Int.MAX_VALUE }
-            ?: cameras.firstOrNull()
+            ?: camerasWithVerification.firstOrNull()
 
         val tier = if (primaryCamera == null) {
             warnings += "no camera reported by the device"
@@ -79,7 +100,7 @@ class ProbeRunner(private val context: Context) {
             )
         }
 
-        if (cameras.count { it.facing == "back" } > 1) {
+        if (camerasWithVerification.count { it.facing == "back" } > 1) {
             warnings += "multiple back cameras; tier computed from camera ${primaryCamera?.id}"
         }
 
@@ -99,16 +120,21 @@ class ProbeRunner(private val context: Context) {
             device = device,
             system = system,
             displays = displays,
-            cameras = cameras,
-            encoders = encoders,
+            cameras = camerasWithVerification,
+            encoders = encodersWithVerification,
             audio = audio,
             tier = tier,
-            verification = Verification(ran = false),
+            verification = if (encodeCheck != null) {
+                Verification(ran = true, checks = listOf(encodeCheck))
+            } else {
+                Verification(ran = false)
+            },
             warnings = warnings,
         )
     }
 
-    fun runJson(kind: String = "summary"): String = json.encodeToString(run(kind))
+    fun runJson(kind: String = "summary", verify: Boolean = true): String =
+        json.encodeToString(run(kind, verify))
 
     companion object {
         const val PROBER_VERSION = "1.0.0"

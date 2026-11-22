@@ -44,30 +44,37 @@ Prober 1.0.0, app 0.1.0, Android 16 (`BP2A.250605.031.A3`), SoC `MT6897`.
 
 | Area | Reported |
 |---|---|
-| Tier | `standard` — missing `hevc_main10_encoder` |
+| Tier | **`cinema`** — verified, no missing requirements |
 | Camera 0 (back) | `level_3`, `manual_sensor`, `manual_post_processing`, `dynamic_range_ten_bit` |
 | Camera 1 (front) | `level_3`, same manual/ten-bit capabilities, no UHD presets |
 | Camera set | only IDs `0` and `1`, no physical IDs, no logical multi-camera |
 | 4K | 30 fps maximum; `uhd60_*` correctly reported unsupported |
 | 1080p | 120 fps available through constrained high-speed streams |
-| 10-bit | claimed at UHD and FHD 24/25/30, `basis: capability_only` |
-| HEVC encoders | `c2.mtk.hevc.encoder`, `OMX.MTK.VIDEO.ENCODER.HEVC`, secure variants: profile `main` only |
+| 10-bit | claimed at UHD and FHD 24/25/30, `basis: capability_only`, then `verified: pass` |
+| HEVC encoders | `c2.mtk.hevc.encoder`, `OMX.MTK.VIDEO.ENCODER.HEVC`, secure variants: all claim profile `main` only |
+| Verification encode | `c2.mtk.hevc.encoder`, 11 frames, `profile=2` (Main10), `transfer=7` (HLG), 149 ms |
 | Display | 120 Hz, wide gamut, HDR10 / HLG / HDR10+ / Dolby Vision, 500 nits |
 | Audio | 48 kHz, 24-bit PCM supported, not low-latency |
 | Native page size | 4 KB |
 
-### Two findings that change the plan
+### Findings
 
-1. **The camera claims 10-bit, but no HEVC encoder claims Main10.** Either
-   10-bit recording is unavailable to third-party apps on this ROM, or MediaTek
-   omits Main10 from `CodecCapabilities` while the encoder still accepts it.
-   Only an actual encode can tell the difference — which is exactly why the
-   tier rules were changed to let a verified Main10 override a missing claim.
-   This device is the first mandatory target for the verification encode.
+1. **MediaTek under-reports Main10.** No HEVC encoder on this ROM lists
+   Main10 in `CodecCapabilities`, yet `c2.mtk.hevc.encoder` produces a Main10
+   stream with HLG colour metadata when asked. Before verification the tier was
+   `standard`; after it, `cinema`. This is the strongest possible argument for
+   the claimed-versus-verified design: trusting the platform would have
+   disabled 10-bit recording on a phone that can actually do it.
 2. **Only two camera IDs are exposed, with no physical IDs.** The ultrawide and
    macro lenses are not reachable through Camera2 on this ROM. Lens switching
    and dual-camera support must be probed per device and described honestly;
    marketing sensor counts are not a capability report.
 
-The tier verdict of `standard` is correct under the current rules: without a
-verification run, an unadvertised Main10 encoder must not be assumed to work.
+### Rules this report produced
+
+- A verified encode may promote a device to `cinema` even when the encoder
+  advertises no Main10 profile.
+- A verdict is credited only to the codec that produced output. The other HEVC
+  encoders stay `not_run` rather than inheriting a pass.
+- The device database stores both the claim and the verification result, because
+  they disagree on this device and probably on many more.

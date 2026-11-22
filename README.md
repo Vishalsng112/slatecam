@@ -15,11 +15,14 @@ no account, and no subscription.
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
 > **Status: Phase 1 — capability prober.**
-> The app builds and runs. On launch it probes the camera and encoder stack and
-> writes a versioned capability report to `files/probe.json`, which is how
-> device support is decided. There is no camera preview or recording yet; those
-> land in Phase 2 and 3. Verified on a POCO X6 Pro 5G — see
-> [docs/test-devices.md](docs/test-devices.md).
+> The app builds and runs. On launch it probes the camera and encoder stack,
+> runs a real HEVC Main10/HLG verification encode, and writes a versioned
+> capability report to `files/probe.json`. There is no camera preview or
+> recording yet; those land in Phase 2 and 3.
+>
+> On a POCO X6 Pro 5G the encoder advertises no Main10 profile yet produces
+> HLG Main10 output — the device only reaches the cinema tier because the probe
+> verifies instead of trusting. See [docs/test-devices.md](docs/test-devices.md).
 
 ---
 
