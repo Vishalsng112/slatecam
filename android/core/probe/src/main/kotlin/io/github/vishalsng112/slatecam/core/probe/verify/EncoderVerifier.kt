@@ -41,17 +41,24 @@ class EncoderVerifier {
         val candidates = runCatching {
             MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos
                 .filter { it.isEncoder && "video/hevc" in it.supportedTypes && it.isHardwareAccelerated }
-                .map { it.name }
         }.getOrElse { return Outcome(failure("encoder enumeration failed: ${it.message}", started), null) }
 
         if (candidates.isEmpty()) return Outcome(failure("no hardware HEVC encoder", started), null)
+
+        for (info in candidates) {
+            val formats = runCatching {
+                info.getCapabilitiesForType("video/hevc").colorFormats.joinToString(",")
+            }.getOrDefault("unknown")
+            android.util.Log.i("SlateCam", "hevc encoder ${info.name} colorFormats=[$formats]")
+        }
+        val codecNames = candidates.map { it.name }
 
         val errors = mutableListOf<String>()
         val deadline = started + OVERALL_TIMEOUT_MS
         // Largest first: verifying UHD is the answer that matters. Falling back
         // to FHD still proves the Main10 path, just at a smaller preset.
         for ((width, height) in TEST_SIZES) {
-            for (name in candidates) {
+            for (name in codecNames) {
                 if (System.currentTimeMillis() > deadline) {
                     errors += "verification time limit reached"
                     return Outcome(failure(errors.joinToString(" | "), started), null)
@@ -258,7 +265,7 @@ class EncoderVerifier {
         const val CHECK_ID = "hevc_main10_encode"
         const val FRAME_COUNT = 10
         const val DRAIN_TIMEOUT_MS = 15_000L
-        const val OVERALL_TIMEOUT_MS = 25_000L
+        const val OVERALL_TIMEOUT_MS = 60_000L
 
         val TEST_SIZES = listOf(3840 to 2160, 1920 to 1080, 1280 to 720)
 

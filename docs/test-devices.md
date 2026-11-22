@@ -239,3 +239,21 @@ conclusion was wrong: it over-reports it.
 
 This is the strongest evidence yet for the project's rule that a codec's own
 claim is not verification — the encoded bytes are.
+
+### Exhaustive Main10 attempt (prober 1.4.0)
+
+Every hardware HEVC encoder was tried at every size the verifier tests:
+
+| Size | c2.mtk.hevc.encoder | OMX.MTK.VIDEO.ENCODER.HEVC | secure variant |
+|---|---|---|---|
+| 3840×2160 | `profile_idc=1` | `profile_idc=1` | no output |
+| 1920×1080 | `profile_idc=1` | `profile_idc=1` | no output |
+| 1280×720 | `profile_idc=1` | `profile_idc=1` | no output |
+
+All three claim `profile=2` in `MediaCodec.outputFormat`. None emits a Main10
+bitstream. **Main10 is unavailable on this device for surface-input HEVC**;
+the POCO X6 Pro is `standard` tier, and HLG recording stays disabled.
+
+The remaining candidate for the cinema tier is the OnePlus Pad 3 (Qualcomm),
+which advertised Main10 on six codecs. It must be re-probed with 1.4.0 before
+that claim is accepted.
