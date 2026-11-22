@@ -9,8 +9,10 @@ no account, and no subscription.
 
 - Application ID: `io.github.vishalsng112.slatecam`
 - License: MIT
-- Minimum Android: 13 (API 33)
+- Minimum Android: 13 (API 33) — no lite mode, one code path
 - Target Android: 17 (API 37)
+
+Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
 > **Status: Phase 0 — foundation.**
 > There is no runnable build yet. This repository currently contains project
