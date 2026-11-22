@@ -36,7 +36,7 @@ val moduleAllowlist: Map<String, Set<String>> = mapOf(
     ":core:gpu" to setOf(":core:common"),
     ":core:codec" to setOf(":core:common"),
     ":core:storage" to setOf(":core:common"),
-    ":bridge" to setOf(":core:common", ":core:profile"),
+    ":bridge" to setOf(":core:common", ":core:profile", ":core:camera", ":core:gpu"),
     ":feature:capture" to setOf(
         ":core:common",
         ":core:profile",

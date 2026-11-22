@@ -155,3 +155,22 @@ single pixel path from ADR-level rule 3 and it is why `:core:gpu` sits between
   isolation benefit at this size.
 - **Dynamic feature modules** — rejected: they solve install size, which is not
   a problem here, and add manifest complexity.
+
+## Amendment — Phase 2
+
+Implementation changed three details without changing the layering:
+
+1. **State is pushed through a Pigeon `FlutterApi`, not an `EventChannel`.**
+   Commands arrive on a Pigeon `HostApi`; state snapshots go back on a typed
+   Pigeon callback. One contract, one codec, no second serialization path.
+   `EventChannel` remains the right choice for high-frequency telemetry such as
+   histograms, which are not part of this contract.
+2. **`:bridge` compiles against the Flutter embedding jar with `compileOnly`.**
+   The app supplies the classes at runtime. This keeps the module graph honest:
+   `:bridge` is still the only module that references Flutter types.
+3. **`:bridge` now depends on `:core:camera` and `:core:gpu`**, and the
+   `checkModuleGraph` allowlist was updated. `:app` still depends only on
+   `:bridge` plus features, so the host stays wiring-only.
+
+Threading is unchanged: camera callbacks on `slatecam-camera`, all GL on
+`slatecam-gl`, state emission on the main thread.

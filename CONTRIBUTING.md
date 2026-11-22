@@ -64,6 +64,20 @@ Device support is data, not code:
 - Commits: Conventional Commits (`feat:`, `fix:`, `docs:`, `core:`, `build:`).
 - No commented-out code, no debug logging left enabled.
 
+## Bridge code generation
+
+The Pigeon contract lives in `pigeon/slatecam.dart`. Regenerate after changing it:
+
+```sh
+dart run pigeon --input pigeon/slatecam.dart \
+  --dart_out lib/src/pigeon/slatecam.g.dart \
+  --kotlin_out android/bridge/src/main/kotlin/io/github/vishalsng112/slatecam/bridge/pigeon/SlateCamPigeon.kt \
+  --kotlin_package io.github.vishalsng112.slatecam.bridge.pigeon
+```
+
+Never hand-edit the generated files. A contract change updates the Dart and
+Kotlin sides together, in the same commit.
+
 ## Testing expectations
 
 | Change area | Required evidence |

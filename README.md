@@ -14,15 +14,15 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 1 — capability prober.**
-> The app builds and runs. On launch it probes the camera and encoder stack,
-> runs a real HEVC Main10/HLG verification encode, and writes a versioned
-> capability report to `files/probe.json`. There is no camera preview or
-> recording yet; those land in Phase 2 and 3.
+> **Status: Phase 2 — camera core and preview.**
+> Live preview runs camera → GL → Flutter `SurfaceProducer` texture, with
+> manual ISO, shutter, focus and white balance over a Pigeon bridge. Kotlin owns
+> camera state; Dart only renders snapshots and sends commands. Recording,
+> profiles and LUTs are Phase 3 and 4.
 >
-> On a POCO X6 Pro 5G the encoder advertises no Main10 profile yet produces
-> HLG Main10 output — the device only reaches the cinema tier because the probe
-> verifies instead of trusting. See [docs/test-devices.md](docs/test-devices.md).
+> Verified on a POCO X6 Pro 5G: preview upright and full-bleed, manual ISO
+> visibly changes exposure and noise, and backgrounding releases and reopens the
+> camera without losing settings. See [docs/test-devices.md](docs/test-devices.md).
 
 ---
 

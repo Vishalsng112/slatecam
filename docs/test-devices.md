@@ -146,3 +146,31 @@ possible inside the `10–30` range, but the camera will not hold a fixed 25 fps
 This is exactly the distinction `ae_target_fps_ranges` exists to expose: the
 stream map says 25 fps is a supported stream, while the AE ranges say it cannot
 be locked.
+
+## Phase 2 verification — preview and manual controls (2026-11-23)
+
+Tested on the POCO X6 Pro 5G (Android 16, MT6897).
+
+| Item | Result |
+|---|---|
+| Preview path | camera → OES texture → GL shader → `SurfaceProducer` → Flutter `Texture`, live |
+| Preview size | 1920×1080 selected from the stream map |
+| Rotation | `sensor=90`, `display=ROTATION_90` → 270°; Dart rotates and centre-crops |
+| Manual ISO | 400 → 4176 visibly brightens the image and raises noise |
+| Manual shutter | 20.00 ms → 14.20 ms applied through the repeating request |
+| Manual focus | dioptre slider defocuses and refocuses the lens |
+| White balance | mode list populated from `CONTROL_AWB_AVAILABLE_MODES` |
+| Background/foreground | camera released on pause, reopened on resume, same process, settings preserved |
+
+### Bugs this test found
+
+1. **Startup probe and preview fought over the camera.** Running the Phase 1
+   probe on launch opened camera 0 while preview was opening, which triggered a
+   framework `RejectedExecutionException` on `CameraDeviceImpl.onClosed`. The
+   probe no longer runs automatically; it belongs behind an explicit action.
+2. **The deprecated `openCamera(handler)` overload tears down its own executor
+   on close**, producing the same crash. Switched to the `Executor` overload
+   with the module's own executor.
+3. **Preview was rotated 90° and pillarboxed.** Fixed by exposing
+   `previewRotationDegrees` in the state and using `RotatedBox` plus a
+   `BoxFit.cover` crop in Dart.
