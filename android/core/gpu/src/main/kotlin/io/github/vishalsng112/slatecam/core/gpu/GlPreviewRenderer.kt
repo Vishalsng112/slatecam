@@ -53,6 +53,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uMono = 0
     private var uZebra = 0
     private var uZebraThreshold = 0
+    private var uFalseColor = 0
     private var uLut = 0
     private var uLutEnabled = 0
     private var uLutSize = 0
@@ -90,6 +91,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var monochrome = false
     @Volatile private var zebra = false
     @Volatile private var zebraThreshold = 0.9f
+    @Volatile private var falseColor = false
+    @Volatile private var displayRotation = 0
 
     fun applyProfile(
         exposure: Float,
@@ -112,6 +115,14 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
     fun setAnalysisEnabled(enabled: Boolean) {
         analysisEnabled = enabled
+    }
+
+    fun setFalseColor(enabled: Boolean) {
+        falseColor = enabled
+    }
+
+    fun setDisplayRotation(degrees: Int) {
+        displayRotation = ((degrees % 360) + 360) % 360
     }
 
     fun setLut(size: Int, data: FloatArray?) {
@@ -422,6 +433,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uMono = GLES20.glGetUniformLocation(program, "uMono")
         uZebra = GLES20.glGetUniformLocation(program, "uZebra")
         uZebraThreshold = GLES20.glGetUniformLocation(program, "uZebraThreshold")
+        uFalseColor = GLES20.glGetUniformLocation(program, "uFalseColor")
         uLut = GLES20.glGetUniformLocation(program, "uLut")
         uLutEnabled = GLES20.glGetUniformLocation(program, "uLutEnabled")
         uLutSize = GLES20.glGetUniformLocation(program, "uLutSize")
@@ -501,6 +513,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform1i(uMono, if (monochrome) 1 else 0)
         GLES20.glUniform1i(uZebra, if (overlay && zebra) 1 else 0)
         GLES20.glUniform1f(uZebraThreshold, zebraThreshold)
+        GLES20.glUniform1i(uFalseColor, if (overlay && falseColor) 1 else 0)
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
 
         GLES20.glEnableVertexAttribArray(aPosition)
@@ -551,8 +564,15 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             histogram[(luma * (HISTOGRAM_BINS - 1)).toInt().coerceIn(0, HISTOGRAM_BINS - 1)]++
 
             val x = pixel % ANALYSIS_WIDTH
-            val column = (x * WAVEFORM_COLUMNS / ANALYSIS_WIDTH)
-                .coerceIn(0, WAVEFORM_COLUMNS - 1)
+            val y = pixel / ANALYSIS_WIDTH
+            // The preview is rotated in Dart; match the waveform columns to the
+            // orientation the user actually sees.
+            val column = when (displayRotation) {
+                90 -> y * WAVEFORM_COLUMNS / ANALYSIS_HEIGHT
+                180 -> (ANALYSIS_WIDTH - 1 - x) * WAVEFORM_COLUMNS / ANALYSIS_WIDTH
+                270 -> (ANALYSIS_HEIGHT - 1 - y) * WAVEFORM_COLUMNS / ANALYSIS_HEIGHT
+                else -> x * WAVEFORM_COLUMNS / ANALYSIS_WIDTH
+            }.coerceIn(0, WAVEFORM_COLUMNS - 1)
             val bin = (luma * (WAVEFORM_BINS - 1)).toInt().coerceIn(0, WAVEFORM_BINS - 1)
             waveform[bin * WAVEFORM_COLUMNS + column]++
         }
@@ -721,6 +741,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform int uMono;
             uniform int uZebra;
             uniform float uZebraThreshold;
+            uniform int uFalseColor;
             uniform sampler2D uLut;
             uniform int uLutEnabled;
             uniform float uLutSize;
@@ -783,6 +804,23 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 if (uZebra == 1 && luma(c) >= uZebraThreshold) {
                     float stripe = step(0.5, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.06));
                     c = mix(c, vec3(1.0, 0.1, 0.1), stripe * 0.8);
+                }
+
+                if (uFalseColor == 1) {
+                    float level = luma(c);
+                    if (level < 0.02) {
+                        c = vec3(0.35, 0.0, 0.5);
+                    } else if (level < 0.15) {
+                        c = vec3(0.0, 0.1, 0.9);
+                    } else if (level < 0.40) {
+                        c = vec3(0.0, 0.8, 0.0);
+                    } else if (level < 0.55) {
+                        c = vec3(0.9, 0.9, 0.0);
+                    } else if (level < 0.75) {
+                        c = vec3(1.0, 0.4, 0.0);
+                    } else {
+                        c = vec3(1.0, 0.0, 0.0);
+                    }
                 }
 
                 gl_FragColor = vec4(c, src.a);

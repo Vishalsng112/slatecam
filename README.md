@@ -15,8 +15,9 @@ no account, and no subscription.
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
 > **Status: Phase 4 — profiles and monitoring tools.**
-> Picture profiles (`standard`, `slatelog`, `mono`, `warm` LUT) run in the GL
-> shader, with the SlateLog curve unit-tested on the JVM. Zebra, a 64-bin
+> Picture profiles (`standard`, `slatelog`, `mono`, `warm` LUT, plus user
+> `.cube` files from `files/luts`) run in the GL shader, with the SlateLog curve
+> unit-tested on the JVM. Zebra, false colour, framing guides, a 64-bin
 > histogram and a waveform are live on the preview path and never reach
 > recordings. A 17³ LUT is packed into a 2D texture, so the pipeline stays on
 > GLES 2.0.

@@ -329,3 +329,16 @@ app-internal storage:
    pass renders the unrotated camera buffer while the preview is rotated in
    Dart. The histogram is unaffected; aligning waveform columns to the displayed
    image is a follow-up.
+
+### Phase 4 surface additions (2026-11-23)
+
+| Item | Result |
+|---|---|
+| False colour | verified: blue shadows, green mids, yellow highlights, red clip |
+| Framing guides | thirds + centre cross + 90% safe area, drawn in Dart over the preview |
+| Waveform orientation | columns now follow the display rotation; the bright plug appears left in both the preview and the waveform |
+| User LUTs | `.cube` files dropped into `files/luts`, scanned on launch and by "Reload LUTs" |
+| Analysis overlays | false colour, zebra, histogram and waveform never appear in recordings |
+
+A system file picker for LUTs (SAF) is still a follow-up; the folder scan keeps
+the pipeline testable without adding a Flutter plugin.

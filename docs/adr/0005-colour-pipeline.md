@@ -49,10 +49,13 @@ curve and LUT handling live in a pure JVM module.
 - The log curve operates on an approximated linear signal (`pow(c, 2.2)`), not a
   measured sensor response. It is a look, not a scene-referred camera log; this
   must be stated in user documentation.
-- LUTs are parsed, sampled on the CPU for tests, and applied on the GPU;
-  user-supplied `.cube` files still need a picker and a cache.
-- The waveform's horizontal axis is sensor-oriented because the analysis pass
-  renders the unrotated buffer while the preview is rotated in Dart. Histogram
-  is unaffected; aligning waveform columns is a follow-up.
+- LUTs are parsed, sampled on the CPU for tests, and applied on the GPU.
+  User `.cube` files are loaded from `files/luts` and reloaded on demand; a SAF
+  picker is a follow-up.
+- **False colour and guides are preview-only.** False colour is a shader branch
+  gated by the overlay flag; guides are drawn in Dart over the texture, so
+  neither can reach a recording.
+- The waveform's horizontal axis follows the display rotation, so its columns
+  match what the user sees. The histogram is orientation-independent.
 - The in-app profile dropdown was not reachable through `adb input tap`; profile
   changes were verified through launch extras. Worth revisiting for real users.

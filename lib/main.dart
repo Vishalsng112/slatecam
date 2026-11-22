@@ -45,6 +45,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   CameraState? _state;
   int? _textureId;
   bool _busy = false;
+  bool _showGuides = false;
   String? _bridgeError;
 
   @override
@@ -156,13 +157,20 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
     return ColoredBox(
       color: Colors.black,
-      child: ClipRect(
-        child: SizedBox.expand(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: preview,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRect(
+            child: SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: preview,
+              ),
+            ),
           ),
-        ),
+          if (_showGuides)
+            IgnorePointer(child: CustomPaint(painter: _GuidesPainter())),
+        ],
       ),
     );
   }
@@ -322,6 +330,28 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   setState(() => state.zebra = value);
                   _host.setZebra(value);
                 },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('False colour'),
+                value: state.falseColor,
+                onChanged: (value) {
+                  setState(() => state.falseColor = value);
+                  _host.setFalseColor(value);
+                },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Framing guides'),
+                value: _showGuides,
+                onChanged: (value) => setState(() => _showGuides = value),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () => _host.reloadLuts(),
+                  child: const Text('Reload LUTs'),
+                ),
               ),
               const SizedBox(height: 8),
               Text('HISTOGRAM', style: Theme.of(context).textTheme.labelSmall),
@@ -483,4 +513,41 @@ class _WaveformPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WaveformPainter oldDelegate) => true;
+}
+
+class _GuidesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final thin = Paint()
+      ..color = Colors.white.withValues(alpha: 0.45)
+      ..strokeWidth = 1;
+    final thirds = Paint()
+      ..color = Colors.white.withValues(alpha: 0.35)
+      ..strokeWidth = 1;
+
+    for (var i = 1; i < 3; i++) {
+      final dx = size.width * i / 3;
+      final dy = size.height * i / 3;
+      canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), thirds);
+      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), thirds);
+    }
+
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    canvas.drawLine(Offset(cx - 16, cy), Offset(cx + 16, cy), thin);
+    canvas.drawLine(Offset(cx, cy - 16), Offset(cx, cy + 16), thin);
+
+    canvas.drawRect(
+      Rect.fromLTWH(
+        size.width * 0.05,
+        size.height * 0.05,
+        size.width * 0.9,
+        size.height * 0.9,
+      ),
+      thin,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -22,6 +22,7 @@ import io.github.vishalsng112.slatecam.core.camera.CameraUiState
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
 import io.github.vishalsng112.slatecam.core.profile.BuiltInLuts
+import io.github.vishalsng112.slatecam.core.profile.LutLibrary
 import io.github.vishalsng112.slatecam.core.profile.PictureProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +78,8 @@ class SlateCamBridge private constructor(
 
     private var profileId = PictureProfile.STANDARD.id
     private var zebraEnabled = false
+    private var falseColorEnabled = false
+    private var lutEntries: List<LutLibrary.Entry> = emptyList()
 
     private var histogramBins: List<Int> = emptyList()
     private var waveformBins: List<Int> = emptyList()
@@ -95,6 +98,7 @@ class SlateCamBridge private constructor(
         controller.listener = CameraController.Listener { state ->
             lastState = state
             renderer.setTenBitSource(state.isTenBit)
+            renderer.setDisplayRotation(state.previewRotationDegrees)
             pushState()
         }
         applyProfile(PictureProfile.STANDARD)
@@ -172,7 +176,7 @@ class SlateCamBridge private constructor(
     }
 
     override fun setProfile(profileId: String) {
-        applyProfile(PictureProfile.byId(profileId))
+        applyProfileById(profileId)
         pushState()
     }
 
@@ -182,9 +186,49 @@ class SlateCamBridge private constructor(
         pushState()
     }
 
+    override fun setFalseColor(enabled: Boolean) {
+        falseColorEnabled = enabled
+        renderer.setFalseColor(enabled)
+        pushState()
+    }
+
+    override fun reloadLuts() {
+        refreshLuts()
+        pushState()
+    }
+
+    private fun refreshLuts() {
+        lutEntries = LutLibrary.scan(File(context.filesDir, "luts"))
+        if (profileId.startsWith("lut:") && lutEntries.none { it.id == profileId }) {
+            applyProfile(PictureProfile.STANDARD)
+        }
+    }
+
+    private fun applyProfileById(id: String) {
+        if (id.startsWith("lut:")) {
+            val entry = lutEntries.firstOrNull { it.id == id }
+            if (entry != null) {
+                profileId = id
+                renderer.applyProfile(1f, 1f, 1f, false, false)
+                renderer.setLut(entry.lut.size, entry.lut.copyData())
+                return
+            }
+        }
+        applyProfile(PictureProfile.byId(id))
+    }
+
     /** Device-testing hook: apply profile/zebra from launch intent extras. */
-    fun applyStartupOverrides(profile: String?, zebra: Boolean, zebraThreshold: Float = 0.7f) {
-        if (profile != null) setProfile(profile)
+    fun applyStartupOverrides(
+        profile: String?,
+        zebra: Boolean,
+        zebraThreshold: Float = 0.7f,
+        falseColor: Boolean = false,
+    ) {
+        if (profile != null) applyProfileById(profile)
+        if (falseColor) {
+            falseColorEnabled = true
+            renderer.setFalseColor(true)
+        }
         if (zebra) {
             zebraEnabled = true
             renderer.setZebra(true, zebraThreshold)
@@ -452,8 +496,9 @@ class SlateCamBridge private constructor(
         clipPath = clipPath,
         recordingError = recordingError,
         profile = profileId,
-        profileNames = PictureProfile.all.map { it.id },
+        profileNames = PictureProfile.all.map { it.id } + lutEntries.map { it.id },
         zebra = zebraEnabled,
+        falseColor = falseColorEnabled,
         histogram = histogramBins.map { it.toLong() },
         waveform = waveformBins.map { it.toLong() },
         waveformColumns = WAVEFORM_COLUMNS.toLong(),
@@ -490,6 +535,7 @@ class SlateCamBridge private constructor(
             SlateCamHostApi.setUp(engine.dartExecutor.binaryMessenger, bridge)
             bridge.attach(SlateCamFlutterApi(engine.dartExecutor.binaryMessenger))
             bridge.registerThermalGuard()
+            bridge.refreshLuts()
             return bridge
         }
     }

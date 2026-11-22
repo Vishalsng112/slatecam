@@ -93,3 +93,42 @@ class Lut3DTest {
         assertNull(Lut3D.parse("LUT_1D_SIZE 2\n0 0 0"))
     }
 }
+
+class LutLibraryTest {
+
+    private val cube = """
+        LUT_3D_SIZE 2
+        0 0 0
+        1 0 0
+        0 1 0
+        1 1 0
+        0 0 1
+        1 0 1
+        0 1 1
+        1 1 1
+    """.trimIndent()
+
+    @Test
+    fun `scans cube files and ignores everything else`() {
+        val directory = java.nio.file.Files.createTempDirectory("luts").toFile()
+        try {
+            java.io.File(directory, "look.cube").writeText(cube)
+            java.io.File(directory, "notes.txt").writeText("not a lut")
+            java.io.File(directory, "broken.cube").writeText("LUT_3D_SIZE 2\n0 0 0")
+
+            val entries = LutLibrary.scan(directory)
+
+            assertEquals(1, entries.size)
+            assertEquals("lut:look", entries[0].id)
+            assertEquals("look", entries[0].name)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `missing directory yields no entries`() {
+        val directory = java.io.File("/tmp/slatecam-does-not-exist-12345")
+        assertTrue(LutLibrary.scan(directory).isEmpty())
+    }
+}

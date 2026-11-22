@@ -28,6 +28,7 @@ class CameraState {
     required this.profile,
     required this.profileNames,
     required this.zebra,
+    required this.falseColor,
     required this.histogram,
     required this.waveform,
     required this.waveformColumns,
@@ -59,6 +60,7 @@ class CameraState {
   String profile;
   List<String> profileNames;
   bool zebra;
+  bool falseColor;
   List<int> histogram;
   List<int> waveform;
   int waveformColumns;
@@ -92,6 +94,10 @@ abstract class SlateCamHostApi {
   void setProfile(String profileId);
 
   void setZebra(bool enabled);
+
+  void setFalseColor(bool enabled);
+
+  void reloadLuts();
 }
 
 @FlutterApi()

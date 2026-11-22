@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity() {
             profile = intent?.getStringExtra(EXTRA_PROFILE),
             zebra = intent?.getBooleanExtra(EXTRA_ZEBRA, false) == true,
             zebraThreshold = intent?.getFloatExtra(EXTRA_ZEBRA_THRESHOLD, 0.7f) ?: 0.7f,
+            falseColor = intent?.getBooleanExtra(EXTRA_FALSE_COLOR, false) == true,
         )
         bridge = installed
     }
@@ -86,5 +87,6 @@ class MainActivity : FlutterActivity() {
         const val EXTRA_PROFILE = "profile"
         const val EXTRA_ZEBRA = "zebra"
         const val EXTRA_ZEBRA_THRESHOLD = "zebra_threshold"
+        const val EXTRA_FALSE_COLOR = "false_color"
     }
 }
