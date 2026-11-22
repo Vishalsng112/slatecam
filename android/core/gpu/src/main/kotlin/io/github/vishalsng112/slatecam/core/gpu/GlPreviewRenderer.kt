@@ -54,6 +54,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uZebra = 0
     private var uZebraThreshold = 0
     private var uFalseColor = 0
+    private var uInputMatrix = 0
+    private var uInputExposure = 0
+    private var uInputSaturation = 0
     private var uLut = 0
     private var uLutEnabled = 0
     private var uLutSize = 0
@@ -93,6 +96,20 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var zebraThreshold = 0.9f
     @Volatile private var falseColor = false
     @Volatile private var displayRotation = 0
+    @Volatile private var inputMatrix = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
+    @Volatile private var inputExposure = 1f
+    @Volatile private var inputSaturation = 1f
+
+    /**
+     * Per-device normalisation, applied before the creative look. Identity by
+     * default; calibration data arrives in Phase 7.
+     */
+    fun setInputProfile(matrix: FloatArray, exposure: Float, saturation: Float) {
+        require(matrix.size == 9) { "colour matrix must be 3x3" }
+        inputMatrix = matrix.copyOf()
+        inputExposure = exposure
+        inputSaturation = saturation
+    }
 
     fun applyProfile(
         exposure: Float,
@@ -434,6 +451,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uZebra = GLES20.glGetUniformLocation(program, "uZebra")
         uZebraThreshold = GLES20.glGetUniformLocation(program, "uZebraThreshold")
         uFalseColor = GLES20.glGetUniformLocation(program, "uFalseColor")
+        uInputMatrix = GLES20.glGetUniformLocation(program, "uInputMatrix")
+        uInputExposure = GLES20.glGetUniformLocation(program, "uInputExposure")
+        uInputSaturation = GLES20.glGetUniformLocation(program, "uInputSaturation")
         uLut = GLES20.glGetUniformLocation(program, "uLut")
         uLutEnabled = GLES20.glGetUniformLocation(program, "uLutEnabled")
         uLutSize = GLES20.glGetUniformLocation(program, "uLutSize")
@@ -514,6 +534,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform1i(uZebra, if (overlay && zebra) 1 else 0)
         GLES20.glUniform1f(uZebraThreshold, zebraThreshold)
         GLES20.glUniform1i(uFalseColor, if (overlay && falseColor) 1 else 0)
+        GLES20.glUniformMatrix3fv(uInputMatrix, 1, false, inputMatrix, 0)
+        GLES20.glUniform1f(uInputExposure, inputExposure)
+        GLES20.glUniform1f(uInputSaturation, inputSaturation)
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
 
         GLES20.glEnableVertexAttribArray(aPosition)
@@ -742,6 +765,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform int uZebra;
             uniform float uZebraThreshold;
             uniform int uFalseColor;
+            uniform mat3 uInputMatrix;
+            uniform float uInputExposure;
+            uniform float uInputSaturation;
             uniform sampler2D uLut;
             uniform int uLutEnabled;
             uniform float uLutSize;
@@ -779,6 +805,12 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 if (uHlgToSdr == 1) {
                     c = hlgToSdr(c);
                 }
+
+                // Device normalisation runs before any creative transform.
+                c = uInputMatrix * c;
+                c *= uInputExposure;
+                float inputLuma = luma(c);
+                c = mix(vec3(inputLuma), c, uInputSaturation);
 
                 c *= uExposure;
                 float y = luma(c);

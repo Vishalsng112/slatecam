@@ -11,7 +11,7 @@ const val SCHEMA_ID = "slatecam.probe"
  * support at a given size can only ever be claimed until an actual session is
  * created. See docs/probe-schema.md.
  */
-const val SCHEMA_VERSION = "1.5.0"
+const val SCHEMA_VERSION = "1.6.0"
 
 @Serializable
 data class ProbeReport(
@@ -258,6 +258,9 @@ data class AudioInfo(
     @SerialName("max_input_channels") val maxInputChannels: Int,
     @SerialName("pcm_24bit") val pcm24Bit: Boolean,
     @SerialName("low_latency") val lowLatency: Boolean,
+    @SerialName("unprocessed_supported") val unprocessedSupported: Boolean = false,
+    @SerialName("input_devices") val inputDevices: List<String> = emptyList(),
+    @SerialName("effects_available") val effectsAvailable: List<String> = emptyList(),
 )
 
 @Serializable

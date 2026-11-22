@@ -22,6 +22,7 @@ import io.github.vishalsng112.slatecam.core.camera.CameraUiState
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
 import io.github.vishalsng112.slatecam.core.profile.BuiltInLuts
+import io.github.vishalsng112.slatecam.core.profile.InputProfile
 import io.github.vishalsng112.slatecam.core.profile.LutLibrary
 import io.github.vishalsng112.slatecam.core.profile.PictureProfile
 import kotlinx.coroutines.CoroutineScope
@@ -95,6 +96,7 @@ class SlateCamBridge private constructor(
     }
 
     init {
+        renderer.setInputProfile(InputProfile.IDENTITY.matrixArray(), 1f, 1f)
         controller.listener = CameraController.Listener { state ->
             lastState = state
             renderer.setTenBitSource(state.isTenBit)

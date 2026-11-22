@@ -6,6 +6,10 @@ import android.hardware.display.DisplayManager
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
+import android.media.AudioDeviceInfo
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.os.Build
 import android.os.PowerManager
 import android.os.StatFs
@@ -125,7 +129,33 @@ object AudioSource {
             maxInputChannels = 2,
             pcm24Bit = supports24BitPcm(),
             lowLatency = outputFrames in 1..192,
+            unprocessedSupported = audioManager
+                .getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED)
+                ?.toBoolean() == true,
+            inputDevices = runCatching {
+                audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+                    .mapNotNull { inputDeviceName(it.type) }
+                    .distinct()
+                    .sorted()
+            }.getOrDefault(emptyList()),
+            effectsAvailable = runCatching {
+                buildList {
+                    if (NoiseSuppressor.isAvailable()) add("noise_suppressor")
+                    if (AcousticEchoCanceler.isAvailable()) add("acoustic_echo_canceler")
+                    if (AutomaticGainControl.isAvailable()) add("automatic_gain_control")
+                }
+            }.getOrDefault(emptyList()),
         )
+    }
+
+    private fun inputDeviceName(type: Int): String? = when (type) {
+        AudioDeviceInfo.TYPE_BUILTIN_MIC -> "builtin_mic"
+        AudioDeviceInfo.TYPE_USB_DEVICE -> "usb_device"
+        AudioDeviceInfo.TYPE_USB_HEADSET -> "usb_headset"
+        AudioDeviceInfo.TYPE_WIRED_HEADSET -> "wired_headset"
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "bluetooth_sco"
+        AudioDeviceInfo.TYPE_BLE_HEADSET -> "ble_headset"
+        else -> null
     }
 
     private fun supports24BitPcm(): Boolean = runCatching {

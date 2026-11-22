@@ -577,6 +577,38 @@ class CameraController(private val context: Context) {
                 result.get(CaptureResult.CONTROL_AE_ANTIBANDING_MODE),
                 antibandingValue(antibanding),
             )
+            if ("off" in hotPixelModes) {
+                checkApplied(
+                    "HOT_PIXEL_MODE",
+                    "off",
+                    result.get(CaptureResult.HOT_PIXEL_MODE),
+                    CameraCharacteristics.HOT_PIXEL_MODE_OFF,
+                )
+            }
+            if ("off" in shadingModes) {
+                checkApplied(
+                    "SHADING_MODE",
+                    "off",
+                    result.get(CaptureResult.SHADING_MODE),
+                    CameraCharacteristics.SHADING_MODE_OFF,
+                )
+            }
+            if ("off" in aberrationModes) {
+                checkApplied(
+                    "ABERRATION_MODE",
+                    "off",
+                    result.get(CaptureResult.COLOR_CORRECTION_ABERRATION_MODE),
+                    CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_OFF,
+                )
+            }
+            if ("off" in distortionModes) {
+                checkApplied(
+                    "DISTORTION_CORRECTION_MODE",
+                    "off",
+                    result.get(CaptureResult.DISTORTION_CORRECTION_MODE),
+                    CameraCharacteristics.DISTORTION_CORRECTION_MODE_OFF,
+                )
+            }
         }
     }
 

@@ -132,3 +132,40 @@ class LutLibraryTest {
         assertTrue(LutLibrary.scan(directory).isEmpty())
     }
 }
+
+class InputProfileTest {
+
+    @Test
+    fun `identity leaves colours alone`() {
+        val out = InputProfile.IDENTITY.transform(0.2f, 0.4f, 0.6f)
+        assertEquals(0.2f, out[0], 0.0001f)
+        assertEquals(0.4f, out[1], 0.0001f)
+        assertEquals(0.6f, out[2], 0.0001f)
+        assertTrue(InputProfile.IDENTITY.isIdentity())
+    }
+
+    @Test
+    fun `matrix swaps red and blue`() {
+        val swap = InputProfile(
+            matrix = listOf(
+                0f, 0f, 1f,
+                0f, 1f, 0f,
+                1f, 0f, 0f,
+            ),
+        )
+        val out = swap.transform(0.9f, 0.5f, 0.1f)
+        assertEquals(0.1f, out[0], 0.0001f)
+        assertEquals(0.5f, out[1], 0.0001f)
+        assertEquals(0.9f, out[2], 0.0001f)
+    }
+
+    @Test
+    fun `exposure and saturation trims apply`() {
+        val profile = InputProfile(exposureTrim = 2f, saturationTrim = 0f)
+        val out = profile.transform(1f, 0f, 0f)
+        // fully desaturated to luma of the exposed colour
+        assertEquals(0.2126f * 2f, out[0], 0.001f)
+        assertEquals(0.2126f * 2f, out[1], 0.001f)
+        assertEquals(0.2126f * 2f, out[2], 0.001f)
+    }
+}

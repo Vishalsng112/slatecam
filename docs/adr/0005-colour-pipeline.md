@@ -44,6 +44,11 @@ curve and LUT handling live in a pure JVM module.
 ## Consequences
 
 - A profile change costs no pipeline rebuild: it is four uniforms.
+- **Pipeline order** is now: camera (optionally HLG→SDR for preview) → device
+  input profile (3×3 matrix, exposure/saturation trim) → creative profile
+  (exposure, contrast, saturation, log, mono) → LUT → monitoring overlays.
+  The input profile is identity until calibration data exists, so preview and
+  recordings are unchanged today.
 - Log and mono apply to recordings too, which is intended (they are looks, not
   monitoring aids). Zebra is the exception and is excluded.
 - The log curve operates on an approximated linear signal (`pow(c, 2.2)`), not a
