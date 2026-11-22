@@ -1,7 +1,7 @@
 # Probe report schema
 
 - **Schema id:** `slatecam.probe`
-- **Version:** `1.1.0`
+- **Version:** `1.2.0`
 - **Status:** draft for Phase 1
 - **Owner:** `:core:probe`
 
@@ -140,9 +140,27 @@ The `egl_capabilities` block is the distilled form of ~200 extension strings.
 Only booleans the pipeline actually branches on are recorded. `full` reports
 may include the raw extension arrays.
 
-`displays[]` entries carry `id`, `refresh_hz`, `wide_color_gamut`,
-`hdr_types` (`hdr10`, `hlg`, `dolby_vision`), and `max_luminance_nits`, used to
-decide whether the preview can show a monitor-referred image.
+**Not yet collected in 1.2.0.** The prober does not emit `gles`,
+`gpu_capabilities`, or `egl_capabilities`; they arrive with the GPU pipeline in
+Phase 2, which needs a live EGL context. Absent means "not collected", never
+"unsupported". The verification encode already proves 10-bit EGL surface
+creation works, but that is not the same as a full capability report.
+
+`sustained_performance_supported` is populated by the app, not the prober: it
+requires a `Window`, which a background probe does not have.
+
+`displays[]` entries carry:
+
+| Field | Meaning |
+|---|---|
+| `refresh_hz` | Refresh rate of the mode the display is **currently in** |
+| `max_refresh_hz` | Highest rate the panel supports; absent if not reported |
+| `wide_color_gamut` | Panel covers a wide gamut |
+| `hdr_types` | `hdr10`, `hlg`, `hdr10_plus`, `dolby_vision` |
+| `max_luminance_nits` | Desired peak luminance for HDR content |
+
+Reporting both refresh values matters: a 144 Hz tablet reports `refresh_hz: 60`
+when idle, and monitoring features need the panel maximum, not the current mode.
 
 ## 6. Cameras
 
@@ -279,6 +297,10 @@ and are therefore a heuristic, not a guarantee.
 
 Version 1.1.0 added `basis` and `verified`; both are additive.
 
+Version 1.2.0 added `displays[].max_refresh_hz` and
+`verification.checks[].width`/`height`; all optional and additive. Reports
+produced by 1.1.0 probers decode unchanged.
+
 Reason codes are a closed set so the UI can localize them:
 
 | Code | Meaning |
@@ -353,6 +375,32 @@ run. The UI must render these as distinct states. "Your phone lacks 10-bit" and
 
 `main10_verified` is one of `pass`, `fail`, `not_run`. A pass requires a real
 short encode; the claim alone never sets it.
+
+`audio.max_input_channels` is the channel count the prober actually opened, not
+a device maximum. `pcm_24bit` means `AudioRecord` accepts 48 kHz/24-bit input,
+not that the microphone is lossless.
+
+Verification checks record the size they exercised, so consumers never have to
+parse prose:
+
+```json
+"verification": {
+  "ran": true,
+  "checks": [
+    {
+      "id": "hevc_main10_encode",
+      "status": "pass",
+      "detail": "c2.mtk.hevc.encoder: 11 frames, 75341 bytes, profile=2, transfer=7",
+      "width": 3840,
+      "height": 2160,
+      "duration_ms": 495
+    }
+  ]
+}
+```
+
+A check without `width`/`height` is capability-level only and must not be used
+to promote a specific preset.
 
 ## 9. Versioning and evolution
 

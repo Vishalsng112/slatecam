@@ -11,7 +11,7 @@ const val SCHEMA_ID = "slatecam.probe"
  * support at a given size can only ever be claimed until an actual session is
  * created. See docs/probe-schema.md.
  */
-const val SCHEMA_VERSION = "1.1.0"
+const val SCHEMA_VERSION = "1.2.0"
 
 @Serializable
 data class ProbeReport(
@@ -75,7 +75,10 @@ data class SystemInfo(
 @Serializable
 data class DisplayInfo(
     val id: Int,
+    /** Refresh rate of the mode the display is currently in. */
     @SerialName("refresh_hz") val refreshHz: Int,
+    /** Highest refresh rate the panel supports; null when not reported. */
+    @SerialName("max_refresh_hz") val maxRefreshHz: Int? = null,
     @SerialName("wide_color_gamut") val wideColorGamut: Boolean,
     @SerialName("hdr_types") val hdrTypes: List<String> = emptyList(),
     @SerialName("max_luminance_nits") val maxLuminanceNits: Float = 0f,
@@ -210,4 +213,7 @@ data class VerificationCheck(
     val status: String,
     val detail: String? = null,
     @SerialName("duration_ms") val durationMs: Long? = null,
+    /** Encoded width, when the check exercised a specific size. */
+    val width: Int? = null,
+    val height: Int? = null,
 )

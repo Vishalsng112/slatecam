@@ -113,8 +113,9 @@ verification as separate fields rather than collapsing them into one flag.
 
 ### Probe refinements this report suggests
 
-- `display.refresh_hz` reports the active mode (60 on this tablet), not the
-  panel maximum. Monitoring wants both; add `max_refresh_hz` in a schema minor.
+- `display.refresh_hz` reported only the active mode (60 on this tablet, and
+  120 on the POCO when it happened to be in its high-rate mode). Schema 1.2.0
+  adds `max_refresh_hz`; the POCO now correctly reports 60 active / 120 maximum.
 - The tablet offers no high-speed streams at all, so 120/240 presets correctly
   report `no_stream_config` rather than a frame-rate limit. The distinction
   matters for the UI copy.

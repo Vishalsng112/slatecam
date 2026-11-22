@@ -44,6 +44,11 @@ class ProbeReportRoundTripTest {
         val decoded = ProbeRunner.json.decodeFromString<ProbeReport>(encoded)
         assertEquals(original.tier, decoded.tier)
         assertEquals(original.cameras.map { it.id }, decoded.cameras.map { it.id })
+
+        // This fixture is a 1.1.0 report. Fields added in 1.2.0 must decode as
+        // absent, not as a fabricated zero.
+        assertEquals(null, original.displays.first().maxRefreshHz)
+        assertEquals(null, original.verification.checks.firstOrNull()?.width)
     }
 
     @Test
@@ -81,9 +86,17 @@ class ProbeReportRoundTripTest {
         assertTrue(report.tier.missing.isEmpty())
         assertTrue(report.tier.unverified.isEmpty())
         assertTrue(report.verification.ran)
+        assertEquals("1.2.0", report.schemaVersion)
+
+        // 1.2.0 additions: active vs maximum refresh, and a structured size.
+        val display = report.displays.first()
+        assertEquals(60, display.refreshHz)
+        assertEquals(120, display.maxRefreshHz)
 
         val check = report.verification.checks.first { it.id == "hevc_main10_encode" }
         assertEquals("pass", check.status)
+        assertEquals(3840, check.width)
+        assertEquals(2160, check.height)
 
         // Exactly one codec is credited with the pass; the others were not tried.
         val passing = report.encoders.filter {

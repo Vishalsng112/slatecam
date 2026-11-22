@@ -58,6 +58,8 @@ class EncoderVerifier {
                             status = "pass",
                             detail = detail,
                             durationMs = System.currentTimeMillis() - started,
+                            width = width,
+                            height = height,
                         ),
                         passingCodec = name,
                         width = width,

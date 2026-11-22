@@ -93,6 +93,9 @@ object DisplaySource {
             DisplayInfo(
                 id = display.displayId,
                 refreshHz = runCatching { display.mode.refreshRate.toInt() }.getOrDefault(0),
+                maxRefreshHz = runCatching {
+                    display.supportedModes.maxOfOrNull { it.refreshRate }?.toInt()
+                }.getOrNull(),
                 wideColorGamut = runCatching { display.isWideColorGamut }.getOrDefault(false),
                 hdrTypes = hdr?.supportedHdrTypes?.map(::hdrName) ?: emptyList(),
                 maxLuminanceNits = hdr?.desiredMaxLuminance ?: 0f,
