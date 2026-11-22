@@ -3,6 +3,11 @@ package io.github.vishalsng112.slatecam.core.probe
 import io.github.vishalsng112.slatecam.core.probe.model.ProbeReport
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -168,5 +173,39 @@ class ProbeReportRoundTripTest {
         assertTrue(back.presets.getValue("uhd24_10bit").supported)
         assertEquals("fps_out_of_range", back.presets.getValue("uhd60_8bit").reason)
         assertEquals("no_stream_config", back.presets.getValue("fhd120_8bit").reason)
+    }
+
+    @Test
+    fun `unknown fields from a newer prober are ignored, not fatal`() {
+        val root = ProbeRunner.json
+            .parseToJsonElement(sample("oneplus-pad-3-opd2415.json"))
+            .jsonObject
+
+        val extended = JsonObject(
+            root + mapOf(
+                "future_root_field" to JsonPrimitive(1),
+                "future_object" to buildJsonObject {
+                    put("nested", 2)
+                    put("also_unknown", true)
+                },
+            ),
+        )
+
+        val decoded = ProbeRunner.json.decodeFromString<ProbeReport>(extended.toString())
+        assertEquals("oneplus/op6190l1", decoded.device.deviceKey)
+        assertEquals("cinema", decoded.tier.name)
+    }
+
+    @Test
+    fun `a report missing optional sections still decodes`() {
+        val root = ProbeRunner.json
+            .parseToJsonElement(sample("oneplus-pad-3-opd2415.json"))
+            .jsonObject
+
+        val withoutAudio = JsonObject(root - "audio")
+
+        val decoded = ProbeRunner.json.decodeFromString<ProbeReport>(withoutAudio.toString())
+        assertEquals(null, decoded.audio)
+        assertEquals(2, decoded.cameras.size)
     }
 }

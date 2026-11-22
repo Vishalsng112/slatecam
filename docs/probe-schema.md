@@ -9,6 +9,9 @@ This document defines the capability report produced by the prober. It is the
 contract between Phase 1 (probing), Phase 2 (gating the UI), Phase 7 (device
 database), and any external tool that reads reports.
 
+What the prober covers today, and what it still lacks for operating a camera,
+is tracked in [probe-coverage.md](probe-coverage.md).
+
 ## 1. Two artifacts, one schema
 
 A report exists in two kinds. They share every structure; `kind` only controls
@@ -409,9 +412,22 @@ to promote a specific preset.
 - **Minor:** new optional fields. Consumers must ignore unknown fields.
 - **Major:** removed, renamed, or retyped fields, or a changed enum value.
 
-The JSON Schema is **generated from the Kotlin `@Serializable` model** in
-`:core:probe`, not hand-maintained. There is exactly one source of truth. The
-generated schema is committed under `schemas/` for external consumers.
+Rules for readers:
+
+1. Unknown fields are ignored, never fatal. `ProbeRunner.json` sets
+   `ignoreUnknownKeys = true`.
+2. An unrecognised value in a string enum (`tier.name`, `reason`, `basis`,
+   `verified`, `status`, `facing`, `hardware_level`) is treated as `unknown`.
+   It must never be used to enable a feature or to fail a parse.
+3. A field that is absent is "not collected", which is different from `false`
+   and different from "unsupported". Do not substitute one for another.
+4. Within a major version, a newly added field must be optional with a default.
+   Never add a required field, and never repurpose an existing field name.
+
+Planned, not yet done: the JSON Schema will be generated from the Kotlin
+`@Serializable` model in `:core:probe` rather than hand-maintained, once
+external consumers exist. Until then the Kotlin model is the single source of
+truth and this document describes it.
 
 Reports are stored with the `schema_version` they were produced with. The
 device database migrates old reports at read time; readers never assume the

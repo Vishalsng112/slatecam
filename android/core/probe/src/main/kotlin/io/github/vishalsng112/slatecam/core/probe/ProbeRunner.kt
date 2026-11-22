@@ -156,6 +156,9 @@ class ProbeRunner(private val context: Context) {
             prettyPrint = true
             encodeDefaults = true
             explicitNulls = false
+            // Forward compatibility: a report from a newer prober may carry fields
+            // this build does not know. Never fail on them.
+            ignoreUnknownKeys = true
         }
     }
 }
