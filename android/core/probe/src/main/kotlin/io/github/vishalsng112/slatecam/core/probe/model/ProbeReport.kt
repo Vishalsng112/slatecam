@@ -11,7 +11,7 @@ const val SCHEMA_ID = "slatecam.probe"
  * support at a given size can only ever be claimed until an actual session is
  * created. See docs/probe-schema.md.
  */
-const val SCHEMA_VERSION = "1.4.0"
+const val SCHEMA_VERSION = "1.5.0"
 
 @Serializable
 data class ProbeReport(
@@ -91,6 +91,8 @@ data class CameraInfo(
     @SerialName("hardware_level") val hardwareLevel: String,
     @SerialName("logical_multi_camera") val logicalMultiCamera: Boolean,
     @SerialName("physical_ids") val physicalIds: List<String> = emptyList(),
+    /** Characteristics of the physical sub-cameras, when the platform exposes them. */
+    @SerialName("physical_cameras") val physicalCameras: List<PhysicalCameraInfo> = emptyList(),
     @SerialName("concurrent_with") val concurrentWith: List<String> = emptyList(),
     val capabilities: List<String> = emptyList(),
     val sensor: SensorInfo? = null,
@@ -99,6 +101,19 @@ data class CameraInfo(
     val controls: ControlsInfo? = null,
     @SerialName("dynamic_range") val dynamicRange: DynamicRangeInfo,
     val presets: Map<String, PresetInfo> = emptyMap(),
+)
+
+@Serializable
+data class PhysicalCameraInfo(
+    val id: String,
+    val facing: String? = null,
+    @SerialName("hardware_level") val hardwareLevel: String? = null,
+    @SerialName("focal_lengths_mm") val focalLengthsMm: List<Float> = emptyList(),
+    @SerialName("sensor_size_mm") val sensorSizeMm: List<Float> = emptyList(),
+    @SerialName("pixel_array") val pixelArray: List<Int> = emptyList(),
+    @SerialName("horizontal_fov_deg") val horizontalFovDeg: Float? = null,
+    /** ultrawide | wide | tele, relative to the other physical cameras */
+    @SerialName("lens_role") val lensRole: String? = null,
 )
 
 @Serializable

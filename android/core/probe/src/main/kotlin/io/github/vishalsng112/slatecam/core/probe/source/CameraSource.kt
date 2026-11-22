@@ -7,6 +7,7 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.params.DynamicRangeProfiles
 import android.util.Range
 import io.github.vishalsng112.slatecam.core.probe.eval.HighSpeedEntry
+import io.github.vishalsng112.slatecam.core.probe.eval.LensRoles
 import io.github.vishalsng112.slatecam.core.probe.eval.PresetCatalog
 import io.github.vishalsng112.slatecam.core.probe.eval.PresetEvaluator
 import io.github.vishalsng112.slatecam.core.probe.eval.StreamEntry
@@ -19,8 +20,11 @@ import io.github.vishalsng112.slatecam.core.probe.model.FloatRange
 import io.github.vishalsng112.slatecam.core.probe.model.FpsRange
 import io.github.vishalsng112.slatecam.core.probe.model.LensInfo
 import io.github.vishalsng112.slatecam.core.probe.model.MaxRegions
+import io.github.vishalsng112.slatecam.core.probe.model.PhysicalCameraInfo
 import io.github.vishalsng112.slatecam.core.probe.model.SensorInfo
 import io.github.vishalsng112.slatecam.core.probe.model.ZoomInfo
+import kotlin.math.PI
+import kotlin.math.atan
 
 class CameraSource(private val context: Context) {
 
@@ -63,6 +67,7 @@ class CameraSource(private val context: Context) {
             ?: emptyList()
 
         val tenBit = capabilityNames.contains("dynamic_range_ten_bit")
+        val physicalIds = runCatching { c.physicalCameraIds.toList() }.getOrDefault(emptyList())
         val map = c.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
         val evaluator = PresetEvaluator(
             streams = streamEntries(map),
@@ -88,7 +93,8 @@ class CameraSource(private val context: Context) {
                 c.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL),
             ),
             logicalMultiCamera = capabilityNames.contains("logical_multi_camera"),
-            physicalIds = runCatching { c.physicalCameraIds.toList() }.getOrDefault(emptyList()),
+            physicalIds = physicalIds,
+            physicalCameras = readPhysicalCameras(manager, physicalIds),
             concurrentWith = concurrentSets
                 .filter { id in it }
                 .flatten()
@@ -120,6 +126,43 @@ class CameraSource(private val context: Context) {
             ),
             presets = presets,
         )
+    }
+
+    /**
+     * Reads whatever characteristics the platform exposes for physical sub-cameras
+     * and classifies their lens roles by field of view. Physical IDs are not
+     * always openable, so every read is best-effort.
+     */
+    private fun readPhysicalCameras(
+        manager: CameraManager,
+        ids: List<String>,
+    ): List<PhysicalCameraInfo> {
+        val partial = ids.mapNotNull { id ->
+            runCatching { manager.getCameraCharacteristics(id) }.getOrNull()?.let { pc ->
+                val focal = pc.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                    ?.toList() ?: emptyList()
+                val size = pc.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+                val array = pc.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+                val fov = if (size != null && focal.isNotEmpty()) {
+                    (2.0 * atan((size.width / 2.0) / focal[0]) * 180.0 / PI).toFloat()
+                } else {
+                    null
+                }
+                PhysicalCameraInfo(
+                    id = id,
+                    facing = facingName(pc.get(CameraCharacteristics.LENS_FACING)),
+                    hardwareLevel = hardwareLevelName(
+                        pc.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL),
+                    ),
+                    focalLengthsMm = focal,
+                    sensorSizeMm = size?.let { listOf(it.width, it.height) } ?: emptyList(),
+                    pixelArray = array?.let { listOf(it.width, it.height) } ?: emptyList(),
+                    horizontalFovDeg = fov,
+                )
+            }
+        }
+        val roles = LensRoles.classify(partial.map { it.horizontalFovDeg?.toDouble() })
+        return partial.mapIndexed { index, info -> info.copy(lensRole = roles.getOrNull(index)) }
     }
 
     private fun readSensor(c: CameraCharacteristics): SensorInfo? {

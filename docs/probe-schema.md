@@ -517,3 +517,10 @@ Schema 1.4.0 adds the capture-control mode lists to `cameras[].controls`:
 `edge_modes`, `noise_reduction_modes`, `antibanding_modes`, `hot_pixel_modes`,
 `shading_modes`, `aberration_modes`, `distortion_modes`. All optional and
 additive; they exist so the UI only offers modes the device reports.
+
+Schema 1.5.0 adds `cameras[].physical_cameras`: the characteristics the platform
+exposes for each physical sub-camera (facing, hardware level, focal lengths,
+sensor size, pixel array, horizontal field of view) plus a relative `lens_role`
+of `ultrawide`, `wide` or `tele`. Roles are computed against the other physical
+cameras, so they carry meaning on any device. Physical IDs are not always
+openable; every read is best-effort and absent fields mean "not exposed".
