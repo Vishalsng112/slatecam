@@ -378,8 +378,8 @@ speed sizes, and the raw capability bitmasks. Nothing in the app reads this.
 
 | Tier | Rule |
 |---|---|
-| `cinema` | `FULL`/`LEVEL_3` + `manual_sensor` + `manual_post_processing` + `dynamic_range_ten_bit` + hardware HEVC Main10 **verified** |
-| `cinema_claimed` | All of the above claimed, verification not run or not passed |
+| `cinema` | `FULL`/`LEVEL_3` + `manual_sensor` + `manual_post_processing` + `dynamic_range_ten_bit` + hardware HEVC Main10 **verified by a real encode** + HLG10 camera session **verified** |
+| `cinema_claimed` | All of the above claimed, but one or both verifications are not run or not passed |
 | `standard` | `LIMITED` or better + `manual_sensor` + hardware HEVC (8-bit) |
 | `basic` | Camera2 surface path works, no manual control |
 | `unsupported` | No usable surface path |
@@ -444,6 +444,16 @@ parse prose:
 
 A check without `width`/`height` is capability-level only and must not be used
 to promote a specific preset.
+
+Known check ids:
+
+| id | Proves |
+|---|---|
+| `hevc_main10_encode` | The device produced a Main10 stream with HLG colour metadata |
+| `camera_hlg10_session` | The camera configured a session whose output carries the HLG10 profile |
+
+A 10-bit preset is only marked `verified: pass` when **both** checks passed at
+the preset's size. Either half alone is not a working 10-bit path.
 
 ## 9. Versioning and evolution
 

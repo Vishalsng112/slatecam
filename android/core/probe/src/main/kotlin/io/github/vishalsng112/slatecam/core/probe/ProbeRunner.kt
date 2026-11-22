@@ -14,6 +14,7 @@ import io.github.vishalsng112.slatecam.core.probe.source.DeviceSource
 import io.github.vishalsng112.slatecam.core.probe.source.DisplaySource
 import io.github.vishalsng112.slatecam.core.probe.source.EncoderSource
 import io.github.vishalsng112.slatecam.core.probe.source.SystemSource
+import io.github.vishalsng112.slatecam.core.probe.verify.CameraSessionVerifier
 import io.github.vishalsng112.slatecam.core.probe.verify.EncoderVerifier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -41,7 +42,10 @@ class ProbeRunner(private val context: Context) {
 
         val encodeOutcome = if (verify) EncoderVerifier().verifyHevcMain10() else null
         val encodeCheck = encodeOutcome?.check
+        val sessionCheck = if (verify) CameraSessionVerifier(context).verifyHlg10Session() else null
+
         val main10Verified = encodeCheck?.status ?: "not_run"
+        val sessionVerified = sessionCheck?.status ?: "not_run"
 
         val encodersWithVerification = encoders.map { encoder ->
             if (encoder.mime == "video/hevc") {
@@ -57,22 +61,26 @@ class ProbeRunner(private val context: Context) {
             }
         }
 
-        val verifiedWidth = encodeOutcome?.width ?: 0
-        val verifiedHeight = encodeOutcome?.height ?: 0
+        // A preset is verified only when both halves of the 10-bit path passed at
+        // the same size: the camera configured HLG10, and the encoder produced a
+        // Main10 stream.
+        val encodeSize = encodeCheck?.takeIf { it.status == "pass" }
+            ?.let { it.width to it.height }
+        val sessionSize = sessionCheck?.takeIf { it.status == "pass" }
+            ?.let { it.width to it.height }
+        val verifiedSize = encodeSize?.takeIf { it == sessionSize }
+        val verifiedWidth = verifiedSize?.first
+        val verifiedHeight = verifiedSize?.second
+
         val camerasWithVerification = cameras.map { camera ->
             camera.copy(
                 presets = camera.presets.mapValues { (id, preset) ->
                     val spec = PresetCatalog.v1.firstOrNull { it.id == id }
-                    val sameSize = spec != null &&
-                        spec.width == verifiedWidth &&
-                        spec.height == verifiedHeight
-                    // A verdict only covers a preset this camera actually offers
-                    // at the size that encoded successfully.
-                    val promotable = preset.supported &&
+                    val sameSize = verifiedWidth != null &&
                         spec != null &&
                         spec.width == verifiedWidth &&
                         spec.height == verifiedHeight
-                    if (id.endsWith("_10bit") && promotable && main10Verified == "pass") {
+                    if (id.endsWith("_10bit") && preset.supported && sameSize) {
                         preset.copy(verified = "pass")
                     } else {
                         preset
@@ -109,6 +117,7 @@ class ProbeRunner(private val context: Context) {
                     hardwareHevc = hardwareHevc,
                     hardwareHevcMain10 = hardwareHevcMain10,
                     main10Verified = main10Verified,
+                    tenBitSessionVerified = sessionVerified,
                 ),
             )
         }
@@ -137,11 +146,10 @@ class ProbeRunner(private val context: Context) {
             encoders = encodersWithVerification,
             audio = audio,
             tier = tier,
-            verification = if (encodeCheck != null) {
-                Verification(ran = true, checks = listOf(encodeCheck))
-            } else {
-                Verification(ran = false)
-            },
+            verification = Verification(
+                ran = encodeCheck != null || sessionCheck != null,
+                checks = listOfNotNull(encodeCheck, sessionCheck),
+            ),
             warnings = warnings,
         )
     }

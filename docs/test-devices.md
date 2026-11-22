@@ -52,7 +52,8 @@ Prober 1.0.0, app 0.1.0, Android 16 (`BP2A.250605.031.A3`), SoC `MT6897`.
 | 1080p | 120 fps available through constrained high-speed streams |
 | 10-bit | claimed at UHD and FHD 24/25/30; UHD then **verified** at 3840×2160 |
 | HEVC encoders | `c2.mtk.hevc.encoder`, `OMX.MTK.VIDEO.ENCODER.HEVC`, secure variants: all claim profile `main` only |
-| Verification encode | `c2.mtk.hevc.encoder`, 3840×2160, 11 frames, 75,341 bytes, `profile=2` (Main10), `transfer=7` (HLG), 495 ms |
+| Verification encode | `c2.mtk.hevc.encoder`, 3840×2160, 11 frames, 75,341 bytes, `profile=2` (Main10), `transfer=7` (HLG), 299 ms |
+| HLG10 camera session | camera 0, `OutputConfiguration` with HLG10 at 3840×2160, configured in 748 ms |
 | Display | 120 Hz, wide gamut, HDR10 / HLG / HDR10+ / Dolby Vision, 500 nits |
 | Audio | 48 kHz, 24-bit PCM supported, not low-latency |
 | Native page size | 4 KB |
@@ -106,6 +107,8 @@ Prober 1.0.0, app 0.1.0, Android 17 (API 37), SoC `SM8750P` (Snapdragon 8 Elite)
 | Main10 advertised | no | yes |
 | Main10 verified | **yes** | yes |
 | Tier | `cinema` | `cinema` |
+| Camera session | HLG10 at 3840×2160, 748 ms | not run |
+| Encode session | 4K Main10 HLG, 299 ms | 4K Main10 HLG, 348 ms |
 
 Both devices are cinema-capable and disagree completely about whether they can
 be trusted to say so. That is why the database stores the claim and the

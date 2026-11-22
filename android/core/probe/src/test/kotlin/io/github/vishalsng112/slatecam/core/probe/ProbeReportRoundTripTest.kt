@@ -117,6 +117,12 @@ class ProbeReportRoundTripTest {
         assertEquals(3840, check.width)
         assertEquals(2160, check.height)
 
+        val session = report.verification.checks.first { it.id == "camera_hlg10_session" }
+        assertEquals("pass", session.status)
+        assertEquals(3840, session.width)
+        assertEquals(2160, session.height)
+        assertTrue(session.detail!!.contains("HLG10"))
+
         // Exactly one codec is credited with the pass; the others were not tried.
         val passing = report.encoders.filter {
             it.mime == "video/hevc" && it.main10Verified == "pass"

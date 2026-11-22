@@ -37,7 +37,7 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 | ✅ Rotate and crop (1.3.0) | `SCALER_AVAILABLE_ROTATE_AND_CROP_MODES` | Stabilisation crop behaviour |
 | ✅ Buffer stall durations (1.3.0) | `StreamConfigurationMap.getOutputStallDuration` | Sizing `ImageReader` and encoder queues |
 | ✅ Recommended 10-bit profile (1.3.0) | `REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE` | We assume HLG10; the device may prefer HDR10 |
-| 🕒 Available dynamic range profiles | session/characteristics | Whether HLG10 actually configures at a given size |
+| ✅ Available dynamic range profiles | `REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES` + `camera_hlg10_session` check | Whether HLG10 actually configures at a given size |
 | 🕒 Concurrent session combos | `isConcurrentSessionConfigurationSupported` | Dual-camera feasibility per stream set |
 | ⬜ Physical camera stream maps | per-physical `SCALER_STREAM_CONFIGURATION_MAP` | Lens switching changes available sizes |
 
@@ -73,9 +73,9 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 - **Phase 3 operational data is still partial.** Encoder size/fps/bitrate
   limits, HDR encode features, audio input devices and storage throughput are
   not yet collected.
-- **Some facts are only knowable by opening a session.** No amount of
-  characteristic reading proves that HLG10 configures, that a concurrent combo
-  works, or that an encoder sustains a bitrate.
+- **Some facts are only knowable by opening a session.** HLG10 configuration is
+  now proven by the `camera_hlg10_session` check. Concurrent stream
+  combinations and long-take thermal behaviour still are not.
 
 Phases 2 and 3 each add their section above to the probe, and the
 `verification` block is where session-time results belong.

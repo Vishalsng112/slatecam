@@ -169,6 +169,8 @@ data class TierInput(
     val hardwareHevcMain10: Boolean,
     /** pass | fail | not_run */
     val main10Verified: String,
+    /** pass | fail | not_run — HLG10 camera session configured at the tested size. */
+    val tenBitSessionVerified: String = "not_run",
 )
 
 object TierEvaluator {
@@ -190,18 +192,24 @@ object TierEvaluator {
         if (!main10Available) missing += "hevc_main10_encoder"
 
         if (missing.isEmpty()) {
-            return when (input.main10Verified) {
-                "pass" -> TierVerdict(name = "cinema")
-                "fail" -> TierVerdict(
-                    name = "cinema_claimed",
-                    reasons = listOf("ten_bit_verification_failed"),
-                )
-                else -> TierVerdict(
-                    name = "cinema_claimed",
-                    unverified = listOf("hevc_main10_encode"),
-                    reasons = listOf("ten_bit_claimed_not_verified"),
-                )
+            val encodeOk = input.main10Verified == "pass"
+            val sessionOk = input.tenBitSessionVerified == "pass"
+            if (encodeOk && sessionOk) return TierVerdict(name = "cinema")
+
+            val unverified = buildList {
+                if (input.main10Verified == "not_run") add("hevc_main10_encode")
+                if (input.tenBitSessionVerified == "not_run") add("camera_hlg10_session")
             }
+            val reasons = buildList {
+                if (input.main10Verified == "fail") add("hevc_main10_encode_failed")
+                if (input.tenBitSessionVerified == "fail") add("hlg10_session_failed")
+                if (unverified.isNotEmpty()) add("ten_bit_claimed_not_verified")
+            }
+            return TierVerdict(
+                name = "cinema_claimed",
+                unverified = unverified,
+                reasons = reasons,
+            )
         }
 
         val levelOk = fullLevel || input.hardwareLevel == "limited"

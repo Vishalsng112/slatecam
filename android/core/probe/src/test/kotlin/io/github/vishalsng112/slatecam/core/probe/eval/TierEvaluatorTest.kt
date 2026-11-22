@@ -6,7 +6,7 @@ import org.junit.Test
 
 class TierEvaluatorTest {
 
-    private fun cinemaDevice(verified: String) = TierInput(
+    private fun cinemaDevice(verified: String, session: String = verified) = TierInput(
         hardwareLevel = "full",
         manualSensor = true,
         manualPostProcessing = true,
@@ -14,6 +14,7 @@ class TierEvaluatorTest {
         hardwareHevc = true,
         hardwareHevcMain10 = true,
         main10Verified = verified,
+        tenBitSessionVerified = session,
     )
 
     @Test
@@ -28,7 +29,8 @@ class TierEvaluatorTest {
     fun `unverified capability is cinema_claimed, not cinema`() {
         val verdict = TierEvaluator.evaluate(cinemaDevice("not_run"))
         assertEquals("cinema_claimed", verdict.name)
-        assertEquals(listOf("hevc_main10_encode"), verdict.unverified)
+        assertTrue(verdict.unverified.contains("hevc_main10_encode"))
+        assertTrue(verdict.unverified.contains("camera_hlg10_session"))
         assertTrue(verdict.reasons.contains("ten_bit_claimed_not_verified"))
     }
 
@@ -36,7 +38,22 @@ class TierEvaluatorTest {
     fun `failed verification keeps the device out of the cinema tier`() {
         val verdict = TierEvaluator.evaluate(cinemaDevice("fail"))
         assertEquals("cinema_claimed", verdict.name)
-        assertTrue(verdict.reasons.contains("ten_bit_verification_failed"))
+        assertTrue(verdict.reasons.contains("hevc_main10_encode_failed"))
+    }
+
+    @Test
+    fun `a passing encode without a camera session stays claimed`() {
+        val verdict = TierEvaluator.evaluate(cinemaDevice("pass", session = "not_run"))
+        assertEquals("cinema_claimed", verdict.name)
+        assertEquals(listOf("camera_hlg10_session"), verdict.unverified)
+    }
+
+    @Test
+    fun `a failing HLG10 session keeps the device out of cinema`() {
+        val verdict = TierEvaluator.evaluate(cinemaDevice("pass", session = "fail"))
+        assertEquals("cinema_claimed", verdict.name)
+        assertTrue(verdict.reasons.contains("hlg10_session_failed"))
+        assertTrue(verdict.unverified.isEmpty())
     }
 
     @Test
