@@ -512,3 +512,8 @@ be sent.
 - Cross-device ranking. That is a Phase 8 concern, derived from reports, not
   part of the schema.
 - Vendor diagnostics. Raw HAL logs stay out of the schema.
+
+Schema 1.4.0 adds the capture-control mode lists to `cameras[].controls`:
+`edge_modes`, `noise_reduction_modes`, `antibanding_modes`, `hot_pixel_modes`,
+`shading_modes`, `aberration_modes`, `distortion_modes`. All optional and
+additive; they exist so the UI only offers modes the device reports.

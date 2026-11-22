@@ -192,6 +192,18 @@ class SlateCamBridge private constructor(
         pushState()
     }
 
+    override fun setEdgeMode(mode: String) {
+        controller.setEdgeMode(mode)
+    }
+
+    override fun setNoiseReduction(mode: String) {
+        controller.setNoiseReduction(mode)
+    }
+
+    override fun setAntibanding(mode: String) {
+        controller.setAntibanding(mode)
+    }
+
     override fun reloadLuts() {
         refreshLuts()
         pushState()
@@ -499,6 +511,12 @@ class SlateCamBridge private constructor(
         profileNames = PictureProfile.all.map { it.id } + lutEntries.map { it.id },
         zebra = zebraEnabled,
         falseColor = falseColorEnabled,
+        edgeMode = edgeMode,
+        edgeModes = edgeModes,
+        noiseReduction = noiseReduction,
+        noiseReductionModes = noiseReductionModes,
+        antibanding = antibanding,
+        antibandingModes = antibandingModes,
         histogram = histogramBins.map { it.toLong() },
         waveform = waveformBins.map { it.toLong() },
         waveformColumns = WAVEFORM_COLUMNS.toLong(),

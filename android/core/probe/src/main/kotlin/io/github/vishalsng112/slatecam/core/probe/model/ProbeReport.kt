@@ -11,7 +11,7 @@ const val SCHEMA_ID = "slatecam.probe"
  * support at a given size can only ever be claimed until an actual session is
  * created. See docs/probe-schema.md.
  */
-const val SCHEMA_VERSION = "1.3.0"
+const val SCHEMA_VERSION = "1.4.0"
 
 @Serializable
 data class ProbeReport(
@@ -179,6 +179,13 @@ data class ControlsInfo(
     @SerialName("max_regions") val maxRegions: MaxRegions? = null,
     @SerialName("focus_distance_calibration") val focusDistanceCalibration: String? = null,
     @SerialName("scaler_rotate_and_crop") val scalerRotateAndCrop: List<String> = emptyList(),
+    @SerialName("edge_modes") val edgeModes: List<String> = emptyList(),
+    @SerialName("noise_reduction_modes") val noiseReductionModes: List<String> = emptyList(),
+    @SerialName("antibanding_modes") val antibandingModes: List<String> = emptyList(),
+    @SerialName("hot_pixel_modes") val hotPixelModes: List<String> = emptyList(),
+    @SerialName("shading_modes") val shadingModes: List<String> = emptyList(),
+    @SerialName("aberration_modes") val aberrationModes: List<String> = emptyList(),
+    @SerialName("distortion_modes") val distortionModes: List<String> = emptyList(),
 )
 
 @Serializable

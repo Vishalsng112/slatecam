@@ -201,6 +201,25 @@ class CameraSource(private val context: Context) {
             scalerRotateAndCrop = c.get(
                 CameraCharacteristics.SCALER_AVAILABLE_ROTATE_AND_CROP_MODES,
             )?.map(::rotateAndCropName) ?: emptyList(),
+            edgeModes = c.get(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES)
+                ?.map(::edgeModeName) ?: emptyList(),
+            noiseReductionModes = c.get(
+                CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
+            )?.map(::noiseReductionName) ?: emptyList(),
+            antibandingModes = c.get(
+                CameraCharacteristics.CONTROL_AE_AVAILABLE_ANTIBANDING_MODES,
+            )?.map(::antibandingName) ?: emptyList(),
+            hotPixelModes = c.get(
+                CameraCharacteristics.HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES,
+            )?.map(::hotPixelName) ?: emptyList(),
+            shadingModes = c.get(CameraCharacteristics.SHADING_AVAILABLE_MODES)
+                ?.map(::shadingName) ?: emptyList(),
+            aberrationModes = c.get(
+                CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES,
+            )?.map(::aberrationName) ?: emptyList(),
+            distortionModes = c.get(
+                CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES,
+            )?.map(::distortionName) ?: emptyList(),
         )
     }
 
@@ -337,6 +356,58 @@ class CameraSource(private val context: Context) {
         2 -> "180"
         3 -> "270"
         4 -> "auto"
+        else -> "mode_$value"
+    }
+
+    private fun edgeModeName(value: Int): String = when (value) {
+        CameraCharacteristics.EDGE_MODE_OFF -> "off"
+        CameraCharacteristics.EDGE_MODE_FAST -> "fast"
+        CameraCharacteristics.EDGE_MODE_HIGH_QUALITY -> "high_quality"
+        CameraCharacteristics.EDGE_MODE_ZERO_SHUTTER_LAG -> "zero_shutter_lag"
+        else -> "mode_$value"
+    }
+
+    private fun noiseReductionName(value: Int): String = when (value) {
+        CameraCharacteristics.NOISE_REDUCTION_MODE_OFF -> "off"
+        CameraCharacteristics.NOISE_REDUCTION_MODE_FAST -> "fast"
+        CameraCharacteristics.NOISE_REDUCTION_MODE_HIGH_QUALITY -> "high_quality"
+        CameraCharacteristics.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG -> "zero_shutter_lag"
+        else -> "mode_$value"
+    }
+
+    private fun antibandingName(value: Int): String = when (value) {
+        CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_OFF -> "off"
+        CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_50HZ -> "50hz"
+        CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_60HZ -> "60hz"
+        CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_AUTO -> "auto"
+        else -> "mode_$value"
+    }
+
+    private fun hotPixelName(value: Int): String = when (value) {
+        CameraCharacteristics.HOT_PIXEL_MODE_OFF -> "off"
+        CameraCharacteristics.HOT_PIXEL_MODE_FAST -> "fast"
+        CameraCharacteristics.HOT_PIXEL_MODE_HIGH_QUALITY -> "high_quality"
+        else -> "mode_$value"
+    }
+
+    private fun shadingName(value: Int): String = when (value) {
+        CameraCharacteristics.SHADING_MODE_OFF -> "off"
+        CameraCharacteristics.SHADING_MODE_FAST -> "fast"
+        CameraCharacteristics.SHADING_MODE_HIGH_QUALITY -> "high_quality"
+        else -> "mode_$value"
+    }
+
+    private fun aberrationName(value: Int): String = when (value) {
+        CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_OFF -> "off"
+        CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_FAST -> "fast"
+        CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY -> "high_quality"
+        else -> "mode_$value"
+    }
+
+    private fun distortionName(value: Int): String = when (value) {
+        CameraCharacteristics.DISTORTION_CORRECTION_MODE_OFF -> "off"
+        CameraCharacteristics.DISTORTION_CORRECTION_MODE_FAST -> "fast"
+        CameraCharacteristics.DISTORTION_CORRECTION_MODE_HIGH_QUALITY -> "high_quality"
         else -> "mode_$value"
     }
 

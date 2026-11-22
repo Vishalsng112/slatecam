@@ -342,3 +342,20 @@ app-internal storage:
 
 A system file picker for LUTs (SAF) is still a follow-up; the folder scan keeps
 the pipeline testable without adding a Flutter plugin.
+
+## Phase 2 completion — capture controls (2026-11-23)
+
+| Control | Default | Device result |
+|---|---|---|
+| Sharpening (`EDGE_MODE`) | `off` | applied; no HAL-ignored warning |
+| Noise reduction (`NOISE_REDUCTION_MODE`) | `off` | applied |
+| Anti-banding (`CONTROL_AE_ANTIBANDING_MODE`) | `50hz` if offered, else `auto` | POCO offered no `50hz`, so `auto` |
+| Hot pixel / shading / aberration / distortion | `off` where supported | applied silently |
+
+Each request is compared against the first `CaptureResult`, and any mismatch
+logs `HAL ignored <mode>`. Nothing was logged on this device, so the defaults
+took effect. That check is the important one: several vendors advertise `OFF`
+and then ignore it.
+
+The probe now records the available mode lists for all seven controls
+(schema 1.4.0), so the UI only offers what the device actually supports.

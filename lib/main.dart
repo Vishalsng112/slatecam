@@ -290,6 +290,54 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     ? null
                     : (value) => _host.setFocusDiopters(value),
               ),
+              _label('Sharpening', state.edgeMode),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: state.edgeModes.contains(state.edgeMode)
+                    ? state.edgeMode
+                    : null,
+                items: [
+                  for (final mode in state.edgeModes)
+                    DropdownMenuItem(value: mode, child: Text(mode)),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => state.edgeMode = value);
+                  _host.setEdgeMode(value);
+                },
+              ),
+              _label('Noise reduction', state.noiseReduction),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: state.noiseReductionModes.contains(state.noiseReduction)
+                    ? state.noiseReduction
+                    : null,
+                items: [
+                  for (final mode in state.noiseReductionModes)
+                    DropdownMenuItem(value: mode, child: Text(mode)),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => state.noiseReduction = value);
+                  _host.setNoiseReduction(value);
+                },
+              ),
+              _label('Anti-banding', state.antibanding),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: state.antibandingModes.contains(state.antibanding)
+                    ? state.antibanding
+                    : null,
+                items: [
+                  for (final mode in state.antibandingModes)
+                    DropdownMenuItem(value: mode, child: Text(mode)),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => state.antibanding = value);
+                  _host.setAntibanding(value);
+                },
+              ),
               _label('White balance', state.whiteBalanceMode),
               DropdownButton<String>(
                 isExpanded: true,

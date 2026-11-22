@@ -29,6 +29,12 @@ class CameraState {
     required this.profileNames,
     required this.zebra,
     required this.falseColor,
+    required this.edgeMode,
+    required this.edgeModes,
+    required this.noiseReduction,
+    required this.noiseReductionModes,
+    required this.antibanding,
+    required this.antibandingModes,
     required this.histogram,
     required this.waveform,
     required this.waveformColumns,
@@ -61,6 +67,12 @@ class CameraState {
   List<String> profileNames;
   bool zebra;
   bool falseColor;
+  String edgeMode;
+  List<String> edgeModes;
+  String noiseReduction;
+  List<String> noiseReductionModes;
+  String antibanding;
+  List<String> antibandingModes;
   List<int> histogram;
   List<int> waveform;
   int waveformColumns;
@@ -96,6 +108,12 @@ abstract class SlateCamHostApi {
   void setZebra(bool enabled);
 
   void setFalseColor(bool enabled);
+
+  void setEdgeMode(String mode);
+
+  void setNoiseReduction(String mode);
+
+  void setAntibanding(String mode);
 
   void reloadLuts();
 }

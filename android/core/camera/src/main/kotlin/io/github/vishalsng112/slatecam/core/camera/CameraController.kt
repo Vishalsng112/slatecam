@@ -7,6 +7,8 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.DynamicRangeProfiles
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
@@ -39,6 +41,12 @@ data class CameraUiState(
     val previewHeight: Int,
     val previewRotationDegrees: Int,
     val isTenBit: Boolean = false,
+    val edgeMode: String = "off",
+    val edgeModes: List<String> = emptyList(),
+    val noiseReduction: String = "off",
+    val noiseReductionModes: List<String> = emptyList(),
+    val antibanding: String = "auto",
+    val antibandingModes: List<String> = emptyList(),
 )
 
 /**
@@ -88,6 +96,19 @@ class CameraController(private val context: Context) {
     private var wantsTenBit = false
     private var tenBitActive = false
     private var retriedStandard = false
+
+    private var edgeModes: List<String> = emptyList()
+    private var noiseReductionModes: List<String> = emptyList()
+    private var antibandingModes: List<String> = emptyList()
+    private var hotPixelModes: List<String> = emptyList()
+    private var shadingModes: List<String> = emptyList()
+    private var aberrationModes: List<String> = emptyList()
+    private var distortionModes: List<String> = emptyList()
+
+    private var edgeMode = "off"
+    private var noiseReduction = "off"
+    private var antibanding = "auto"
+    private var modesVerified = false
 
     val isTenBitActive: Boolean get() = tenBitActive
 
@@ -190,6 +211,30 @@ class CameraController(private val context: Context) {
         }
     }
 
+    fun setEdgeMode(mode: String) {
+        handler.post {
+            if (mode !in edgeModes) return@post
+            edgeMode = mode
+            applyAndEmit()
+        }
+    }
+
+    fun setNoiseReduction(mode: String) {
+        handler.post {
+            if (mode !in noiseReductionModes) return@post
+            noiseReduction = mode
+            applyAndEmit()
+        }
+    }
+
+    fun setAntibanding(mode: String) {
+        handler.post {
+            if (mode !in antibandingModes) return@post
+            antibanding = mode
+            applyAndEmit()
+        }
+    }
+
     /** Closes the camera and stops the camera thread. Call when the owner goes away. */
     fun shutdown() {
         handler.post {
@@ -241,6 +286,39 @@ class CameraController(private val context: Context) {
         }
 
         fpsRange = pickFpsRange(characteristics)
+
+        edgeModes = characteristics.get(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES)
+            ?.map(::edgeModeName) ?: emptyList()
+        noiseReductionModes = characteristics.get(
+            CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES,
+        )?.map(::noiseReductionName) ?: emptyList()
+        antibandingModes = characteristics.get(
+            CameraCharacteristics.CONTROL_AE_AVAILABLE_ANTIBANDING_MODES,
+        )?.map(::antibandingName) ?: emptyList()
+        hotPixelModes = characteristics.get(CameraCharacteristics.HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES)
+            ?.map(::hotPixelName) ?: emptyList()
+        shadingModes = characteristics.get(CameraCharacteristics.SHADING_AVAILABLE_MODES)
+            ?.map(::shadingName) ?: emptyList()
+        aberrationModes = characteristics.get(
+            CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES,
+        )?.map(::aberrationName) ?: emptyList()
+        distortionModes = characteristics.get(
+            CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES,
+        )?.map(::distortionName) ?: emptyList()
+
+        if (!initialized) {
+            edgeMode = if ("off" in edgeModes) "off" else edgeModes.firstOrNull() ?: "off"
+            noiseReduction = if ("off" in noiseReductionModes) {
+                "off"
+            } else {
+                noiseReductionModes.firstOrNull() ?: "off"
+            }
+            antibanding = when {
+                "50hz" in antibandingModes -> "50hz"
+                "auto" in antibandingModes -> "auto"
+                else -> antibandingModes.firstOrNull() ?: "auto"
+            }
+        }
 
         rotationDegrees = displayRotationDegrees(characteristics)
         android.util.Log.i(
@@ -331,7 +409,8 @@ class CameraController(private val context: Context) {
             val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
             request.addTarget(target)
             applyControls(request)
-            captureSession.setRepeatingRequest(request.build(), null, handler)
+            modesVerified = false
+            captureSession.setRepeatingRequest(request.build(), captureCallback, handler)
             builder = request
             open = true
             errorMessage = null
@@ -366,6 +445,37 @@ class CameraController(private val context: Context) {
         }
 
         request.set(CaptureRequest.CONTROL_AWB_MODE, awbModeValue(wbMode))
+
+        if (edgeMode in edgeModes) {
+            request.set(CaptureRequest.EDGE_MODE, edgeModeValue(edgeMode))
+        }
+        if (noiseReduction in noiseReductionModes) {
+            request.set(CaptureRequest.NOISE_REDUCTION_MODE, noiseReductionValue(noiseReduction))
+        }
+        if (antibanding in antibandingModes) {
+            request.set(
+                CaptureRequest.CONTROL_AE_ANTIBANDING_MODE,
+                antibandingValue(antibanding),
+            )
+        }
+        if ("off" in hotPixelModes) {
+            request.set(CaptureRequest.HOT_PIXEL_MODE, CameraCharacteristics.HOT_PIXEL_MODE_OFF)
+        }
+        if ("off" in shadingModes) {
+            request.set(CaptureRequest.SHADING_MODE, CameraCharacteristics.SHADING_MODE_OFF)
+        }
+        if ("off" in aberrationModes) {
+            request.set(
+                CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE,
+                CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_OFF,
+            )
+        }
+        if ("off" in distortionModes) {
+            request.set(
+                CaptureRequest.DISTORTION_CORRECTION_MODE,
+                CameraCharacteristics.DISTORTION_CORRECTION_MODE_OFF,
+            )
+        }
     }
 
     private fun applyAndEmit() {
@@ -374,7 +484,7 @@ class CameraController(private val context: Context) {
         if (request != null && captureSession != null) {
             runCatching {
                 applyControls(request)
-                captureSession.setRepeatingRequest(request.build(), null, handler)
+                captureSession.setRepeatingRequest(request.build(), captureCallback, handler)
             }.onFailure { errorMessage = it.message }
         }
         emit()
@@ -411,6 +521,12 @@ class CameraController(private val context: Context) {
             previewHeight = previewSize.height,
             previewRotationDegrees = rotationDegrees,
             isTenBit = tenBitActive,
+            edgeMode = edgeMode,
+            edgeModes = edgeModes,
+            noiseReduction = noiseReduction,
+            noiseReductionModes = noiseReductionModes,
+            antibanding = antibanding,
+            antibandingModes = antibandingModes,
         )
         mainHandler.post { listener?.onState(state) }
     }
@@ -438,6 +554,113 @@ class CameraController(private val context: Context) {
         "twilight" -> CameraCharacteristics.CONTROL_AWB_MODE_TWILIGHT
         "shade" -> CameraCharacteristics.CONTROL_AWB_MODE_SHADE
         else -> CameraCharacteristics.CONTROL_AWB_MODE_AUTO
+    }
+
+    private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
+        override fun onCaptureCompleted(
+            session: CameraCaptureSession,
+            request: CaptureRequest,
+            result: TotalCaptureResult,
+        ) {
+            if (modesVerified) return
+            modesVerified = true
+            checkApplied("EDGE_MODE", edgeMode, result.get(CaptureResult.EDGE_MODE), edgeModeValue(edgeMode))
+            checkApplied(
+                "NOISE_REDUCTION_MODE",
+                noiseReduction,
+                result.get(CaptureResult.NOISE_REDUCTION_MODE),
+                noiseReductionValue(noiseReduction),
+            )
+            checkApplied(
+                "ANTIBANDING",
+                antibanding,
+                result.get(CaptureResult.CONTROL_AE_ANTIBANDING_MODE),
+                antibandingValue(antibanding),
+            )
+        }
+    }
+
+    private fun checkApplied(name: String, requested: String, applied: Int?, expected: Int) {
+        if (applied == null || applied == expected) return
+        android.util.Log.w(
+            "SlateCam",
+            "HAL ignored $name=$requested (applied=$applied, requested=$expected)",
+        )
+    }
+
+    private fun edgeModeName(value: Int): String = when (value) {
+        CameraCharacteristics.EDGE_MODE_OFF -> "off"
+        CameraCharacteristics.EDGE_MODE_FAST -> "fast"
+        CameraCharacteristics.EDGE_MODE_HIGH_QUALITY -> "high_quality"
+        CameraCharacteristics.EDGE_MODE_ZERO_SHUTTER_LAG -> "zero_shutter_lag"
+        else -> "mode_$value"
+    }
+
+    private fun edgeModeValue(mode: String): Int = when (mode) {
+        "off" -> CameraCharacteristics.EDGE_MODE_OFF
+        "fast" -> CameraCharacteristics.EDGE_MODE_FAST
+        "high_quality" -> CameraCharacteristics.EDGE_MODE_HIGH_QUALITY
+        "zero_shutter_lag" -> CameraCharacteristics.EDGE_MODE_ZERO_SHUTTER_LAG
+        else -> CameraCharacteristics.EDGE_MODE_OFF
+    }
+
+    private fun noiseReductionName(value: Int): String = when (value) {
+        CameraCharacteristics.NOISE_REDUCTION_MODE_OFF -> "off"
+        CameraCharacteristics.NOISE_REDUCTION_MODE_FAST -> "fast"
+        CameraCharacteristics.NOISE_REDUCTION_MODE_HIGH_QUALITY -> "high_quality"
+        CameraCharacteristics.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG -> "zero_shutter_lag"
+        else -> "mode_$value"
+    }
+
+    private fun noiseReductionValue(mode: String): Int = when (mode) {
+        "off" -> CameraCharacteristics.NOISE_REDUCTION_MODE_OFF
+        "fast" -> CameraCharacteristics.NOISE_REDUCTION_MODE_FAST
+        "high_quality" -> CameraCharacteristics.NOISE_REDUCTION_MODE_HIGH_QUALITY
+        "zero_shutter_lag" -> CameraCharacteristics.NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG
+        else -> CameraCharacteristics.NOISE_REDUCTION_MODE_OFF
+    }
+
+    private fun antibandingName(value: Int): String = when (value) {
+        CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_OFF -> "off"
+        CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_50HZ -> "50hz"
+        CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_60HZ -> "60hz"
+        CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_AUTO -> "auto"
+        else -> "mode_$value"
+    }
+
+    private fun antibandingValue(mode: String): Int = when (mode) {
+        "off" -> CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_OFF
+        "50hz" -> CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_50HZ
+        "60hz" -> CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_60HZ
+        else -> CameraCharacteristics.CONTROL_AE_ANTIBANDING_MODE_AUTO
+    }
+
+    private fun hotPixelName(value: Int): String = when (value) {
+        CameraCharacteristics.HOT_PIXEL_MODE_OFF -> "off"
+        CameraCharacteristics.HOT_PIXEL_MODE_FAST -> "fast"
+        CameraCharacteristics.HOT_PIXEL_MODE_HIGH_QUALITY -> "high_quality"
+        else -> "mode_$value"
+    }
+
+    private fun shadingName(value: Int): String = when (value) {
+        CameraCharacteristics.SHADING_MODE_OFF -> "off"
+        CameraCharacteristics.SHADING_MODE_FAST -> "fast"
+        CameraCharacteristics.SHADING_MODE_HIGH_QUALITY -> "high_quality"
+        else -> "mode_$value"
+    }
+
+    private fun aberrationName(value: Int): String = when (value) {
+        CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_OFF -> "off"
+        CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_FAST -> "fast"
+        CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY -> "high_quality"
+        else -> "mode_$value"
+    }
+
+    private fun distortionName(value: Int): String = when (value) {
+        CameraCharacteristics.DISTORTION_CORRECTION_MODE_OFF -> "off"
+        CameraCharacteristics.DISTORTION_CORRECTION_MODE_FAST -> "fast"
+        CameraCharacteristics.DISTORTION_CORRECTION_MODE_HIGH_QUALITY -> "high_quality"
+        else -> "mode_$value"
     }
 
     companion object {
