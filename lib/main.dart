@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import 'src/pigeon/slatecam.g.dart';
@@ -321,6 +323,28 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   _host.setZebra(value);
                 },
               ),
+              const SizedBox(height: 8),
+              Text('HISTOGRAM', style: Theme.of(context).textTheme.labelSmall),
+              SizedBox(
+                height: 64,
+                child: CustomPaint(
+                  painter: _HistogramPainter(state.histogram),
+                  size: Size.infinite,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text('WAVEFORM', style: Theme.of(context).textTheme.labelSmall),
+              SizedBox(
+                height: 64,
+                child: CustomPaint(
+                  painter: _WaveformPainter(
+                    state.waveform,
+                    state.waveformColumns,
+                    state.waveformBins,
+                  ),
+                  size: Size.infinite,
+                ),
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -389,4 +413,74 @@ class _StateListener implements SlateCamFlutterApi {
 
   @override
   Future<void> onState(CameraState state) async => _onStateCallback(state);
+}
+
+class _HistogramPainter extends CustomPainter {
+  _HistogramPainter(this.bins);
+
+  final List<int> bins;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (bins.isEmpty) return;
+    final peak = bins.reduce(max);
+    if (peak == 0) return;
+    final barWidth = size.width / bins.length;
+    final paint = Paint()..color = const Color(0xFFE8B44A);
+    for (var i = 0; i < bins.length; i++) {
+      final height = (bins[i] / peak) * size.height;
+      canvas.drawRect(
+        Rect.fromLTWH(i * barWidth, size.height - height, barWidth * 0.8, height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HistogramPainter oldDelegate) =>
+      oldDelegate.bins != bins;
+}
+
+class _WaveformPainter extends CustomPainter {
+  _WaveformPainter(this.data, this.columns, this.bins);
+
+  final List<int> data;
+  final int columns;
+  final int bins;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (columns <= 0 || bins <= 0 || data.length != columns * bins) return;
+    final peak = data.reduce(max);
+    if (peak == 0) return;
+
+    final cellWidth = size.width / columns;
+    final cellHeight = size.height / bins;
+    final paint = Paint();
+
+    for (var bin = 0; bin < bins; bin++) {
+      for (var column = 0; column < columns; column++) {
+        final count = data[bin * columns + column];
+        if (count == 0) continue;
+        paint.color = Color.fromRGBO(
+          232,
+          180,
+          74,
+          (count / peak).clamp(0.0, 1.0),
+        );
+        canvas.drawRect(
+          Rect.fromLTWH(
+            column * cellWidth,
+            size.height - (bin + 1) * cellHeight,
+            cellWidth,
+            cellHeight,
+          ),
+          paint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveformPainter oldDelegate) => true;
 }

@@ -21,6 +21,7 @@ import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
+import io.github.vishalsng112.slatecam.core.profile.BuiltInLuts
 import io.github.vishalsng112.slatecam.core.profile.PictureProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +78,10 @@ class SlateCamBridge private constructor(
     private var profileId = PictureProfile.STANDARD.id
     private var zebraEnabled = false
 
+    private var histogramBins: List<Int> = emptyList()
+    private var waveformBins: List<Int> = emptyList()
+    private var lastAnalysisPublishMs = 0L
+
     private val tick = object : Runnable {
         override fun run() {
             if (recorder.isRecording) {
@@ -93,6 +98,17 @@ class SlateCamBridge private constructor(
             pushState()
         }
         applyProfile(PictureProfile.STANDARD)
+
+        renderer.setAnalysisEnabled(true)
+        renderer.onAnalysis = { histogram, waveform ->
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastAnalysisPublishMs >= 200L) {
+                lastAnalysisPublishMs = now
+                histogramBins = histogram.toList()
+                waveformBins = waveform.toList()
+                mainHandler.post { pushState() }
+            }
+        }
     }
 
     fun attach(api: SlateCamFlutterApi) {
@@ -185,6 +201,12 @@ class SlateCamBridge private constructor(
             logEnabled = profile.logEnabled,
             monochrome = profile.monochrome,
         )
+        val lut = profile.lutId?.let(BuiltInLuts::byId)
+        if (lut != null) {
+            renderer.setLut(lut.size, lut.copyData())
+        } else {
+            renderer.setLut(0, null)
+        }
     }
 
     override fun startRecording() {
@@ -432,11 +454,17 @@ class SlateCamBridge private constructor(
         profile = profileId,
         profileNames = PictureProfile.all.map { it.id },
         zebra = zebraEnabled,
+        histogram = histogramBins.map { it.toLong() },
+        waveform = waveformBins.map { it.toLong() },
+        waveformColumns = WAVEFORM_COLUMNS.toLong(),
+        waveformBins = WAVEFORM_BINS.toLong(),
     )
 
     companion object {
         private const val FPS = 30
         private const val VIDEO_BITRATE = 12_000_000
+        private const val WAVEFORM_COLUMNS = 64
+        private const val WAVEFORM_BINS = 16
 
         fun install(engine: FlutterEngine, context: Context): SlateCamBridge {
             val producer = engine.renderer.createSurfaceProducer()

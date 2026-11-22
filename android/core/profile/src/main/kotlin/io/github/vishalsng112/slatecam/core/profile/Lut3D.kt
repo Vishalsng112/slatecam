@@ -54,7 +54,31 @@ class Lut3D(
     private fun index(r: Int, g: Int, b: Int): Int =
         (b * size * size) + (g * size) + r
 
+    /** Copy of the raw RGB triplets, for uploading to a texture. */
+    fun copyData(): FloatArray = data.copyOf()
+
     companion object {
+        /** Builds a LUT by evaluating [fn] over the cube. */
+        fun fromFunction(size: Int, fn: (Float, Float, Float) -> FloatArray): Lut3D {
+            val data = FloatArray(size * size * size * 3)
+            var index = 0
+            for (b in 0 until size) {
+                for (g in 0 until size) {
+                    for (r in 0 until size) {
+                        val out = fn(
+                            r / (size - 1f),
+                            g / (size - 1f),
+                            b / (size - 1f),
+                        )
+                        data[index++] = out[0]
+                        data[index++] = out[1]
+                        data[index++] = out[2]
+                    }
+                }
+            }
+            return Lut3D(size, data)
+        }
+
         /** Parses the Adobe `.cube` format. Returns null when the text is invalid. */
         fun parse(text: String): Lut3D? {
             var size = -1

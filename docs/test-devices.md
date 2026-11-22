@@ -307,3 +307,25 @@ app-internal storage:
    control is visible and reachable by a real finger, but automated taps on the
    scrollable panel did not register. Profiles were verified via launch extras
    instead; the interaction needs a manual pass.
+
+## Phase 4 tools — LUT, histogram, waveform (2026-11-23)
+
+| Item | Result |
+|---|---|
+| GPU LUT | 17³ warm/cool LUT packed into a 2D texture, sampled in the shader |
+| Histogram | 64-bin luma, from a 160×90 FBO readback, ~5 updates/s |
+| Waveform | 64×16 luma heatmap, same readback |
+| Overlays | zebra/histogram/waveform are preview-only; recordings get none |
+| Verification | `--es profile warm` shows cooler shadows/warmer highlights; histogram and waveform update with the scene |
+
+### Findings
+
+1. **The first LUT upload produced a black preview.** `setLut` ran before the
+   EGL context existed (profiles are applied at bridge install, before the
+   camera opens), so texture creation silently failed and the shader sampled an
+   incomplete texture. The renderer now parks the LUT and uploads it once
+   `start()` has a context.
+2. **The waveform's horizontal axis is sensor-oriented**, because the analysis
+   pass renders the unrotated camera buffer while the preview is rotated in
+   Dart. The histogram is unaffected; aligning waveform columns to the displayed
+   image is a follow-up.

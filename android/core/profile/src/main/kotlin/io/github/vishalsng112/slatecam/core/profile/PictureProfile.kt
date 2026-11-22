@@ -13,6 +13,7 @@ data class PictureProfile(
     val exposure: Float = 1f,
     val contrast: Float = 1f,
     val saturation: Float = 1f,
+    val lutId: String? = null,
 ) {
     val logEnabled: Boolean get() = kind == ProfileKind.SLATE_LOG
     val monochrome: Boolean get() = kind == ProfileKind.MONO
@@ -37,7 +38,14 @@ data class PictureProfile(
             saturation = 0f,
         )
 
-        val all: List<PictureProfile> = listOf(STANDARD, SLATE_LOG, MONO)
+        /** Demonstrates the GPU LUT path with a built-in warm/cool look. */
+        val WARM = PictureProfile(
+            id = "warm",
+            kind = ProfileKind.STANDARD,
+            lutId = BuiltInLuts.WARM_COOL,
+        )
+
+        val all: List<PictureProfile> = listOf(STANDARD, SLATE_LOG, MONO, WARM)
 
         fun byId(id: String): PictureProfile = all.firstOrNull { it.id == id } ?: STANDARD
     }

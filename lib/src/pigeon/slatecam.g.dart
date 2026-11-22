@@ -135,6 +135,10 @@ class CameraState {
     required this.profile,
     required this.profileNames,
     required this.zebra,
+    required this.histogram,
+    required this.waveform,
+    required this.waveformColumns,
+    required this.waveformBins,
   });
 
   bool isOpen;
@@ -187,6 +191,14 @@ class CameraState {
 
   bool zebra;
 
+  List<int> histogram;
+
+  List<int> waveform;
+
+  int waveformColumns;
+
+  int waveformBins;
+
   List<Object?> _toList() {
     return <Object?>[
       isOpen,
@@ -214,6 +226,10 @@ class CameraState {
       profile,
       profileNames,
       zebra,
+      histogram,
+      waveform,
+      waveformColumns,
+      waveformBins,
     ];
   }
 
@@ -248,6 +264,10 @@ class CameraState {
       profile: result[22]! as String,
       profileNames: (result[23]! as List<Object?>).cast<String>(),
       zebra: result[24]! as bool,
+      histogram: (result[25]! as List<Object?>).cast<int>(),
+      waveform: (result[26]! as List<Object?>).cast<int>(),
+      waveformColumns: result[27]! as int,
+      waveformBins: result[28]! as int,
     );
   }
 
@@ -260,7 +280,7 @@ class CameraState {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(isOpen, other.isOpen) && _deepEquals(error, other.error) && _deepEquals(iso, other.iso) && _deepEquals(isoMin, other.isoMin) && _deepEquals(isoMax, other.isoMax) && _deepEquals(shutterNs, other.shutterNs) && _deepEquals(shutterMinNs, other.shutterMinNs) && _deepEquals(shutterMaxNs, other.shutterMaxNs) && _deepEquals(focusDiopters, other.focusDiopters) && _deepEquals(focusMin, other.focusMin) && _deepEquals(focusMax, other.focusMax) && _deepEquals(whiteBalanceMode, other.whiteBalanceMode) && _deepEquals(whiteBalanceModes, other.whiteBalanceModes) && _deepEquals(autoExposure, other.autoExposure) && _deepEquals(autoFocus, other.autoFocus) && _deepEquals(previewWidth, other.previewWidth) && _deepEquals(previewHeight, other.previewHeight) && _deepEquals(previewRotationDegrees, other.previewRotationDegrees) && _deepEquals(isRecording, other.isRecording) && _deepEquals(recordingSeconds, other.recordingSeconds) && _deepEquals(clipPath, other.clipPath) && _deepEquals(recordingError, other.recordingError) && _deepEquals(profile, other.profile) && _deepEquals(profileNames, other.profileNames) && _deepEquals(zebra, other.zebra);
+    return _deepEquals(isOpen, other.isOpen) && _deepEquals(error, other.error) && _deepEquals(iso, other.iso) && _deepEquals(isoMin, other.isoMin) && _deepEquals(isoMax, other.isoMax) && _deepEquals(shutterNs, other.shutterNs) && _deepEquals(shutterMinNs, other.shutterMinNs) && _deepEquals(shutterMaxNs, other.shutterMaxNs) && _deepEquals(focusDiopters, other.focusDiopters) && _deepEquals(focusMin, other.focusMin) && _deepEquals(focusMax, other.focusMax) && _deepEquals(whiteBalanceMode, other.whiteBalanceMode) && _deepEquals(whiteBalanceModes, other.whiteBalanceModes) && _deepEquals(autoExposure, other.autoExposure) && _deepEquals(autoFocus, other.autoFocus) && _deepEquals(previewWidth, other.previewWidth) && _deepEquals(previewHeight, other.previewHeight) && _deepEquals(previewRotationDegrees, other.previewRotationDegrees) && _deepEquals(isRecording, other.isRecording) && _deepEquals(recordingSeconds, other.recordingSeconds) && _deepEquals(clipPath, other.clipPath) && _deepEquals(recordingError, other.recordingError) && _deepEquals(profile, other.profile) && _deepEquals(profileNames, other.profileNames) && _deepEquals(zebra, other.zebra) && _deepEquals(histogram, other.histogram) && _deepEquals(waveform, other.waveform) && _deepEquals(waveformColumns, other.waveformColumns) && _deepEquals(waveformBins, other.waveformBins);
   }
 
   @override
@@ -269,7 +289,7 @@ class CameraState {
 
   @override
   String toString() {
-    return 'CameraState(isOpen: $isOpen, error: $error, iso: $iso, isoMin: $isoMin, isoMax: $isoMax, shutterNs: $shutterNs, shutterMinNs: $shutterMinNs, shutterMaxNs: $shutterMaxNs, focusDiopters: $focusDiopters, focusMin: $focusMin, focusMax: $focusMax, whiteBalanceMode: $whiteBalanceMode, whiteBalanceModes: $whiteBalanceModes, autoExposure: $autoExposure, autoFocus: $autoFocus, previewWidth: $previewWidth, previewHeight: $previewHeight, previewRotationDegrees: $previewRotationDegrees, isRecording: $isRecording, recordingSeconds: $recordingSeconds, clipPath: $clipPath, recordingError: $recordingError, profile: $profile, profileNames: $profileNames, zebra: $zebra)';
+    return 'CameraState(isOpen: $isOpen, error: $error, iso: $iso, isoMin: $isoMin, isoMax: $isoMax, shutterNs: $shutterNs, shutterMinNs: $shutterMinNs, shutterMaxNs: $shutterMaxNs, focusDiopters: $focusDiopters, focusMin: $focusMin, focusMax: $focusMax, whiteBalanceMode: $whiteBalanceMode, whiteBalanceModes: $whiteBalanceModes, autoExposure: $autoExposure, autoFocus: $autoFocus, previewWidth: $previewWidth, previewHeight: $previewHeight, previewRotationDegrees: $previewRotationDegrees, isRecording: $isRecording, recordingSeconds: $recordingSeconds, clipPath: $clipPath, recordingError: $recordingError, profile: $profile, profileNames: $profileNames, zebra: $zebra, histogram: $histogram, waveform: $waveform, waveformColumns: $waveformColumns, waveformBins: $waveformBins)';
   }
 }
 

@@ -1,5 +1,6 @@
 package io.github.vishalsng112.slatecam.core.gpu
 
+import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -9,6 +10,7 @@ import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.opengl.GLUtils
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
@@ -51,6 +53,25 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uMono = 0
     private var uZebra = 0
     private var uZebraThreshold = 0
+    private var uLut = 0
+    private var uLutEnabled = 0
+    private var uLutSize = 0
+
+    private var lutTexture = 0
+    private var lutSize = 0f
+    private var lutEnabled = false
+    private var pendingLutSize = 0
+    private var pendingLutData: FloatArray? = null
+
+    private var analysisFbo = 0
+    private var analysisTexture = 0
+    private var frameCounter = 0
+
+    @Volatile
+    private var analysisEnabled = false
+
+    /** Called on the GL thread with (64-bin luma histogram, 64x16 waveform). */
+    var onAnalysis: ((IntArray, IntArray) -> Unit)? = null
     private var aPosition = 0
     private var aTexCoord = 0
     private val texMatrix = FloatArray(16)
@@ -89,6 +110,76 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         zebraThreshold = threshold.coerceIn(0.3f, 1f)
     }
 
+    fun setAnalysisEnabled(enabled: Boolean) {
+        analysisEnabled = enabled
+    }
+
+    fun setLut(size: Int, data: FloatArray?) {
+        handler.post { uploadLut(size, data) }
+    }
+
+    private fun uploadLut(size: Int, data: FloatArray?) {
+        if (!started) {
+            // The EGL context does not exist yet; defer until start().
+            pendingLutSize = size
+            pendingLutData = data
+            return
+        }
+        if (lutTexture != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(lutTexture), 0)
+            lutTexture = 0
+        }
+        lutEnabled = false
+        if (data == null || size <= 1) return
+
+        val n = size
+        val pixels = IntArray(n * n * n)
+        for (b in 0 until n) {
+            for (g in 0 until n) {
+                for (r in 0 until n) {
+                    val source = ((b * n + g) * n + r) * 3
+                    val red = (data[source] * 255f).toInt().coerceIn(0, 255)
+                    val green = (data[source + 1] * 255f).toInt().coerceIn(0, 255)
+                    val blue = (data[source + 2] * 255f).toInt().coerceIn(0, 255)
+                    pixels[g * n * n + b * n + r] =
+                        (0xFF shl 24) or (red shl 16) or (green shl 8) or blue
+                }
+            }
+        }
+
+        val bitmap = Bitmap.createBitmap(pixels, n * n, n, Bitmap.Config.ARGB_8888)
+        val ids = IntArray(1)
+        GLES20.glGenTextures(1, ids, 0)
+        lutTexture = ids[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTexture)
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_MIN_FILTER,
+            GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_MAG_FILTER,
+            GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_WRAP_S,
+            GLES20.GL_CLAMP_TO_EDGE,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_WRAP_T,
+            GLES20.GL_CLAMP_TO_EDGE,
+        )
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+        bitmap.recycle()
+
+        lutSize = n.toFloat()
+        lutEnabled = true
+        Log.i(TAG, "LUT uploaded: ${n}x${n}x$n")
+    }
+
     /** Surface the camera must target. Available after [start]. */
     @Volatile
     var cameraSurface: Surface? = null
@@ -106,6 +197,11 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 setupProgram()
                 setupTexture()
                 started = true
+                pendingLutData?.let { data ->
+                    val size = pendingLutSize
+                    pendingLutData = null
+                    uploadLut(size, data)
+                }
             } catch (t: Throwable) {
                 failure = t
             } finally {
@@ -326,6 +422,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uMono = GLES20.glGetUniformLocation(program, "uMono")
         uZebra = GLES20.glGetUniformLocation(program, "uZebra")
         uZebraThreshold = GLES20.glGetUniformLocation(program, "uZebraThreshold")
+        uLut = GLES20.glGetUniformLocation(program, "uLut")
+        uLutEnabled = GLES20.glGetUniformLocation(program, "uLutEnabled")
+        uLutSize = GLES20.glGetUniformLocation(program, "uLutSize")
 
         GLES20.glDeleteShader(vertex)
         GLES20.glDeleteShader(fragment)
@@ -375,26 +474,25 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         val timestampNs = System.nanoTime()
         renderTo(outputEglSurface, timestampNs, tonemap = tenBitSource, overlay = true)
         renderTo(encoderEglSurface, timestampNs, tonemap = false, overlay = false)
+
+        frameCounter++
+        if (analysisEnabled && frameCounter % ANALYSIS_INTERVAL == 0) {
+            runAnalysis()
+        }
+
         onFrameRendered()
     }
 
-    private fun renderTo(
-        surface: EGLSurface,
-        timestampNs: Long,
-        tonemap: Boolean,
-        overlay: Boolean,
-    ) {
-        if (surface == EGL14.EGL_NO_SURFACE) return
-        EGL14.eglMakeCurrent(display, surface, surface, context)
-
-        GLES20.glViewport(0, 0, width, height)
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-
+    private fun drawQuad(tonemap: Boolean, overlay: Boolean) {
         GLES20.glUseProgram(program)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
         GLES20.glUniform1i(uTexture, 0)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTexture)
+        GLES20.glUniform1i(uLut, 1)
+        GLES20.glUniform1i(uLutEnabled, if (lutEnabled) 1 else 0)
+        GLES20.glUniform1f(uLutSize, if (lutSize > 0f) lutSize else 2f)
         GLES20.glUniform1i(uHlgToSdr, if (tonemap) 1 else 0)
         GLES20.glUniform1f(uExposure, exposure)
         GLES20.glUniform1f(uContrast, contrast)
@@ -410,6 +508,121 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glEnableVertexAttribArray(aTexCoord)
         GLES20.glVertexAttribPointer(aTexCoord, 2, GLES20.GL_FLOAT, false, 0, QUAD_TEX_COORDS)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+    }
+
+    private fun runAnalysis() {
+        val callback = onAnalysis ?: return
+        if (!ensureAnalysisTarget()) return
+
+        EGL14.eglMakeCurrent(display, outputEglSurface, outputEglSurface, context)
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, analysisFbo)
+        GLES20.glViewport(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        drawQuad(tonemap = false, overlay = false)
+
+        val byteCount = ANALYSIS_WIDTH * ANALYSIS_HEIGHT * 4
+        val buffer = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder())
+        GLES20.glReadPixels(
+            0,
+            0,
+            ANALYSIS_WIDTH,
+            ANALYSIS_HEIGHT,
+            GLES20.GL_RGBA,
+            GLES20.GL_UNSIGNED_BYTE,
+            buffer,
+        )
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+
+        val pixels = ByteArray(byteCount)
+        buffer.position(0)
+        buffer.get(pixels)
+
+        val histogram = IntArray(HISTOGRAM_BINS)
+        val waveform = IntArray(WAVEFORM_COLUMNS * WAVEFORM_BINS)
+
+        for (pixel in 0 until ANALYSIS_WIDTH * ANALYSIS_HEIGHT) {
+            val offset = pixel * 4
+            val r = pixels[offset].toInt() and 0xFF
+            val g = pixels[offset + 1].toInt() and 0xFF
+            val b = pixels[offset + 2].toInt() and 0xFF
+            val luma = (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255f
+
+            histogram[(luma * (HISTOGRAM_BINS - 1)).toInt().coerceIn(0, HISTOGRAM_BINS - 1)]++
+
+            val x = pixel % ANALYSIS_WIDTH
+            val column = (x * WAVEFORM_COLUMNS / ANALYSIS_WIDTH)
+                .coerceIn(0, WAVEFORM_COLUMNS - 1)
+            val bin = (luma * (WAVEFORM_BINS - 1)).toInt().coerceIn(0, WAVEFORM_BINS - 1)
+            waveform[bin * WAVEFORM_COLUMNS + column]++
+        }
+
+        callback(histogram, waveform)
+    }
+
+    private fun ensureAnalysisTarget(): Boolean {
+        if (analysisFbo != 0) return true
+
+        val textures = IntArray(1)
+        GLES20.glGenTextures(1, textures, 0)
+        analysisTexture = textures[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, analysisTexture)
+        GLES20.glTexImage2D(
+            GLES20.GL_TEXTURE_2D,
+            0,
+            GLES20.GL_RGBA,
+            ANALYSIS_WIDTH,
+            ANALYSIS_HEIGHT,
+            0,
+            GLES20.GL_RGBA,
+            GLES20.GL_UNSIGNED_BYTE,
+            null,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_MIN_FILTER,
+            GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_MAG_FILTER,
+            GLES20.GL_LINEAR,
+        )
+
+        val framebuffers = IntArray(1)
+        GLES20.glGenFramebuffers(1, framebuffers, 0)
+        analysisFbo = framebuffers[0]
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, analysisFbo)
+        GLES20.glFramebufferTexture2D(
+            GLES20.GL_FRAMEBUFFER,
+            GLES20.GL_COLOR_ATTACHMENT0,
+            GLES20.GL_TEXTURE_2D,
+            analysisTexture,
+            0,
+        )
+        val complete = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) ==
+            GLES20.GL_FRAMEBUFFER_COMPLETE
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        if (!complete) {
+            Log.w(TAG, "analysis framebuffer incomplete; monitoring disabled")
+        }
+        return complete
+    }
+
+    private fun renderTo(
+        surface: EGLSurface,
+        timestampNs: Long,
+        tonemap: Boolean,
+        overlay: Boolean,
+    ) {
+        if (surface == EGL14.EGL_NO_SURFACE) return
+        EGL14.eglMakeCurrent(display, surface, surface, context)
+
+        GLES20.glViewport(0, 0, width, height)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+
+        drawQuad(tonemap, overlay)
 
         if (surface == encoderEglSurface) {
             EGLExt.eglPresentationTimeANDROID(display, surface, timestampNs)
@@ -437,6 +650,19 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         if (program != 0) {
             GLES20.glDeleteProgram(program)
             program = 0
+        }
+        if (lutTexture != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(lutTexture), 0)
+            lutTexture = 0
+            lutEnabled = false
+        }
+        if (analysisFbo != 0) {
+            GLES20.glDeleteFramebuffers(1, intArrayOf(analysisFbo), 0)
+            analysisFbo = 0
+        }
+        if (analysisTexture != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(analysisTexture), 0)
+            analysisTexture = 0
         }
         if (display != EGL14.EGL_NO_DISPLAY) {
             EGL14.eglMakeCurrent(
@@ -495,9 +721,25 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform int uMono;
             uniform int uZebra;
             uniform float uZebraThreshold;
+            uniform sampler2D uLut;
+            uniform int uLutEnabled;
+            uniform float uLutSize;
 
             float luma(vec3 c) {
                 return dot(c, vec3(0.2126, 0.7152, 0.0722));
+            }
+
+            vec3 applyLut(vec3 c) {
+                float n = uLutSize;
+                float slice = clamp(c.b, 0.0, 1.0) * (n - 1.0);
+                float b0 = floor(slice);
+                float b1 = min(b0 + 1.0, n - 1.0);
+                float blend = slice - b0;
+                float red = clamp(c.r, 0.0, 1.0) * (n - 1.0);
+                float y = (clamp(c.g, 0.0, 1.0) * (n - 1.0) + 0.5) / n;
+                vec2 uv0 = vec2((b0 * n + red + 0.5) / (n * n), y);
+                vec2 uv1 = vec2((b1 * n + red + 0.5) / (n * n), y);
+                return mix(texture2D(uLut, uv0).rgb, texture2D(uLut, uv1).rgb, blend);
             }
 
             // Approximate HLG -> SDR for the preview only. The encoder receives
@@ -534,6 +776,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
                 c = clamp(c, 0.0, 1.0);
 
+                if (uLutEnabled == 1) {
+                    c = applyLut(c);
+                }
+
                 if (uZebra == 1 && luma(c) >= uZebraThreshold) {
                     float stripe = step(0.5, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.06));
                     c = mix(c, vec3(1.0, 0.1, 0.1), stripe * 0.8);
@@ -547,6 +793,13 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private companion object {
         const val START_TIMEOUT_SECONDS = 5L
         const val TAG = "SlateCamGl"
+
+        const val ANALYSIS_WIDTH = 160
+        const val ANALYSIS_HEIGHT = 90
+        const val HISTOGRAM_BINS = 64
+        const val WAVEFORM_COLUMNS = 64
+        const val WAVEFORM_BINS = 16
+        const val ANALYSIS_INTERVAL = 5
 
         // Android EGL extension: marks a config usable as a MediaCodec input.
         const val EGL_RECORDABLE_ANDROID = 0x3142

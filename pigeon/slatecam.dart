@@ -28,6 +28,10 @@ class CameraState {
     required this.profile,
     required this.profileNames,
     required this.zebra,
+    required this.histogram,
+    required this.waveform,
+    required this.waveformColumns,
+    required this.waveformBins,
   });
 
   bool isOpen;
@@ -55,6 +59,10 @@ class CameraState {
   String profile;
   List<String> profileNames;
   bool zebra;
+  List<int> histogram;
+  List<int> waveform;
+  int waveformColumns;
+  int waveformBins;
 }
 
 @HostApi()
