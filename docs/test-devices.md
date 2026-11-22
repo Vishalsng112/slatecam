@@ -121,3 +121,25 @@ verification as separate fields rather than collapsing them into one flag.
   matters for the UI copy.
 - The Pad confirms the build runs on the target API 37, which the POCO
   (API 36) could not.
+
+### Phase 2 control data (schema 1.3.0)
+
+The POCO now reports the full control surface:
+
+| Field | Value |
+|---|---|
+| AE target fps ranges | `10–10`, `15–15`, `15–20`, `20–20`, `24–24`, `10–30`, `14–30`, `30–30` |
+| Exposure compensation | `-24 … +24`, step `1/6` EV (about ±4 EV) |
+| AE / AWB lock | available |
+| Max regions | AE 1, AF 1, AWB 1 |
+| Focus distance calibration | `uncalibrated` |
+| Zoom ratio | `1.0 … 10.0` |
+| Recommended 10-bit profile | `hlg10` |
+| Rotate and crop | `none` only |
+
+**25p cannot be frame-locked on this device.** There is an exact `24–24` range
+and an exact `30–30` range, but no `25–25`. Recording at 25 fps is still
+possible inside the `10–30` range, but the camera will not hold a fixed 25 fps.
+This is exactly the distinction `ae_target_fps_ranges` exists to expose: the
+stream map says 25 fps is a supported stream, while the AE ranges say it cannot
+be locked.

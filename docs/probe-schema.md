@@ -1,7 +1,7 @@
 # Probe report schema
 
 - **Schema id:** `slatecam.probe`
-- **Version:** `1.2.0`
+- **Version:** `1.3.0`
 - **Status:** draft for Phase 1
 - **Owner:** `:core:probe`
 
@@ -200,7 +200,11 @@ logical camera IDs are not guaranteed contiguous.
   "lenses": [
     { "focal_length_mm": 6.9, "aperture": 1.68, "min_focus_distance_diopters": 0.0 }
   ],
-  "zoom": { "max_digital": 30.0, "available_focal_lengths_mm": [2.2, 6.9, 14.0] },
+  "zoom": {
+    "max_digital": 30.0,
+    "available_focal_lengths_mm": [2.2, 6.9, 14.0],
+    "ratio_range": { "min": 1.0, "max": 10.0 }
+  },
   "controls": {
     "ae_modes": ["on", "off", "on_auto_flash", "precapture"],
     "af_modes": ["off", "auto", "continuous_video", "continuous_picture"],
@@ -208,11 +212,19 @@ logical camera IDs are not guaranteed contiguous.
     "ois_modes": ["on", "off"],
     "ois_available": ["on", "off"],
     "video_stabilization_modes": ["off", "on", "preview"],
-    "video_stabilization_available": ["off", "on", "preview"]
+    "video_stabilization_available": ["off", "on", "preview"],
+    "ae_target_fps_ranges": [{ "min": 24, "max": 30 }, { "min": 30, "max": 60 }],
+    "exposure_compensation": { "min": -12, "max": 12, "step": 0.16666667 },
+    "ae_lock_available": true,
+    "awb_lock_available": true,
+    "max_regions": { "ae": 1, "af": 1, "awb": 0 },
+    "focus_distance_calibration": "approximate",
+    "scaler_rotate_and_crop": ["none", "90", "180", "270", "auto"]
   },
   "dynamic_range": {
     "ten_bit_streams": true,
-    "profiles": ["hlg10", "hdr10"]
+    "profiles": ["hlg10"],
+    "recommended_profile": "hlg10"
   },
   "presets": {},
   "tables": {}
@@ -222,6 +234,24 @@ logical camera IDs are not guaranteed contiguous.
 `timestamp_source` matters: gyro metadata alignment is only reliable when it is
 `realtime`. `presets` is defined in section 6.1. `tables` exists only in `full`
 reports (section 6.2).
+
+### 6.0 Control-surface fields (1.3.0)
+
+These exist to drive the UI, not to gate features:
+
+| Field | Source characteristic | Used for |
+|---|---|---|
+| `controls.ae_target_fps_ranges` | `CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES` | Offering 24/25 only where AE can actually run them |
+| `controls.exposure_compensation` | `CONTROL_AE_COMPENSATION_RANGE/_STEP` | EV wheel bounds and granularity |
+| `controls.ae_lock_available`, `awb_lock_available` | `CONTROL_AE_LOCK_AVAILABLE`, `CONTROL_AWB_LOCK_AVAILABLE` | Whether a lock control is honest |
+| `controls.max_regions` | `CONTROL_MAX_REGIONS_AE/AF/AWB` | Enabling tap-to-focus and spot metering |
+| `controls.focus_distance_calibration` | `LENS_INFO_FOCUS_DISTANCE_CALIBRATION` | Whether dioptres map to real distances |
+| `controls.scaler_rotate_and_crop` | `SCALER_AVAILABLE_ROTATE_AND_CROP_MODES` | Stabilisation crop behaviour |
+| `zoom.ratio_range` | `CONTROL_ZOOM_RATIO_RANGE` | Zoom slider in ratio units, not digital factor |
+| `dynamic_range.recommended_profile` | `REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE` | HLG10 vs HDR10 preference |
+
+`scaler_rotate_and_crop` modes are the documented values `none`, `90`, `180`,
+`270`, `auto`; the platform does not expose them as public constants.
 
 ### 6.1 Presets (summary)
 
@@ -286,6 +316,10 @@ never disagree about what is supported.
 `verified` is `pass`, `fail`, or `not_run`. A `capability_only` verdict with
 `not_run` must never be presented to the user as confirmed support.
 
+`stall_duration_ns` is present only when the platform reports a non-zero stall
+for that stream. Zero is omitted: it means the stream does not stall, not that
+the value is unknown.
+
 ### Why 10-bit is always `capability_only`
 
 Camera2 does not report bit depth per stream size. `DYNAMIC_RANGE_TEN_BIT` is a
@@ -303,6 +337,12 @@ Version 1.1.0 added `basis` and `verified`; both are additive.
 Version 1.2.0 added `displays[].max_refresh_hz` and
 `verification.checks[].width`/`height`; all optional and additive. Reports
 produced by 1.1.0 probers decode unchanged.
+
+Version 1.3.0 added the Phase 2 control surface: `controls.ae_target_fps_ranges`,
+`exposure_compensation`, `ae_lock_available`, `awb_lock_available`,
+`max_regions`, `focus_distance_calibration`, `scaler_rotate_and_crop`,
+`zoom.ratio_range`, `dynamic_range.recommended_profile`, and
+`presets[].stall_duration_ns`. All optional and additive.
 
 Reason codes are a closed set so the UI can localize them:
 

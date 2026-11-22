@@ -28,15 +28,15 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 
 | Requirement | Camera2 source | Why it matters |
 |---|---|---|
-| ⬜ Exact frame-rate ranges | `CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES` | Min frame duration says "30", not whether 24 or 25 is selectable with AE |
-| ⬜ Exposure compensation | `CONTROL_AE_COMPENSATION_RANGE`, `_STEP` | EV wheel bounds and granularity |
-| ⬜ Lock availability | `CONTROL_AE_LOCK_AVAILABLE`, `CONTROL_AWB_LOCK_AVAILABLE` | Whether a WB/exposure lock button is honest |
-| ⬜ Metering/focus regions | `CONTROL_MAX_REGIONS_AE/AF/AWB` | Tap-to-focus needs a region count, not an assumption |
-| ⬜ Zoom ratio | `CONTROL_ZOOM_RATIO_RANGE` | Digital zoom alone ignores logical multi-camera switching |
-| ⬜ Focus calibration | `LENS_INFO_FOCUS_DISTANCE_CALIBRATION` | Whether dioptre values map to real distances |
-| ⬜ Rotate and crop | `SCALER_AVAILABLE_ROTATE_AND_CROP` | Stabilisation crop behaviour |
-| ⬜ Buffer stall durations | `StreamConfigurationMap.getOutputStallDuration` | Sizing `ImageReader` and encoder queues |
-| ⬜ Recommended 10-bit profile | `REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE` | We assume HLG10; the device may prefer HDR10 |
+| ✅ Exact frame-rate ranges (1.3.0) | `CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES` | Min frame duration says "30", not whether 24 or 25 is selectable with AE |
+| ✅ Exposure compensation (1.3.0) | `CONTROL_AE_COMPENSATION_RANGE`, `_STEP` | EV wheel bounds and granularity |
+| ✅ Lock availability (1.3.0) | `CONTROL_AE_LOCK_AVAILABLE`, `CONTROL_AWB_LOCK_AVAILABLE` | Whether a WB/exposure lock button is honest |
+| ✅ Metering/focus regions (1.3.0) | `CONTROL_MAX_REGIONS_AE/AF/AWB` | Tap-to-focus needs a region count, not an assumption |
+| ✅ Zoom ratio (1.3.0) | `CONTROL_ZOOM_RATIO_RANGE` | Digital zoom alone ignores logical multi-camera switching |
+| ✅ Focus calibration (1.3.0) | `LENS_INFO_FOCUS_DISTANCE_CALIBRATION` | Whether dioptre values map to real distances |
+| ✅ Rotate and crop (1.3.0) | `SCALER_AVAILABLE_ROTATE_AND_CROP_MODES` | Stabilisation crop behaviour |
+| ✅ Buffer stall durations (1.3.0) | `StreamConfigurationMap.getOutputStallDuration` | Sizing `ImageReader` and encoder queues |
+| ✅ Recommended 10-bit profile (1.3.0) | `REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE` | We assume HLG10; the device may prefer HDR10 |
 | 🕒 Available dynamic range profiles | session/characteristics | Whether HLG10 actually configures at a given size |
 | 🕒 Concurrent session combos | `isConcurrentSessionConfigurationSupported` | Dual-camera feasibility per stream set |
 | ⬜ Physical camera stream maps | per-physical `SCALER_STREAM_CONFIGURATION_MAP` | Lens switching changes available sizes |
@@ -67,9 +67,12 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 
 - **Capability gating is complete.** The probe can decide every preset, the
   tier, and every "is this feature available" question.
-- **Operational data is partial.** It cannot yet drive the full control surface
-  (fps selection, EV range, focus regions, zoom ratios) or plan a recording
-  (encoder limits, audio devices, storage throughput).
+- **The Phase 2 control surface is covered as of 1.3.0.** FPS ranges, EV
+  compensation, lock flags, focus/meter regions, zoom ratios, focus
+  calibration, rotate-and-crop and stall durations are all reported.
+- **Phase 3 operational data is still partial.** Encoder size/fps/bitrate
+  limits, HDR encode features, audio input devices and storage throughput are
+  not yet collected.
 - **Some facts are only knowable by opening a session.** No amount of
   characteristic reading proves that HLG10 configures, that a concurrent combo
   works, or that an encoder sustains a bitrate.

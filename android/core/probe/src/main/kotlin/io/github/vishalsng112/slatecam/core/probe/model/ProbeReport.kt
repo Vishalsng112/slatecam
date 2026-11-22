@@ -11,7 +11,7 @@ const val SCHEMA_ID = "slatecam.probe"
  * support at a given size can only ever be claimed until an actual session is
  * created. See docs/probe-schema.md.
  */
-const val SCHEMA_VERSION = "1.2.0"
+const val SCHEMA_VERSION = "1.3.0"
 
 @Serializable
 data class ProbeReport(
@@ -127,6 +127,39 @@ data class LensInfo(
 data class ZoomInfo(
     @SerialName("max_digital") val maxDigital: Float,
     @SerialName("available_focal_lengths_mm") val availableFocalLengthsMm: List<Float> = emptyList(),
+    @SerialName("ratio_range") val ratioRange: FloatRange? = null,
+)
+
+@Serializable
+data class FloatRange(
+    val min: Float,
+    val max: Float,
+)
+
+@Serializable
+data class IntRange(
+    val min: Int,
+    val max: Int,
+)
+
+@Serializable
+data class FpsRange(
+    val min: Int,
+    val max: Int,
+)
+
+@Serializable
+data class ExposureCompensation(
+    val min: Int,
+    val max: Int,
+    val step: Float,
+)
+
+@Serializable
+data class MaxRegions(
+    val ae: Int,
+    val af: Int,
+    val awb: Int,
 )
 
 @Serializable
@@ -138,12 +171,22 @@ data class ControlsInfo(
     @SerialName("ois_available") val oisAvailable: List<String> = emptyList(),
     @SerialName("video_stabilization_modes") val videoStabilizationModes: List<String> = emptyList(),
     @SerialName("video_stabilization_available") val videoStabilizationAvailable: List<String> = emptyList(),
+    /** Frame-rate ranges selectable with auto-exposure; min frame duration is not enough. */
+    @SerialName("ae_target_fps_ranges") val aeTargetFpsRanges: List<FpsRange> = emptyList(),
+    @SerialName("exposure_compensation") val exposureCompensation: ExposureCompensation? = null,
+    @SerialName("ae_lock_available") val aeLockAvailable: Boolean? = null,
+    @SerialName("awb_lock_available") val awbLockAvailable: Boolean? = null,
+    @SerialName("max_regions") val maxRegions: MaxRegions? = null,
+    @SerialName("focus_distance_calibration") val focusDistanceCalibration: String? = null,
+    @SerialName("scaler_rotate_and_crop") val scalerRotateAndCrop: List<String> = emptyList(),
 )
 
 @Serializable
 data class DynamicRangeInfo(
     @SerialName("ten_bit_streams") val tenBitStreams: Boolean,
     val profiles: List<String> = emptyList(),
+    /** Profile the device recommends for ten-bit capture, when it says. */
+    @SerialName("recommended_profile") val recommendedProfile: String? = null,
 )
 
 @Serializable
@@ -153,6 +196,8 @@ data class PresetInfo(
     val detail: String? = null,
     val format: String? = null,
     @SerialName("min_frame_duration_ns") val minFrameDurationNs: Long? = null,
+    /** Time the pipeline may stall per frame for this stream; used to size queues. */
+    @SerialName("stall_duration_ns") val stallDurationNs: Long? = null,
     val profiles: List<String> = emptyList(),
     /**
      * `stream_map` = derived from ScalerStreamConfigurationMap.

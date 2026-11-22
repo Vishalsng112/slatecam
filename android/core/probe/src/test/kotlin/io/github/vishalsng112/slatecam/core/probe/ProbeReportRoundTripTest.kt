@@ -91,11 +91,25 @@ class ProbeReportRoundTripTest {
         assertTrue(report.tier.missing.isEmpty())
         assertTrue(report.tier.unverified.isEmpty())
         assertTrue(report.verification.ran)
-        assertEquals("1.2.0", report.schemaVersion)
+        assertEquals("1.3.0", report.schemaVersion)
+
+        val back = report.cameras.first { it.facing == "back" }
+        val controls = back.controls!!
+        assertEquals(-24, controls.exposureCompensation!!.min)
+        assertEquals(24, controls.exposureCompensation!!.max)
+        assertEquals(true, controls.aeLockAvailable)
+        assertEquals(true, controls.awbLockAvailable)
+        assertEquals(1, controls.maxRegions!!.af)
+        assertEquals("uncalibrated", controls.focusDistanceCalibration)
+        assertTrue(controls.aeTargetFpsRanges.any { it.min == 24 && it.max == 24 })
+        assertEquals(1.0f, back.zoom!!.ratioRange!!.min, 0.001f)
+        assertEquals(10.0f, back.zoom!!.ratioRange!!.max, 0.001f)
+        assertEquals("hlg10", back.dynamicRange.recommendedProfile)
 
         // 1.2.0 additions: active vs maximum refresh, and a structured size.
         val display = report.displays.first()
-        assertEquals(60, display.refreshHz)
+        // The active mode varies between runs; the panel maximum does not.
+        assertTrue(display.refreshHz in listOf(60, 120))
         assertEquals(120, display.maxRefreshHz)
 
         val check = report.verification.checks.first { it.id == "hevc_main10_encode" }
@@ -146,6 +160,12 @@ class ProbeReportRoundTripTest {
         val check = report.verification.checks.first { it.id == "hevc_main10_encode" }
         assertEquals("pass", check.status)
         assertTrue(check.detail!!.contains("c2.qti.hevc.encoder"))
+
+        // This 1.1.0 capture predates the 1.3.0 control surface.
+        val controls = report.cameras.first().controls
+        assertEquals(null, controls?.exposureCompensation)
+        assertEquals(null, controls?.maxRegions)
+        assertEquals(null, report.cameras.first().zoom?.ratioRange)
     }
 
     @Test

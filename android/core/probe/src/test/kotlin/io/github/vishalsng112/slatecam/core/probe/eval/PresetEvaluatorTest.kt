@@ -88,4 +88,20 @@ class PresetEvaluatorTest {
         val evaluator = PresetEvaluator(listOf(uhdAt30Fps()), emptyList(), tenBitClaimed = true)
         assertTrue(evaluator.evaluate(uhd30EightBit).supported)
     }
+
+    @Test
+    fun `stall duration is carried into the preset verdict`() {
+        val stream = StreamEntry(
+            width = 3840,
+            height = 2160,
+            format = StreamFormat.PRIVATE,
+            minFrameDurationNs = 33_333_333L,
+            stallDurationNs = 8_000_000L,
+        )
+        val evaluator = PresetEvaluator(listOf(stream), emptyList(), tenBitClaimed = false)
+        val verdict = evaluator.evaluate(Preset("uhd24_8bit", 3840, 2160, 24, false))
+
+        assertTrue(verdict.supported)
+        assertEquals(8_000_000L, verdict.stallDurationNs)
+    }
 }

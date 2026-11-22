@@ -11,6 +11,7 @@ data class StreamEntry(
     val height: Int,
     val format: StreamFormat,
     val minFrameDurationNs: Long,
+    val stallDurationNs: Long = 0L,
 )
 
 data class HighSpeedEntry(
@@ -109,6 +110,7 @@ class PresetEvaluator(
             supported = true,
             format = if (preset.tenBit) "p010" else "yuv420_flexible",
             minFrameDurationNs = best.minFrameDurationNs,
+            stallDurationNs = best.stallDurationNs.takeIf { it > 0L },
             profiles = if (preset.tenBit) listOf("hlg10") else emptyList(),
             basis = if (preset.tenBit) "capability_only" else "stream_map",
             verified = "not_run",

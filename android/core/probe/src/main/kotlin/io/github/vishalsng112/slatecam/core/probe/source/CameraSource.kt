@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.ImageFormat
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.params.DynamicRangeProfiles
 import android.util.Range
 import io.github.vishalsng112.slatecam.core.probe.eval.HighSpeedEntry
 import io.github.vishalsng112.slatecam.core.probe.eval.PresetCatalog
@@ -13,7 +14,11 @@ import io.github.vishalsng112.slatecam.core.probe.eval.StreamFormat
 import io.github.vishalsng112.slatecam.core.probe.model.CameraInfo
 import io.github.vishalsng112.slatecam.core.probe.model.ControlsInfo
 import io.github.vishalsng112.slatecam.core.probe.model.DynamicRangeInfo
+import io.github.vishalsng112.slatecam.core.probe.model.ExposureCompensation
+import io.github.vishalsng112.slatecam.core.probe.model.FloatRange
+import io.github.vishalsng112.slatecam.core.probe.model.FpsRange
 import io.github.vishalsng112.slatecam.core.probe.model.LensInfo
+import io.github.vishalsng112.slatecam.core.probe.model.MaxRegions
 import io.github.vishalsng112.slatecam.core.probe.model.SensorInfo
 import io.github.vishalsng112.slatecam.core.probe.model.ZoomInfo
 
@@ -103,12 +108,15 @@ class CameraSource(private val context: Context) {
             zoom = ZoomInfo(
                 maxDigital = c.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1f,
                 availableFocalLengthsMm = focalLengths,
+                ratioRange = c.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
+                    ?.let { FloatRange(it.lower, it.upper) },
             ),
             controls = readControls(c),
             dynamicRange = DynamicRangeInfo(
                 tenBitStreams = tenBit,
                 // HLG10 is the mandatory baseline profile for the ten-bit capability.
                 profiles = if (tenBit) listOf("hlg10") else emptyList(),
+                recommendedProfile = if (tenBit) recommendedTenBitProfile(c) else null,
             ),
             presets = presets,
         )
@@ -151,6 +159,24 @@ class CameraSource(private val context: Context) {
         val videoStab = c.get(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)
             ?.map(::videoStabilizationName)
             ?: emptyList()
+        val regionsAe = c.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE)
+        val regionsAf = c.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF)
+        val regionsAwb = c.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AWB)
+        val maxRegions = if (regionsAe != null || regionsAf != null || regionsAwb != null) {
+            MaxRegions(ae = regionsAe ?: 0, af = regionsAf ?: 0, awb = regionsAwb ?: 0)
+        } else {
+            null
+        }
+        val exposureCompensation = c.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+            ?.let { range ->
+                ExposureCompensation(
+                    min = range.lower,
+                    max = range.upper,
+                    step = c.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)
+                        ?.toFloat() ?: 1f,
+                )
+            }
+
         return ControlsInfo(
             aeModes = c.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES)?.map(::aeModeName)
                 ?: emptyList(),
@@ -162,6 +188,19 @@ class CameraSource(private val context: Context) {
             oisAvailable = ois,
             videoStabilizationModes = videoStab,
             videoStabilizationAvailable = videoStab,
+            aeTargetFpsRanges = c.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
+                ?.map { FpsRange(it.lower, it.upper) }
+                ?: emptyList(),
+            exposureCompensation = exposureCompensation,
+            aeLockAvailable = c.get(CameraCharacteristics.CONTROL_AE_LOCK_AVAILABLE),
+            awbLockAvailable = c.get(CameraCharacteristics.CONTROL_AWB_LOCK_AVAILABLE),
+            maxRegions = maxRegions,
+            focusDistanceCalibration = focusCalibrationName(
+                c.get(CameraCharacteristics.LENS_INFO_FOCUS_DISTANCE_CALIBRATION),
+            ),
+            scalerRotateAndCrop = c.get(
+                CameraCharacteristics.SCALER_AVAILABLE_ROTATE_AND_CROP_MODES,
+            )?.map(::rotateAndCropName) ?: emptyList(),
         )
     }
 
@@ -180,7 +219,10 @@ class CameraSource(private val context: Context) {
                 val duration = runCatching {
                     map.getOutputMinFrameDuration(imageFormat, size)
                 }.getOrDefault(0L)
-                entries += StreamEntry(size.width, size.height, streamFormat, duration)
+                val stall = runCatching {
+                    map.getOutputStallDuration(imageFormat, size)
+                }.getOrDefault(0L)
+                entries += StreamEntry(size.width, size.height, streamFormat, duration, stall)
             }
         }
         return entries
@@ -280,6 +322,31 @@ class CameraSource(private val context: Context) {
         CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION -> "preview"
         else -> "mode_$mode"
     }
+
+    private fun focusCalibrationName(value: Int?): String? = when (value) {
+        CameraCharacteristics.LENS_INFO_FOCUS_DISTANCE_CALIBRATION_UNCALIBRATED -> "uncalibrated"
+        CameraCharacteristics.LENS_INFO_FOCUS_DISTANCE_CALIBRATION_APPROXIMATE -> "approximate"
+        CameraCharacteristics.LENS_INFO_FOCUS_DISTANCE_CALIBRATION_CALIBRATED -> "calibrated"
+        else -> null
+    }
+
+    private fun rotateAndCropName(value: Int): String = when (value) {
+        // The mode values are documented but not exposed as public constants.
+        0 -> "none"
+        1 -> "90"
+        2 -> "180"
+        3 -> "270"
+        4 -> "auto"
+        else -> "mode_$value"
+    }
+
+    private fun recommendedTenBitProfile(c: CameraCharacteristics): String? = runCatching {
+        when (c.get(CameraCharacteristics.REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE)) {
+            DynamicRangeProfiles.HLG10 -> "hlg10"
+            DynamicRangeProfiles.HDR10 -> "hdr10"
+            else -> null
+        }
+    }.getOrNull()
 
     private companion object {
         val CAPABILITY_NAMES: Map<Int, String> = mapOf(
