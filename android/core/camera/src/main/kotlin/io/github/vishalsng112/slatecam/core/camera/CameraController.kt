@@ -7,6 +7,7 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.params.DynamicRangeProfiles
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.os.Handler
@@ -37,6 +38,7 @@ data class CameraUiState(
     val previewWidth: Int,
     val previewHeight: Int,
     val previewRotationDegrees: Int,
+    val isTenBit: Boolean = false,
 )
 
 /**
@@ -83,13 +85,21 @@ class CameraController(private val context: Context) {
     private var autoFocus = true
     private var rotationDegrees = 0
     private var initialized = false
+    private var wantsTenBit = false
+    private var tenBitActive = false
+    private var retriedStandard = false
 
-    fun open(previewTarget: Surface, width: Int, height: Int) {
+    val isTenBitActive: Boolean get() = tenBitActive
+
+    fun open(previewTarget: Surface, width: Int, height: Int, tenBit: Boolean = false) {
         handler.post {
             try {
                 closeInternal()
                 previewSurface = previewTarget
                 previewSize = Size(width, height)
+                wantsTenBit = tenBit
+                tenBitActive = false
+                retriedStandard = false
                 errorMessage = null
 
                 val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -270,20 +280,36 @@ class CameraController(private val context: Context) {
         val camera = device ?: return
         val target = previewSurface ?: return
 
+        val useTenBit = wantsTenBit && !retriedStandard
+        val output = OutputConfiguration(target)
+        val profileApplied = if (useTenBit) {
+            runCatching { output.setDynamicRangeProfile(DynamicRangeProfiles.HLG10) }.isSuccess
+        } else {
+            false
+        }
+
         val configuration = SessionConfiguration(
             SessionConfiguration.SESSION_REGULAR,
-            listOf(OutputConfiguration(target)),
+            listOf(output),
             callbackExecutor,
             object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(configured: CameraCaptureSession) {
+                    tenBitActive = useTenBit && profileApplied
                     session = configured
                     startPreview()
                 }
 
                 override fun onConfigureFailed(failed: CameraCaptureSession) {
-                    open = false
-                    errorMessage = "session configuration failed"
-                    emit()
+                    if (useTenBit) {
+                        // HLG10 rejected: retry once with a standard session.
+                        retriedStandard = true
+                        tenBitActive = false
+                        createSession()
+                    } else {
+                        open = false
+                        errorMessage = "session configuration failed"
+                        emit()
+                    }
                 }
             },
         )
@@ -384,6 +410,7 @@ class CameraController(private val context: Context) {
             previewWidth = previewSize.width,
             previewHeight = previewSize.height,
             previewRotationDegrees = rotationDegrees,
+            isTenBit = tenBitActive,
         )
         mainHandler.post { listener?.onState(state) }
     }

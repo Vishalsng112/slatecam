@@ -419,6 +419,13 @@ run. The UI must render these as distinct states. "Your phone lacks 10-bit" and
 `main10_verified` is one of `pass`, `fail`, `not_run`. A pass requires a real
 short encode; the claim alone never sets it.
 
+**Known limitation (1.3.0):** the encode check currently reads the profile from
+`MediaCodec.outputFormat`. Some encoders (observed on MediaTek MT6897) report
+`profile=2` while emitting an 8-bit Main bitstream. Until the check parses the
+HEVC SPS from the encoded bytes, a `pass` is not proof of Main10. Treat
+`cinema` as provisional on devices where claim and bitstream have not been
+compared.
+
 `audio.max_input_channels` is the channel count the prober actually opened, not
 a device maximum. `pcm_24bit` means `AudioRecord` accepts 48 kHz/24-bit input,
 not that the microphone is lossless.

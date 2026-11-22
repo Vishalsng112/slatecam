@@ -42,6 +42,13 @@ class SlateCamBridge private constructor(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val recorder = ClipRecorder(context)
 
+    /**
+     * HLG recording is disabled until the encoder's bitstream is verified to be
+     * Main10. On the POCO the encoder reports profile=2 but emits 8-bit Main,
+     * so tagging HLG would be false advertising.
+     */
+    private val hlgEnabled = false
+
     private var flutterApi: SlateCamFlutterApi? = null
     private var opened = false
     private var resumeOnReturn = false
@@ -66,6 +73,7 @@ class SlateCamBridge private constructor(
     init {
         controller.listener = CameraController.Listener { state ->
             lastState = state
+            renderer.setTenBitSource(state.isTenBit)
             pushState()
         }
     }
@@ -94,7 +102,7 @@ class SlateCamBridge private constructor(
             renderer.start(outputSurface(), size.width, size.height)
             val cameraSurface = renderer.cameraSurface
                 ?: throw IllegalStateException("GL pipeline did not expose a camera surface")
-            controller.open(cameraSurface, size.width, size.height)
+            controller.open(cameraSurface, size.width, size.height, tenBit = hlgEnabled)
             opened = true
         }
         return producer.id()
@@ -143,14 +151,31 @@ class SlateCamBridge private constructor(
         val output = File(directory, "slatecam-${System.currentTimeMillis()}.mp4")
 
         try {
-            val encoderSurface = recorder.start(
-                width = size.width,
-                height = size.height,
-                fps = 30,
-                bitrate = 12_000_000,
-                output = output,
-            )
-            renderer.attachEncoderSurface(encoderSurface)
+            var tenBitHlg = hlgEnabled && controller.isTenBitActive
+            val encoderSurface = runCatching {
+                recorder.start(
+                    width = size.width,
+                    height = size.height,
+                    fps = 30,
+                    bitrate = 12_000_000,
+                    output = output,
+                    tenBitHlg = tenBitHlg,
+                )
+            }.getOrElse {
+                // Main10 configure can be refused even when HLG10 capture works.
+                runCatching { recorder.stop() }
+                tenBitHlg = false
+                recorder.start(
+                    width = size.width,
+                    height = size.height,
+                    fps = 30,
+                    bitrate = 12_000_000,
+                    output = output,
+                    tenBitHlg = false,
+                )
+            }
+
+            renderer.attachEncoderSurface(encoderSurface, tenBitHlg)
             clipPath = null
             recordingError = null
             recordingStartMs = SystemClock.elapsedRealtime()
@@ -204,7 +229,7 @@ class SlateCamBridge private constructor(
         resumeOnReturn = false
         val surface = renderer.cameraSurface ?: return
         val size = CameraController.choosePreviewSize(context)
-        controller.open(surface, size.width, size.height)
+        controller.open(surface, size.width, size.height, tenBit = hlgEnabled)
         opened = true
     }
 

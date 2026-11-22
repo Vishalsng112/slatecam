@@ -205,3 +205,28 @@ Tested on the POCO X6 Pro 5G (Android 16, MT6897).
 
 Both are exactly the class of vendor-HAL problem the probe-first approach was
 built for, and neither is discoverable without recording on real hardware.
+
+## 10-bit HLG attempt — rejected by evidence (2026-11-23)
+
+Requesting Main10 with BT.2020/HLG at 1080p on the POCO produced a file whose
+MediaCodec **output format claimed** `profile=2` (Main10) and `transfer=7`
+(HLG), but ffprobe reports the truth:
+
+| Field | Actual bitstream |
+|---|---|
+| profile | **Main (8-bit)** |
+| pix_fmt | `yuvj420p` (full range) |
+| color_space / transfer / primaries | `bt2020nc` / `arib-std-b67` (HLG) / `bt2020` |
+
+The encoder reported Main10 and emitted Main. Tagging that footage as HLG would
+be false advertising, so the HLG path is disabled (`hlgEnabled = false`) and
+recording stays 8-bit SDR, verified as `Main` / `yuv420p` / `bt709` / TV range.
+
+### Consequence for the prober
+
+`hevc_main10_encode` currently trusts `MediaCodec.outputFormat`. On this device
+that is **not proof**. Verification must parse the HEVC SPS from the encoded
+bitstream — `general_profile_idc` and bit depth — before claiming Main10.
+Until it does, the `cinema` verdict for the POCO is a **false-positive
+candidate**, and the earlier "MediaTek under-reports Main10" conclusion should
+be treated as unproven.

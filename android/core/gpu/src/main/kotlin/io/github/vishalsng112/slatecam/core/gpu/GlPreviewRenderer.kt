@@ -43,12 +43,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var program = 0
     private var uTexMatrix = 0
     private var uTexture = 0
+    private var uHlgToSdr = 0
     private var aPosition = 0
     private var aTexCoord = 0
     private val texMatrix = FloatArray(16)
     private var width = 1920
     private var height = 1080
     private var started = false
+
+    @Volatile
+    private var tenBitSource = false
 
     /** Surface the camera must target. Available after [start]. */
     @Volatile
@@ -108,19 +112,59 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         }
     }
 
+    /** True when the camera delivers an HLG10 stream that preview must tonemap. */
+    fun setTenBitSource(value: Boolean) {
+        tenBitSource = value
+    }
+
     /** Adds an encoder input surface; every frame is then drawn to both targets. */
-    fun attachEncoderSurface(surface: Surface) {
+    fun attachEncoderSurface(surface: Surface, tenBitHlg: Boolean) {
         handler.post {
             if (!started) return@post
             detachEncoderInternal()
+
+            val targetConfig = if (tenBitHlg) pickTenBitConfig() ?: config else config
+            val attributes = if (tenBitHlg) {
+                intArrayOf(
+                    EGL_GL_COLORSPACE_KHR,
+                    EGL_GL_COLORSPACE_BT2020_HLG_EXT,
+                    EGL14.EGL_NONE,
+                )
+            } else {
+                intArrayOf(EGL14.EGL_NONE)
+            }
+
             encoderEglSurface = EGL14.eglCreateWindowSurface(
                 display,
-                config,
+                targetConfig,
                 surface,
-                intArrayOf(EGL14.EGL_NONE),
+                attributes,
                 0,
             )
+            if (encoderEglSurface == EGL14.EGL_NO_SURFACE) {
+                Log.w(
+                    TAG,
+                    "encoder surface failed, error 0x${Integer.toHexString(EGL14.eglGetError())}",
+                )
+            }
         }
+    }
+
+    private fun pickTenBitConfig(): EGLConfig? {
+        val attributes = intArrayOf(
+            EGL14.EGL_RED_SIZE, 10,
+            EGL14.EGL_GREEN_SIZE, 10,
+            EGL14.EGL_BLUE_SIZE, 10,
+            EGL14.EGL_ALPHA_SIZE, 2,
+            EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+            EGL_RECORDABLE_ANDROID, 1,
+            EGL14.EGL_NONE,
+        )
+        val configs = arrayOfNulls<EGLConfig>(1)
+        val count = IntArray(1)
+        val chosen = EGL14.eglChooseConfig(display, attributes, 0, configs, 0, 1, count, 0) &&
+            count[0] > 0
+        return if (chosen) configs[0] else null
     }
 
     fun detachEncoderSurface() {
@@ -229,6 +273,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         aTexCoord = GLES20.glGetAttribLocation(program, "aTexCoord")
         uTexMatrix = GLES20.glGetUniformLocation(program, "uTexMatrix")
         uTexture = GLES20.glGetUniformLocation(program, "uTexture")
+        uHlgToSdr = GLES20.glGetUniformLocation(program, "uHlgToSdr")
 
         GLES20.glDeleteShader(vertex)
         GLES20.glDeleteShader(fragment)
@@ -276,12 +321,12 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         }.onFailure { return }
 
         val timestampNs = System.nanoTime()
-        renderTo(outputEglSurface, timestampNs)
-        renderTo(encoderEglSurface, timestampNs)
+        renderTo(outputEglSurface, timestampNs, tonemap = tenBitSource)
+        renderTo(encoderEglSurface, timestampNs, tonemap = false)
         onFrameRendered()
     }
 
-    private fun renderTo(surface: EGLSurface, timestampNs: Long) {
+    private fun renderTo(surface: EGLSurface, timestampNs: Long, tonemap: Boolean) {
         if (surface == EGL14.EGL_NO_SURFACE) return
         EGL14.eglMakeCurrent(display, surface, surface, context)
 
@@ -293,6 +338,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
         GLES20.glUniform1i(uTexture, 0)
+        GLES20.glUniform1i(uHlgToSdr, if (tonemap) 1 else 0)
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
 
         GLES20.glEnableVertexAttribArray(aPosition)
@@ -370,11 +416,26 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
         const val FRAGMENT = """
             #extension GL_OES_EGL_image_external : require
-            precision mediump float;
+            precision highp float;
             varying vec2 vTexCoord;
             uniform samplerExternalOES uTexture;
+            uniform int uHlgToSdr;
+
+            // Approximate HLG -> SDR for the preview only. The encoder receives
+            // the untouched HLG signal.
+            vec3 hlgToSdr(vec3 e) {
+                vec3 low = (e * e) / 3.0;
+                vec3 high = (exp((e - 0.55991073) / 0.17883277) + 0.28466892) / 12.0;
+                vec3 x = mix(low, high, step(vec3(0.5), e));
+                return pow(clamp(x * 2.5, 0.0, 1.0), vec3(1.0 / 2.2));
+            }
+
             void main() {
-                gl_FragColor = texture2D(uTexture, vTexCoord);
+                vec4 c = texture2D(uTexture, vTexCoord);
+                if (uHlgToSdr == 1) {
+                    c.rgb = hlgToSdr(c.rgb);
+                }
+                gl_FragColor = c;
             }
         """
     }
@@ -385,6 +446,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
         // Android EGL extension: marks a config usable as a MediaCodec input.
         const val EGL_RECORDABLE_ANDROID = 0x3142
+
+        // Not exposed by android.opengl.EGL14.
+        const val EGL_GL_COLORSPACE_KHR = 0x309D
+        const val EGL_GL_COLORSPACE_BT2020_HLG_EXT = 0x3540
 
         val QUAD_VERTICES: FloatBuffer = floatBuffer(
             floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f),

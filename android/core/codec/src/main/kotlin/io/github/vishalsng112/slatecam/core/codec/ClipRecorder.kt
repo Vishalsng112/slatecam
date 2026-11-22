@@ -49,12 +49,22 @@ class ClipRecorder(private val context: Context) {
 
     private var outputFile: File? = null
 
+    @Volatile
+    private var hlg = false
+
     val isRecording: Boolean get() = running
 
     /**
      * Starts recording and returns the surface the renderer must draw into.
      */
-    fun start(width: Int, height: Int, fps: Int, bitrate: Int, output: File): Surface {
+    fun start(
+        width: Int,
+        height: Int,
+        fps: Int,
+        bitrate: Int,
+        output: File,
+        tenBitHlg: Boolean = false,
+    ): Surface {
         check(!running) { "already recording" }
         lastError = null
         videoEos = false
@@ -63,6 +73,7 @@ class ClipRecorder(private val context: Context) {
         videoTrack = -1
         audioTrack = -1
         outputFile = output
+        hlg = tenBitHlg
 
         val mux = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         muxer = mux
@@ -80,11 +91,23 @@ class ClipRecorder(private val context: Context) {
             setInteger(MediaFormat.KEY_FRAME_RATE, fps)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
             // MediaTek encoders otherwise default to a quality mode that ignores
-            // KEY_BIT_RATE and produces ~150 Mbps at 1080p.
-            setInteger(
-                MediaFormat.KEY_BITRATE_MODE,
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR,
-            )
+            // KEY_BIT_RATE and produces ~150 Mbps at 1080p. Omit it for the HLG
+            // path: it appears to force an 8-bit Main stream.
+            if (!tenBitHlg) {
+                setInteger(
+                    MediaFormat.KEY_BITRATE_MODE,
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR,
+                )
+            }
+            if (tenBitHlg) {
+                setInteger(
+                    MediaFormat.KEY_PROFILE,
+                    MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10,
+                )
+                setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT2020)
+                setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_HLG)
+                setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
+            }
         }
 
         val video = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC)
@@ -224,8 +247,37 @@ class ClipRecorder(private val context: Context) {
             videoEncoder?.let { encoder ->
                 when (val index = encoder.dequeueOutputBuffer(info, 10_000)) {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        val trackFormat = encoder.outputFormat
+                        android.util.Log.i(
+                            "SlateCam",
+                            "recorded video format: profile=${
+                                trackFormat.getInteger(MediaFormat.KEY_PROFILE, -1)
+                            } standard=${
+                                trackFormat.getInteger(MediaFormat.KEY_COLOR_STANDARD, -1)
+                            } transfer=${
+                                trackFormat.getInteger(MediaFormat.KEY_COLOR_TRANSFER, -1)
+                            } range=${
+                                trackFormat.getInteger(MediaFormat.KEY_COLOR_RANGE, -1)
+                            }",
+                        )
+                        if (hlg) {
+                            // Make the colour signalling explicit on the track so
+                            // players see HLG/BT.2020 rather than guessing.
+                            trackFormat.setInteger(
+                                MediaFormat.KEY_COLOR_STANDARD,
+                                MediaFormat.COLOR_STANDARD_BT2020,
+                            )
+                            trackFormat.setInteger(
+                                MediaFormat.KEY_COLOR_TRANSFER,
+                                MediaFormat.COLOR_TRANSFER_HLG,
+                            )
+                            trackFormat.setInteger(
+                                MediaFormat.KEY_COLOR_RANGE,
+                                MediaFormat.COLOR_RANGE_LIMITED,
+                            )
+                        }
                         videoTrack = runCatching {
-                            muxer?.addTrack(encoder.outputFormat) ?: -1
+                            muxer?.addTrack(trackFormat) ?: -1
                         }.getOrDefault(-1)
                         maybeStartMuxer()
                         progressed = true

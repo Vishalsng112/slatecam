@@ -53,3 +53,15 @@ buffers.
   colour, and no path to 10-bit HLG.
 - **One encoder per resolution with reconfiguration** — rejected for now:
   stop/start per clip is simpler and correct.
+
+## Amendment — HLG gated off
+
+HLG recording is compiled in but disabled (`hlgEnabled = false` in
+`SlateCamBridge`). On the POCO the encoder's `outputFormat` reported
+`profile=2` and `transfer=7`, while the actual bitstream was 8-bit Main,
+full-range. Writing an HLG tag over that would misrepresent the footage.
+
+The gate stays closed until the recorder verifies the encoded bitstream itself
+(HEVC SPS `general_profile_idc`, bit depth, range). The same check must be added
+to `hevc_main10_encode` in the prober, because it currently trusts the codec's
+own claim.

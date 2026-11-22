@@ -14,13 +14,14 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 3 — recording (8-bit working, 10-bit next).**
+> **Status: Phase 3 — recording (8-bit SDR verified; HLG gated off).**
 > Live preview plus HEVC/AAC capture through the same GL pipeline: 1080p30
-> HEVC Main at ~12 Mbps with 48 kHz stereo AAC, recorded to app storage and
-> verified with ffprobe. 10-bit HLG, MediaStore output and a thermal stress test
-> are the remaining Phase 3 work.
+> HEVC Main at ~12 Mbps with 48 kHz stereo AAC, written to app storage and
+> verified with ffprobe as `Main` / `yuv420p` / `bt709`.
 >
-> Phase 2 remains verified on a POCO X6 Pro 5G; see
+> HLG recording is implemented but disabled: the POCO's encoder claims Main10
+> while emitting 8-bit Main, so the tag would be false. Bitstream-level
+> verification (HEVC SPS) is the gate. See
 > [docs/test-devices.md](docs/test-devices.md).
 
 ---
