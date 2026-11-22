@@ -121,10 +121,23 @@ task fails the build otherwise. See
 
 ## Building
 
-Not yet available. The build system lands with the Phase 2 camera core.
+Prerequisites: Flutter 3.47 or newer, Android SDK with platform 37, and JDK 17+
+(CI pins 21). The Gradle root is `android/`, not the repository root.
 
-Prerequisites for contributors: Android Studio with SDK 37, JDK 17+, Flutter
-(latest stable), and a physical Android 13+ device.
+```sh
+flutter pub get
+flutter build apk --debug      # or: flutter run
+```
+
+Module boundary checks and other Gradle tasks:
+
+```sh
+cd android
+./gradlew checkModuleGraph
+```
+
+The app builds and shows the Phase 0 shell. There is no camera functionality
+yet — the pipeline lands in Phase 2.
 
 ## Contributing
 

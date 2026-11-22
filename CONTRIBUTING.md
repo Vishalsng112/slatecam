@@ -73,7 +73,15 @@ Device support is data, not code:
 | `:core:camera`, `:core:codec`, `:core:gpu` | Real-device test notes; CI cannot validate these |
 | `:bridge`, `:ui` | Manual test on device |
 
+Before pushing, run the module boundary check:
+
+```sh
+cd android && ./gradlew checkModuleGraph
+```
+
 Emulator results are not accepted as evidence for camera or encoder behavior.
+Remember that the Gradle root is `android/`; `./gradlew` does not exist at the
+repository root.
 
 ## Reporting security issues
 

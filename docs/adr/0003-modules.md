@@ -60,7 +60,7 @@ which adds build fragility for no benefit when the host app is the product.
 | Module | Depends on | May use Flutter | Notes |
 |---|---|---|---|
 | `:core:common` | — | no | No Android UI; minimal Android APIs |
-| `:core:profile` | `:core:common` | no | **Pure Kotlin/JVM.** No `android.*` imports |
+| `:core:profile` | — | no | **Pure Kotlin/JVM.** No `android.*` imports |
 | `:core:probe` | `:core:common` | no | Reads platform APIs directly |
 | `:core:camera` | `:core:common` | no | Owns the camera state machine |
 | `:core:gpu` | `:core:common` | no | Owns the EGL/GLES thread |
@@ -92,20 +92,27 @@ if a forbidden project dependency appears. Rule 6 is a review rule.
 
 ### Versions and toolchain
 
-Pinned in `android/gradle/libs.versions.toml`:
+Pinned in `android/settings.gradle.kts` (plugins) and, once library
+dependencies exist, `android/gradle/libs.versions.toml`:
 
 | Component | Version | Verified |
 |---|---|---|
-| Gradle | 9.7.1 | present in local wrapper cache |
-| Android Gradle Plugin | 9.5.2 | Google Maven, stable |
-| Kotlin | 2.4.20 | Maven Central, stable |
+| Gradle | 9.3.1 | Flutter 3.47 template default |
+| Android Gradle Plugin | 9.1.0 | Flutter 3.47 template, supports SDK 37 |
+| Kotlin | 2.4.0 | Flutter 3.47 template |
 | compileSdk / targetSdk | 37 | installed locally |
 | minSdk | 33 | ADR 0002 |
 | JDK | 17 bytecode target | see risk below |
 
-**Risk:** the local JDK is 25. AGP 9.5 officially supports JDK 17 through 24.
-Gradle runs on 25 locally, but CI should pin JDK 21. The bytecode target stays
-17 regardless, so nothing in the app depends on the build JDK.
+**Risk:** the local JDK is 25. AGP 9.1 supports JDK 17 through 24 officially.
+Gradle 9.3.1 runs on 25 locally, but CI should pin JDK 21. The bytecode target
+stays 17 regardless, so nothing in the app depends on the build JDK.
+
+**Known warning (accepted):** Flutter 3.47 warns that library modules apply the
+Kotlin Gradle Plugin and that a future Flutter version will require AGP Built-in
+Kotlin instead. The build is correct today. Migrating the ten library modules is
+a Phase 10 maintenance task and must not block Phase 1; the warning is recorded
+here so it is not rediscovered as a surprise.
 
 ### Threading ownership
 
