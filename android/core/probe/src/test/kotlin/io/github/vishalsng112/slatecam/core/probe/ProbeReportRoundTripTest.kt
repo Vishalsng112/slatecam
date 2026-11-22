@@ -111,4 +111,49 @@ class ProbeReportRoundTripTest {
         // Other sizes were not exercised, so they stay unverified.
         assertEquals("not_run", back.presets.getValue("fhd30_10bit").verified)
     }
+
+    @Test
+    fun `pad 3 claims and verifies Main10 on android 17`() {
+        val report = ProbeRunner.json.decodeFromString<ProbeReport>(sample("oneplus-pad-3-opd2415.json"))
+
+        assertEquals("oneplus/op6190l1", report.device.deviceKey)
+        assertEquals(37, report.device.sdk)
+        assertEquals("cinema", report.tier.name)
+        assertTrue(report.tier.missing.isEmpty())
+
+        val hevc = report.encoders.filter { it.mime == "video/hevc" && it.hardware }
+        assertTrue(hevc.isNotEmpty())
+        assertTrue(hevc.all { it.main10Claimed })
+
+        val check = report.verification.checks.first { it.id == "hevc_main10_encode" }
+        assertEquals("pass", check.status)
+        assertTrue(check.detail!!.contains("c2.qti.hevc.encoder"))
+    }
+
+    @Test
+    fun `both vendors reach cinema with opposite claim behaviour`() {
+        val poco = ProbeRunner.json.decodeFromString<ProbeReport>(verified())
+        val pad = ProbeRunner.json.decodeFromString<ProbeReport>(sample("oneplus-pad-3-opd2415.json"))
+
+        assertEquals("cinema", poco.tier.name)
+        assertEquals("cinema", pad.tier.name)
+
+        // MediaTek: verified but not advertised.
+        assertFalse(poco.encoders.any { it.mime == "video/hevc" && it.hardware && it.main10Claimed })
+        // Qualcomm: advertised and verified.
+        assertTrue(pad.encoders.any { it.mime == "video/hevc" && it.hardware && it.main10Claimed })
+
+        // Either way, the verdict comes from the encode, not the claim.
+        assertTrue(poco.verification.ran && pad.verification.ran)
+    }
+
+    @Test
+    fun `tablet camera is limited to 4K30 and has no high-speed modes`() {
+        val report = ProbeRunner.json.decodeFromString<ProbeReport>(sample("oneplus-pad-3-opd2415.json"))
+        val back = report.cameras.first { it.facing == "back" }
+
+        assertTrue(back.presets.getValue("uhd24_10bit").supported)
+        assertEquals("fps_out_of_range", back.presets.getValue("uhd60_8bit").reason)
+        assertEquals("no_stream_config", back.presets.getValue("fhd120_8bit").reason)
+    }
 }

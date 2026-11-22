@@ -80,3 +80,43 @@ Prober 1.0.0, app 0.1.0, Android 16 (`BP2A.250605.031.A3`), SoC `MT6897`.
   not promote FHD, and an unsupported mode never inherits a pass.
 - The device database stores both the claim and the verification result, because
   they disagree on this device and probably on many more.
+
+## Second report — OnePlus Pad 3 (2026-11-23)
+
+Prober 1.0.0, app 0.1.0, Android 17 (API 37), SoC `SM8750P` (Snapdragon 8 Elite).
+
+| Area | Reported |
+|---|---|
+| Tier | `cinema` — claimed and verified |
+| Cameras | IDs `0` (back) and `1` (front), both `level_3`, both ten-bit, concurrent |
+| Sensor (back) | 4160×3120, 4.66×3.49 mm, ISO 100–1600, exposure 20.8 µs – 260 ms |
+| Presets | UHD 24/25/30 in 10-bit and 8-bit; FHD 24/25/30; no 60/120/240 modes |
+| HEVC encoders | `c2.qti.hevc.encoder` and five siblings, all advertise Main10 |
+| Verification | `c2.qti.hevc.encoder`, 4K Main10 HLG, 11 frames, 24,134 bytes, 348 ms |
+| Display | 60 Hz active mode, wide gamut, HDR10 / HLG / HDR10+ / Dolby Vision, 500 nits |
+| Audio | 48 kHz, 24-bit PCM, low latency |
+| Native page size | 4 KB |
+
+### Vendor comparison
+
+| | POCO X6 Pro 5G | OnePlus Pad 3 |
+|---|---|---|
+| SoC | MediaTek MT6897 | Qualcomm SM8750P |
+| Android | 16 (API 36) | **17 (API 37)** |
+| Main10 advertised | no | yes |
+| Main10 verified | **yes** | yes |
+| Tier | `cinema` | `cinema` |
+
+Both devices are cinema-capable and disagree completely about whether they can
+be trusted to say so. That is why the database stores the claim and the
+verification as separate fields rather than collapsing them into one flag.
+
+### Probe refinements this report suggests
+
+- `display.refresh_hz` reports the active mode (60 on this tablet), not the
+  panel maximum. Monitoring wants both; add `max_refresh_hz` in a schema minor.
+- The tablet offers no high-speed streams at all, so 120/240 presets correctly
+  report `no_stream_config` rather than a frame-rate limit. The distinction
+  matters for the UI copy.
+- The Pad confirms the build runs on the target API 37, which the POCO
+  (API 36) could not.
