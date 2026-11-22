@@ -14,10 +14,12 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 0 — foundation.**
-> There is no runnable build yet. This repository currently contains project
-> governance, documentation, and structure. The roadmap below is the plan of
-> record; follow along or watch the repo for the first usable build.
+> **Status: Phase 1 — capability prober.**
+> The app builds and runs. On launch it probes the camera and encoder stack and
+> writes a versioned capability report to `files/probe.json`, which is how
+> device support is decided. There is no camera preview or recording yet; those
+> land in Phase 2 and 3. Verified on a POCO X6 Pro 5G — see
+> [docs/test-devices.md](docs/test-devices.md).
 
 ---
 

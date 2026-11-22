@@ -1,7 +1,7 @@
 # Probe report schema
 
 - **Schema id:** `slatecam.probe`
-- **Version:** `1.0.0`
+- **Version:** `1.1.0`
 - **Status:** draft for Phase 1
 - **Owner:** `:core:probe`
 
@@ -235,17 +235,49 @@ never disagree about what is supported.
     "supported": true,
     "format": "p010",
     "min_frame_duration_ns": 33333333,
-    "stabilization": ["on", "off"],
-    "profiles": ["hlg10"]
+    "profiles": ["hlg10"],
+    "basis": "capability_only",
+    "verified": "not_run"
   },
   "uhd60_10bit": {
     "supported": false,
-    "reason": "no_10bit_config_at_fps",
-    "detail": "P010 at 3840x2160 limited to 30fps"
+    "reason": "fps_out_of_range",
+    "detail": "max 30.0 fps at 3840x2160",
+    "basis": "stream_map",
+    "verified": "not_run"
   },
-  "uhd30_8bit": { "supported": true, "format": "yuv420_flexible" }
+  "uhd30_8bit": {
+    "supported": true,
+    "format": "yuv420_flexible",
+    "basis": "stream_map",
+    "verified": "not_run"
+  }
 }
 ```
+
+`basis` states where a verdict came from:
+
+| Value | Meaning |
+|---|---|
+| `stream_map` | Derived from `ScalerStreamConfigurationMap`; size and frame rate are directly reported |
+| `capability_only` | Device advertises the capability, but per-size support can only be proven by configuring a real session |
+
+`verified` is `pass`, `fail`, or `not_run`. A `capability_only` verdict with
+`not_run` must never be presented to the user as confirmed support.
+
+### Why 10-bit is always `capability_only`
+
+Camera2 does not report bit depth per stream size. `DYNAMIC_RANGE_TEN_BIT` is a
+device-wide capability, and 10-bit output is selected when a session is
+configured with a dynamic range profile, not by asking the stream map for a
+different format. A device can therefore advertise ten-bit and still reject a
+P010 stream at UHD. Only a real session and encode can prove otherwise, which
+is what the verification step exists for.
+
+Frame-rate limits for 10-bit presets are also derived from the 8-bit stream map
+and are therefore a heuristic, not a guarantee.
+
+Version 1.1.0 added `basis` and `verified`; both are additive.
 
 Reason codes are a closed set so the UI can localize them:
 
