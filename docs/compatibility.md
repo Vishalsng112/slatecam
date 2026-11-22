@@ -30,7 +30,8 @@ can request verification from the device report screen.
 
 ## How a device becomes supported
 
-1. The prober runs and produces a JSON report (schema lives in `:core:probe`).
+1. The prober runs and produces a JSON report — see
+   [probe-schema.md](probe-schema.md) for the contract.
 2. A maintainer or the device owner records a short verification clip.
 3. If the device needs a workaround, a quirk entry is added.
 4. The entry ships in the next device table update.

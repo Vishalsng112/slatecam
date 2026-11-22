@@ -1,0 +1,357 @@
+# Probe report schema
+
+- **Schema id:** `slatecam.probe`
+- **Version:** `1.0.0`
+- **Status:** draft for Phase 1
+- **Owner:** `:core:probe`
+
+This document defines the capability report produced by the prober. It is the
+contract between Phase 1 (probing), Phase 2 (gating the UI), Phase 7 (device
+database), and any external tool that reads reports.
+
+## 1. Two artifacts, one schema
+
+A report exists in two kinds. They share every structure; `kind` only controls
+how much detail is included in the optional sections.
+
+| Kind | Target size | Uploaded | Use |
+|---|---|---|---|
+| `summary` | < 20 KB | opt-in only | Device database, UI gating, issue reports |
+| `full` | up to ~500 KB | never automatically | Local debugging, maintainer triage |
+
+The summary must be sufficient to answer every gating question the app asks.
+If a feature cannot be gated from `summary` data, the schema is missing a
+field — do not work around it by shipping `full` dumps.
+
+## 2. Design rules
+
+1. **Verdicts, not dumps.** The report contains evaluated answers for the
+   presets the app actually uses, plus the distilled facts used to compute
+   them. Raw `StreamConfigurationMap` tables belong in `full` only.
+2. **Enums are strings.** Never emit raw Android integer constants. They are
+   unreadable, version-dependent, and impossible to review in a diff.
+3. **Claimed and verified are separate.** Anything the platform claims and
+   anything the prober actually exercised live in different fields.
+4. **Null means "not applicable"; missing means "not collected".** Serialize
+   absent optional fields by omitting them, not by writing `null`.
+5. **Additive only within a major version.** See section 9.
+6. **No personal data, ever.** See section 8.
+
+## 3. Envelope
+
+```json
+{
+  "schema": "slatecam.probe",
+  "schema_version": "1.0.0",
+  "kind": "summary",
+  "report": {
+    "id": "0f3c9a52-7d1e-4b2a-9c55-2f6a1d8e4b11",
+    "created_at": "2026-11-23T09:41:00Z",
+    "prober_version": "1.0.0",
+    "app_version": "0.1.0",
+    "duration_ms": 4820,
+    "locale": "en-IN"
+  },
+  "device": {},
+  "system": {},
+  "displays": [],
+  "cameras": [],
+  "encoders": [],
+  "audio": {},
+  "tier": {},
+  "verification": {},
+  "quirks_applied": [],
+  "warnings": []
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `schema_version` | semver string | Written by the prober; stored with the report |
+| `kind` | `summary` \| `full` | Controls detail in `cameras[].streams` and `encoders[].codecs` |
+| `report.id` | UUIDv4 | Unique per run, not per device |
+| `tier` | object | Precomputed by the prober, see section 7 |
+| `warnings` | string[] | Human-readable inconsistencies, e.g. "encoder list disagrees with codec query" |
+
+## 4. Device identity
+
+```json
+{
+  "device_key": "google/husky",
+  "manufacturer": "Google",
+  "brand": "google",
+  "model": "Pixel 8 Pro",
+  "device": "husky",
+  "product": "husky",
+  "board": "husky",
+  "hardware": "husky",
+  "fingerprint": "google/husky/husky:15/AP4A.250105.002/12345678:user/release-keys",
+  "build_id": "AP4A.250105.002",
+  "android_release": "15",
+  "sdk": 35,
+  "security_patch": "2025-01-05",
+  "soc_manufacturer": "Google",
+  "soc_model": "Tensor G3",
+  "abis": ["arm64-v8a"],
+  "is_emulator": false,
+  "is_low_ram": false,
+  "reported_by": "owner"
+}
+```
+
+`device_key` is `manufacturer/device`, lowercased — the stable grouping key for
+the device database. `fingerprint` is required for version-scoped quirks; it is
+public build metadata, not personal data.
+
+`reported_by` is one of `owner`, `maintainer`, `anonymous`.
+
+## 5. System, display, GPU
+
+```json
+"system": {
+  "thermal_status": "none",
+  "sustained_performance_supported": true,
+  "total_ram_mb": 12288,
+  "free_storage_mb": 41200,
+  "native_page_size_kb": 16,
+  "gles": {
+    "version": "3.2",
+    "vendor": "Qualcomm",
+    "renderer": "Adreno (TM) 740"
+  },
+  "gpu_capabilities": {
+    "color_buffer_float": true,
+    "color_buffer_half_float": true,
+    "compute_shader": true,
+    "rgba1010102_renderable": true,
+    "max_texture_size": 16384
+  },
+  "egl_capabilities": {
+    "version": "1.5",
+    "bt2020_hlg_colorspace": true,
+    "bt2020_pq_colorspace": true,
+    "hdr_gl_colorspace": true,
+    "ten_bit_config": true
+  }
+}
+```
+
+The `egl_capabilities` block is the distilled form of ~200 extension strings.
+Only booleans the pipeline actually branches on are recorded. `full` reports
+may include the raw extension arrays.
+
+`displays[]` entries carry `id`, `refresh_hz`, `wide_color_gamut`,
+`hdr_types` (`hdr10`, `hlg`, `dolby_vision`), and `max_luminance_nits`, used to
+decide whether the preview can show a monitor-referred image.
+
+## 6. Cameras
+
+`cameras[]` is ordered by camera ID as a string (`"0"`, `"1"`, `"2"`), because
+logical camera IDs are not guaranteed contiguous.
+
+```json
+{
+  "id": "0",
+  "facing": "back",
+  "hardware_level": "full",
+  "logical_multi_camera": true,
+  "physical_ids": ["2", "3", "4"],
+  "concurrent_with": ["1"],
+  "capabilities": [
+    "manual_sensor",
+    "manual_post_processing",
+    "raw",
+    "dynamic_range_ten_bit",
+    "logical_multi_camera"
+  ],
+  "sensor": {
+    "pixel_array": [4096, 3072],
+    "active_array": [4080, 3060],
+    "physical_size_mm": [9.8, 7.3],
+    "orientation_deg": 90,
+    "color_filter": "bayer",
+    "timestamp_source": "realtime",
+    "iso_range": [50, 12800],
+    "exposure_time_range_ns": [100000, 500000000],
+    "black_level": 64,
+    "white_level": 1023
+  },
+  "lenses": [
+    { "focal_length_mm": 6.9, "aperture": 1.68, "min_focus_distance_diopters": 0.0 }
+  ],
+  "zoom": { "max_digital": 30.0, "available_focal_lengths_mm": [2.2, 6.9, 14.0] },
+  "controls": {
+    "ae_modes": ["on", "off", "on_auto_flash", "precapture"],
+    "af_modes": ["off", "auto", "continuous_video", "continuous_picture"],
+    "awb_modes": ["off", "auto", "incandescent", "daylight", "cloudy"],
+    "ois_modes": ["on", "off"],
+    "ois_available": ["on", "off"],
+    "video_stabilization_modes": ["off", "on", "preview"],
+    "video_stabilization_available": ["off", "on", "preview"]
+  },
+  "dynamic_range": {
+    "ten_bit_streams": true,
+    "profiles": ["hlg10", "hdr10"]
+  },
+  "presets": {},
+  "tables": {}
+}
+```
+
+`timestamp_source` matters: gyro metadata alignment is only reliable when it is
+`realtime`. `presets` is defined in section 6.1. `tables` exists only in `full`
+reports (section 6.2).
+
+### 6.1 Presets (summary)
+
+Preset ids are `{resolution}{fps}_{depth}`, with resolution one of `uhd`
+(3840×2160), `dci4k` (4096×2160), `fhd`, `hd`. Frame rates are the app's
+supported rates, which include **24 and 25 fps** — cinema rates are not
+optional, and many sensors offer 24/25 but not 30 in a given size.
+
+The canonical preset matrix is generated from the app's recording-mode
+catalog, not hardcoded in the prober. For 1.0 the catalog is:
+
+| Resolution | Frame rates | Depth |
+|---|---|---|
+| `uhd` | 24, 25, 30 | 10-bit, 8-bit |
+| `uhd` | 60 | 8-bit |
+| `dci4k` | 24 | 10-bit |
+| `fhd` | 24, 25, 30, 60 | 8-bit |
+| `fhd` | 120 | 8-bit |
+| `hd` | 240 | 8-bit |
+
+Adding a recording mode means adding a preset, so the prober and the UI can
+never disagree about what is supported.
+
+```json
+"presets": {
+  "uhd30_10bit": {
+    "supported": true,
+    "format": "p010",
+    "min_frame_duration_ns": 33333333,
+    "stabilization": ["on", "off"],
+    "profiles": ["hlg10"]
+  },
+  "uhd60_10bit": {
+    "supported": false,
+    "reason": "no_10bit_config_at_fps",
+    "detail": "P010 at 3840x2160 limited to 30fps"
+  },
+  "uhd30_8bit": { "supported": true, "format": "yuv420_flexible" }
+}
+```
+
+Reason codes are a closed set so the UI can localize them:
+
+| Code | Meaning |
+|---|---|
+| `no_stream_config` | Resolution not offered at all |
+| `no_10bit_config_at_fps` | 10-bit exists, but not at this frame rate |
+| `fps_out_of_range` | Frame rate outside the supported range for this size |
+| `unsupported_format` | Stream exists but not in a format the pipeline can use |
+| `stabilization_conflict` | Size/fps only available with stabilization in a fixed state |
+| `hardware_limit` | Explicit HAL refusal (e.g. too many concurrent streams) |
+
+Presets are evaluated for the primary back camera and any logical camera the
+app can select. Do not evaluate all presets for all physical sub-cameras; the
+schema would explode for no benefit.
+
+### 6.2 Tables (full only)
+
+`tables` carries the untranslated data for triage: the full
+`StreamConfigurationMap` output sizes, per-size frame duration ranges, high
+speed sizes, and the raw capability bitmasks. Nothing in the app reads this.
+
+## 7. Tier verdict
+
+```json
+"tier": {
+  "name": "cinema_claimed",
+  "missing": [],
+  "unverified": ["hevc_main10_encode"],
+  "reasons": ["ten_bit_claimed_not_verified"]
+}
+```
+
+| Tier | Rule |
+|---|---|
+| `cinema` | `FULL`/`LEVEL_3` + `manual_sensor` + `manual_post_processing` + `dynamic_range_ten_bit` + hardware HEVC Main10 **verified** |
+| `cinema_claimed` | All of the above claimed, verification not run or not passed |
+| `standard` | `LIMITED` or better + `manual_sensor` + hardware HEVC (8-bit) |
+| `basic` | Camera2 surface path works, no manual control |
+| `unsupported` | No usable surface path |
+
+`missing` lists failed requirements; `unverified` lists checks that were not
+run. The UI must render these as distinct states. "Your phone lacks 10-bit" and
+"we have not tested 10-bit on your phone" are different messages.
+
+## 8. Encoders and audio
+
+```json
+"encoders": [
+  {
+    "mime": "video/hevc",
+    "name": "c2.qti.hevc.encoder",
+    "hardware": true,
+    "software_only": false,
+    "vendor": true,
+    "surface_input": true,
+    "profiles": [
+      { "profile": "main10", "level": "5.2" },
+      { "profile": "main", "level": "5.2" }
+    ],
+    "main10_claimed": true,
+    "main10_verified": "pass",
+    "max_instances": 2
+  }
+],
+"audio": {
+  "sample_rates": [48000, 44100],
+  "max_input_channels": 2,
+  "pcm_24bit": true,
+  "low_latency": true
+}
+```
+
+`main10_verified` is one of `pass`, `fail`, `not_run`. A pass requires a real
+short encode; the claim alone never sets it.
+
+## 9. Versioning and evolution
+
+- `schema_version` is semver.
+- **Patch:** documentation or clarification, no shape change.
+- **Minor:** new optional fields. Consumers must ignore unknown fields.
+- **Major:** removed, renamed, or retyped fields, or a changed enum value.
+
+The JSON Schema is **generated from the Kotlin `@Serializable` model** in
+`:core:probe`, not hand-maintained. There is exactly one source of truth. The
+generated schema is committed under `schemas/` for external consumers.
+
+Reports are stored with the `schema_version` they were produced with. The
+device database migrates old reports at read time; readers never assume the
+current version.
+
+## 10. Privacy
+
+Never collected, in any kind:
+
+- IMEI, serial number, MAC address, phone number
+- Accounts, advertising ID, installed app list
+- Location, media, contact data
+- Free-form user text
+
+Collected but only in `summary` after explicit opt-in: device/build identifiers
+listed in section 4, capability data, and the tier verdict.
+
+`full` reports stay on the device unless the user attaches one to a bug report
+themselves. The export screen shows a diff-style preview of exactly what will
+be sent.
+
+## 11. Non-goals
+
+- Benchmarking. The prober verifies capability, not speed, except where a
+  sustained-write or thermal check is needed to confirm a recording preset.
+- Cross-device ranking. That is a Phase 8 concern, derived from reports, not
+  part of the schema.
+- Vendor diagnostics. Raw HAL logs stay out of the schema.
