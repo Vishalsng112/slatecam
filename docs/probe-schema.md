@@ -524,3 +524,9 @@ sensor size, pixel array, horizontal field of view) plus a relative `lens_role`
 of `ultrawide`, `wide` or `tele`. Roles are computed against the other physical
 cameras, so they carry meaning on any device. Physical IDs are not always
 openable; every read is best-effort and absent fields mean "not exposed".
+
+Schema 1.6.0 adds audio capability fields: `audio.unprocessed_supported`
+(whether `AudioSource.UNPROCESSED` exists), `audio.input_devices` (built-in mic,
+USB, wired, Bluetooth) and `audio.effects_available` (noise suppressor, echo
+canceler, AGC). They exist to decide whether clean audio can be captured before
+any noise reduction is designed.

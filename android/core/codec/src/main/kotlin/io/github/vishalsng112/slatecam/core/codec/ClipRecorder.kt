@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
@@ -177,18 +178,53 @@ class ClipRecorder(private val context: Context) {
             AudioFormat.CHANNEL_IN_STEREO,
             AudioFormat.ENCODING_PCM_16BIT,
         )
-        val record = AudioRecord(
-            MediaRecorder.AudioSource.CAMCORDER,
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_STEREO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            maxOf(minBuffer * 2, 8192),
-        )
-        check(record.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord init failed" }
+        val record = createAudioRecord(maxOf(minBuffer * 2, 8192))
         record.startRecording()
         audioRecord = record
 
         audioThread = Thread(::audioLoop, "slatecam-audio").apply { start() }
+    }
+
+    /**
+     * Prefers a clean source: UNPROCESSED where the platform supports it, then
+     * CAMCORDER, then MIC. Noise suppression and AGC are deliberately not
+     * attached; they are destructive and belong in post-processing.
+     */
+    private fun createAudioRecord(bufferSize: Int): AudioRecord {
+        val audioManager =
+            context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val unprocessed = audioManager
+            .getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED)
+            ?.toBoolean() == true
+
+        val sources = buildList {
+            if (unprocessed) add(MediaRecorder.AudioSource.UNPROCESSED)
+            add(MediaRecorder.AudioSource.CAMCORDER)
+            add(MediaRecorder.AudioSource.MIC)
+        }
+
+        for (source in sources) {
+            val record = AudioRecord(
+                source,
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_STEREO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufferSize,
+            )
+            if (record.state == AudioRecord.STATE_INITIALIZED) {
+                android.util.Log.i("SlateCam", "audio source=${sourceName(source)}")
+                return record
+            }
+            runCatching { record.release() }
+        }
+        error("no usable audio input source")
+    }
+
+    private fun sourceName(source: Int): String = when (source) {
+        MediaRecorder.AudioSource.UNPROCESSED -> "unprocessed"
+        MediaRecorder.AudioSource.CAMCORDER -> "camcorder"
+        MediaRecorder.AudioSource.MIC -> "mic"
+        else -> "source_$source"
     }
 
     private fun audioLoop() {

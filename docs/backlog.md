@@ -36,12 +36,15 @@ left floating in conversation.
 | MediaStore output (`Movies/SlateCam`) | 3 | gallery path + row |
 | Picture profiles, SlateLog, GPU LUT, zebra, false colour, guides, histogram, waveform | 4 | POCO screenshots |
 | Physical camera inventory + relative lens roles | 1/2 | schema 1.5.0, unit tests |
+| HAL verification for all seven capture modes | 2 | `CaptureResult` compared; no mismatches on POCO |
+| Audio capability probe (unprocessed, devices, effects) | 1 | schema 1.6.0 |
+| Colour input-profile model (matrix + trims, versioned) | 4 | `InputProfile`, unit-tested; calibration pending |
+| Audio source selection (UNPROCESSED → CAMCORDER → MIC) | 3 | POCO reports no UNPROCESSED, so CAMCORDER; AAC stereo verified |
 
 ## Phase 2 completion — remaining
 
 | Item | Why | Notes |
 |---|---|---|
-| HAL readback check for hot pixel, shading, aberration, distortion | Only edge/NR/antibanding are compared today | Same `CaptureResult` check, four more keys |
 | Camera tone-map pinning (`TONEMAP_MODE_GAMMA_VALUE`) | The HAL's tone curve runs before our pipeline | No true "off"; pin a fixed gamma and verify |
 
 ## Phase 3 — remaining / blocked
@@ -49,7 +52,6 @@ left floating in conversation.
 | Item | State | Notes |
 |---|---|---|
 | 10-bit HLG recording | **blocked** | Implemented but gated; POCO emits 8-bit Main despite claiming Main10. Needs a device whose SPS says `profile_idc=2` |
-| Audio source selection (`UNPROCESSED` → `CAMCORDER` fallback) | planned | Probe `PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED` first |
 | Audio noise reduction | **deferred to post** | Live NS/AEC artifacts and DSP cost; record clean, process offline. A monitoring high-pass is acceptable |
 | Colour-space menu | planned, gated | Show SDR (enabled) and HLG (disabled with reason). Never offer what the probe did not verify |
 | Declared transfer/gamma selection | planned, gated | Must change signal *and* metadata together; needs 10-bit on this hardware |
@@ -62,7 +64,7 @@ left floating in conversation.
 | SAF LUT picker | Folder scan exists (`files/luts`); picker needs a plugin or native SAF |
 | Profile editor UI | Profiles are data already; editing needs persistence |
 | Creative vignette | Shader effect, distinct from lens-shading correction |
-| Colour pipeline: per-device input profile + shared looks | Model exists conceptually in `:core:profile`; calibration work pairs with Phase 7 |
+| Colour calibration data for the input profile | Model and shader stage are done; a ColorChecker workflow pairs with Phase 7 |
 | Control-panel touch pass | Dropdowns did not respond to synthetic taps |
 
 ## Phase 5 — advanced

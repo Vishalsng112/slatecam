@@ -359,3 +359,16 @@ and then ignore it.
 
 The probe now records the available mode lists for all seven controls
 (schema 1.4.0), so the UI only offers what the device actually supports.
+
+## Phase 3 audio source (2026-11-23)
+
+The recorder now chooses the cleanest available input, in order:
+
+1. `AudioSource.UNPROCESSED` if `PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED` is true
+2. `AudioSource.CAMCORDER`
+3. `AudioSource.MIC`
+
+On the POCO X6 Pro the property is false, so the log shows
+`audio source=camcorder`. The clip still verifies as AAC-LC, 48 kHz, stereo,
+non-silent. No noise suppressor, AGC or echo canceller is attached: they are
+destructive and belong in post-processing.
