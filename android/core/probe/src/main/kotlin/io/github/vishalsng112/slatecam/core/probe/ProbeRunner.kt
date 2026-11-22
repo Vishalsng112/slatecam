@@ -158,7 +158,7 @@ class ProbeRunner(private val context: Context) {
         json.encodeToString(run(kind, verify))
 
     companion object {
-        const val PROBER_VERSION = "1.0.0"
+        const val PROBER_VERSION = "1.4.0"
 
         val json: Json = Json {
             prettyPrint = true

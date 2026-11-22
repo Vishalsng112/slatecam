@@ -19,9 +19,9 @@ Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 > HEVC Main at ~12 Mbps with 48 kHz stereo AAC, written to app storage and
 > verified with ffprobe as `Main` / `yuv420p` / `bt709`.
 >
-> HLG recording is implemented but disabled: the POCO's encoder claims Main10
-> while emitting 8-bit Main, so the tag would be false. Bitstream-level
-> verification (HEVC SPS) is the gate. See
+> HLG recording is implemented but disabled. The prober now parses the HEVC SPS
+> from encoded bytes, which proved the POCO's encoder claims Main10 while
+> emitting 8-bit Main; the device is `standard`, not `cinema`. See
 > [docs/test-devices.md](docs/test-devices.md).
 
 ---

@@ -16,9 +16,10 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Phase 1's prober used to run on every launch. It competes for the
-        // camera with preview and is now redundant, so it moves behind an
-        // explicit action. DeviceReportService stays available for that.
+        if (intent?.getBooleanExtra(EXTRA_RUN_PROBE, false) == true) {
+            // Device testing hook: adb shell am start ... --ez run_probe true
+            runProbeInBackground()
+        }
         requestCameraPermission()
     }
 
@@ -75,5 +76,6 @@ class MainActivity : FlutterActivity() {
     private companion object {
         const val TAG = "SlateCam"
         const val CAMERA_REQUEST_CODE = 1001
+        const val EXTRA_RUN_PROBE = "run_probe"
     }
 }

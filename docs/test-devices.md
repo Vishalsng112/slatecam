@@ -222,11 +222,20 @@ The encoder reported Main10 and emitted Main. Tagging that footage as HLG would
 be false advertising, so the HLG path is disabled (`hlgEnabled = false`) and
 recording stays 8-bit SDR, verified as `Main` / `yuv420p` / `bt709` / TV range.
 
-### Consequence for the prober
+### Confirmed with bitstream verification (prober 1.4.0)
 
-`hevc_main10_encode` currently trusts `MediaCodec.outputFormat`. On this device
-that is **not proof**. Verification must parse the HEVC SPS from the encoded
-bitstream — `general_profile_idc` and bit depth — before claiming Main10.
-Until it does, the `cinema` verdict for the POCO is a **false-positive
-candidate**, and the earlier "MediaTek under-reports Main10" conclusion should
-be treated as unproven.
+A full probe run now reports:
+
+| Check | Result |
+|---|---|
+| `hevc_main10_encode` | **fail** — `profile_idc=1` on every codec, while each header claimed `profile=2` |
+| `camera_hlg10_session` | pass at 3840×2160 |
+| Tier | **`standard`** — missing `hevc_main10_encoder` |
+
+So the camera genuinely produces an HLG10 stream, but the encoder does not
+produce Main10, despite advertising it in `MediaCodec.outputFormat`. **The
+earlier `cinema` verdict is withdrawn.** The "MediaTek under-reports Main10"
+conclusion was wrong: it over-reports it.
+
+This is the strongest evidence yet for the project's rule that a codec's own
+claim is not verification — the encoded bytes are.

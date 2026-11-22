@@ -11,6 +11,7 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.media.MediaRecorder
 import android.view.Surface
+import io.github.vishalsng112.slatecam.core.common.HevcSps
 import java.io.File
 
 /**
@@ -260,7 +261,28 @@ class ClipRecorder(private val context: Context) {
                                 trackFormat.getInteger(MediaFormat.KEY_COLOR_RANGE, -1)
                             }",
                         )
-                        if (hlg) {
+                        val csdProfile = runCatching {
+                            trackFormat.getByteBuffer("csd-0")?.let { buffer ->
+                                val bytes = ByteArray(buffer.remaining())
+                                buffer.get(bytes)
+                                HevcSps.profileIdc(bytes)
+                            }
+                        }.getOrNull()
+                        android.util.Log.i(
+                            "SlateCam",
+                            "bitstream profile_idc=$csdProfile header_profile=${
+                                trackFormat.getInteger(MediaFormat.KEY_PROFILE, -1)
+                            }",
+                        )
+                        // Never tag HLG unless the encoded bytes are really Main10.
+                        val tagHlg = hlg && csdProfile == HevcSps.PROFILE_MAIN10
+                        if (hlg && !tagHlg) {
+                            android.util.Log.w(
+                                "SlateCam",
+                                "encoder claimed HLG but bitstream is profile_idc=$csdProfile",
+                            )
+                        }
+                        if (tagHlg) {
                             // Make the colour signalling explicit on the track so
                             // players see HLG/BT.2020 rather than guessing.
                             trackFormat.setInteger(

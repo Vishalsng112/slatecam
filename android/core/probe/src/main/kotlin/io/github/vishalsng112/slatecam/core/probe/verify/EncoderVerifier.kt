@@ -11,6 +11,7 @@ import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
 import android.opengl.GLES20
 import android.view.Surface
+import io.github.vishalsng112.slatecam.core.common.HevcSps
 import io.github.vishalsng112.slatecam.core.probe.model.VerificationCheck
 
 /**
@@ -46,10 +47,15 @@ class EncoderVerifier {
         if (candidates.isEmpty()) return Outcome(failure("no hardware HEVC encoder", started), null)
 
         val errors = mutableListOf<String>()
+        val deadline = started + OVERALL_TIMEOUT_MS
         // Largest first: verifying UHD is the answer that matters. Falling back
         // to FHD still proves the Main10 path, just at a smaller preset.
         for ((width, height) in TEST_SIZES) {
             for (name in candidates) {
+                if (System.currentTimeMillis() > deadline) {
+                    errors += "verification time limit reached"
+                    return Outcome(failure(errors.joinToString(" | "), started), null)
+                }
                 val attempt = runCatching { encode(name, width, height) }
                 attempt.onSuccess { detail ->
                     return Outcome(
@@ -120,6 +126,7 @@ class EncoderVerifier {
             var frames = 0
             var profile = -1
             var transfer = -1
+            var realProfile: Int? = null
             val deadline = System.currentTimeMillis() + DRAIN_TIMEOUT_MS
 
             while (System.currentTimeMillis() < deadline) {
@@ -129,6 +136,13 @@ class EncoderVerifier {
                         val output = codec.outputFormat
                         profile = output.getInteger(MediaFormat.KEY_PROFILE, -1)
                         transfer = output.getInteger(MediaFormat.KEY_COLOR_TRANSFER, -1)
+                        realProfile = runCatching {
+                            output.getByteBuffer("csd-0")?.let { buffer ->
+                                val bytes = ByteArray(buffer.remaining())
+                                buffer.get(bytes)
+                                HevcSps.profileIdc(bytes)
+                            }
+                        }.getOrNull()
                     }
                     index == MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
                     index >= 0 -> {
@@ -145,11 +159,16 @@ class EncoderVerifier {
             }
 
             check(frames > 0 && bytes > 0L) { "no output frames (bytes=$bytes)" }
+            check(realProfile == HevcSps.PROFILE_MAIN10) {
+                "encoded bitstream is profile_idc=$realProfile, not Main10 " +
+                    "(codec header claimed profile=$profile)"
+            }
 
             return buildString {
                 append("$codecName: $frames frames, $bytes bytes")
                 if (profile >= 0) append(", profile=$profile")
                 if (transfer >= 0) append(", transfer=$transfer")
+                append(", sps_profile=$realProfile")
             }
         } finally {
             runCatching { window?.close() }
@@ -239,6 +258,7 @@ class EncoderVerifier {
         const val CHECK_ID = "hevc_main10_encode"
         const val FRAME_COUNT = 10
         const val DRAIN_TIMEOUT_MS = 15_000L
+        const val OVERALL_TIMEOUT_MS = 25_000L
 
         val TEST_SIZES = listOf(3840 to 2160, 1920 to 1080, 1280 to 720)
 
