@@ -174,3 +174,7 @@ Tested on the POCO X6 Pro 5G (Android 16, MT6897).
 3. **Preview was rotated 90° and pillarboxed.** Fixed by exposing
    `previewRotationDegrees` in the state and using `RotatedBox` plus a
    `BoxFit.cover` crop in Dart.
+
+> The Pad 3 was offline during Phase 2 verification (unstable USB and wireless
+> adb). Preview and manual controls are proven on the POCO only. The Pad must
+> still pass the same checklist before Phase 3 recording work is signed off.
