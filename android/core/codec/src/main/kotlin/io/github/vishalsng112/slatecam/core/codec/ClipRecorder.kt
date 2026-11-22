@@ -12,7 +12,6 @@ import android.media.MediaMuxer
 import android.media.MediaRecorder
 import android.view.Surface
 import io.github.vishalsng112.slatecam.core.common.HevcSps
-import java.io.File
 
 /**
  * Phase 3 recorder: HEVC video from a GL surface plus AAC audio, muxed to MP4.
@@ -48,8 +47,6 @@ class ClipRecorder(private val context: Context) {
     @Volatile
     private var audioEos = false
 
-    private var outputFile: File? = null
-
     @Volatile
     private var hlg = false
 
@@ -63,8 +60,8 @@ class ClipRecorder(private val context: Context) {
         height: Int,
         fps: Int,
         bitrate: Int,
-        output: File,
-        tenBitHlg: Boolean = false,
+        tenBitHlg: Boolean,
+        muxer: MediaMuxer,
     ): Surface {
         check(!running) { "already recording" }
         lastError = null
@@ -73,11 +70,8 @@ class ClipRecorder(private val context: Context) {
         muxerStarted = false
         videoTrack = -1
         audioTrack = -1
-        outputFile = output
         hlg = tenBitHlg
-
-        val mux = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        muxer = mux
+        this.muxer = muxer
 
         val format = MediaFormat.createVideoFormat(
             MediaFormat.MIMETYPE_VIDEO_HEVC,
@@ -117,6 +111,8 @@ class ClipRecorder(private val context: Context) {
         video.start()
         videoEncoder = video
 
+        running = true
+
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) {
@@ -124,16 +120,15 @@ class ClipRecorder(private val context: Context) {
                 .onFailure { lastError = "audio start failed: ${it.message}" }
         }
 
-        running = true
         drainThread = Thread(::drainLoop, "slatecam-muxer").apply {
             start()
         }
         return inputSurface
     }
 
-    /** Stops recording and finalizes the file. Blocking; call off the main thread. */
-    fun stop(): File? {
-        if (!running && drainThread == null) return outputFile
+    /** Stops recording and finalizes the muxer. Returns true when a file was produced. */
+    fun stop(): Boolean {
+        if (!running && drainThread == null) return false
         running = false
 
         runCatching { videoEncoder?.signalEndOfInputStream() }
@@ -153,11 +148,12 @@ class ClipRecorder(private val context: Context) {
         if (muxerStarted) runCatching { muxer?.stop() }
         runCatching { muxer?.release() }
         muxer = null
+        val finalized = muxerStarted
         muxerStarted = false
         drainThread = null
         audioThread = null
 
-        return outputFile
+        return finalized
     }
 
     private fun startAudio() {
@@ -262,9 +258,12 @@ class ClipRecorder(private val context: Context) {
                             }",
                         )
                         val csdProfile = runCatching {
-                            trackFormat.getByteBuffer("csd-0")?.let { buffer ->
-                                val bytes = ByteArray(buffer.remaining())
-                                buffer.get(bytes)
+                            trackFormat.getByteBuffer("csd-0")?.let { original ->
+                                // Read a duplicate: advancing the buffer the muxer
+                                // will consume would strip the codec config (hvcC).
+                                val copy = original.duplicate()
+                                val bytes = ByteArray(copy.remaining())
+                                copy.get(bytes)
                                 HevcSps.profileIdc(bytes)
                             }
                         }.getOrNull()

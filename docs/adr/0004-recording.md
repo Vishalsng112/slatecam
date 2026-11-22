@@ -27,9 +27,9 @@ buffers.
    alone produced 150 Mbps on this MediaTek encoder.
 5. **The EGL config requests `EGL_RECORDABLE_ANDROID`**, falling back if the
    driver rejects it. This is required for correct encoder input on some GPUs.
-6. **Output goes to app-internal storage** (`files/recordings/`) until the
-   MediaStore integration lands. It needs no permission and is pullable with
-   `run-as`.
+6. **Output goes to MediaStore** (`Movies/SlateCam/`) with `IS_PENDING` set
+   until the muxer finalizes, so clips appear in galleries without a storage
+   permission. A private file is used only if the insert fails.
 7. **Thermal guard stops recording at `THERMAL_STATUS_SEVERE`** or worse and
    reports why, rather than letting the device throttle silently.
 

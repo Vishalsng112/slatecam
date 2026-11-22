@@ -53,6 +53,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
     @Volatile
     private var tenBitSource = false
+    private var encoderFrames = 0
 
     /** Surface the camera must target. Available after [start]. */
     @Volatile
@@ -146,6 +147,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                     TAG,
                     "encoder surface failed, error 0x${Integer.toHexString(EGL14.eglGetError())}",
                 )
+            } else {
+                encoderFrames = 0
+                Log.i(TAG, "encoder surface attached (tenBit=$tenBitHlg)")
             }
         }
     }
@@ -181,6 +185,13 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             )
             EGL14.eglDestroySurface(display, encoderEglSurface)
             encoderEglSurface = EGL14.EGL_NO_SURFACE
+            // Keep a valid drawable bound so the preview keeps rendering.
+            EGL14.eglMakeCurrent(
+                display,
+                outputEglSurface,
+                outputEglSurface,
+                context,
+            )
         }
     }
 
@@ -352,6 +363,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         }
         if (!EGL14.eglSwapBuffers(display, surface)) {
             Log.w(TAG, "eglSwapBuffers failed: 0x${Integer.toHexString(EGL14.eglGetError())}")
+        }
+        if (surface == encoderEglSurface) {
+            encoderFrames++
+            if (encoderFrames % 60 == 0) Log.i(TAG, "encoder frames=$encoderFrames")
         }
     }
 

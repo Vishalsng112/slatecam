@@ -14,10 +14,10 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 3 — recording (8-bit SDR verified; HLG gated off).**
+> **Status: Phase 3 — recording (8-bit SDR, MediaStore output).**
 > Live preview plus HEVC/AAC capture through the same GL pipeline: 1080p30
-> HEVC Main at ~12 Mbps with 48 kHz stereo AAC, written to app storage and
-> verified with ffprobe as `Main` / `yuv420p` / `bt709`.
+> HEVC Main at ~12 Mbps with 48 kHz stereo AAC, written via MediaStore into
+> `Movies/SlateCam/` and verified with ffprobe as `Main` / `yuv420p` / `bt709`.
 >
 > HLG recording is implemented but disabled. The prober now parses the HEVC SPS
 > from encoded bytes, which proved the POCO's encoder claims Main10 while

@@ -257,3 +257,28 @@ the POCO X6 Pro is `standard` tier, and HLG recording stays disabled.
 The remaining candidate for the cinema tier is the OnePlus Pad 3 (Qualcomm),
 which advertised Main10 on six codecs. It must be re-probed with 1.4.0 before
 that claim is accepted.
+
+## MediaStore output (2026-11-23)
+
+Recordings now go through `MediaStore.Video` into a public folder rather than
+app-internal storage:
+
+| Item | Result |
+|---|---|
+| Path | `/sdcard/Movies/SlateCam/SlateCam_<timestamp>.mp4` |
+| MediaStore row | created with `IS_PENDING=1`, cleared on finalize |
+| Stream | HEVC Main 1920×1080, ~12 Mbps, AAC-LC 48 kHz stereo |
+| Consecutive recordings | two in a row, both valid and playable |
+| Fallback | app-internal `files/recordings/` if the MediaStore insert fails |
+| 60 s run (informal) | thermal status `0` before and after; no throttling observed |
+
+### Bugs found while wiring it
+
+1. **Reading `csd-0` for the SPS check consumed the buffer** the muxer needed,
+   so the video sample entry had no codec config and ffprobe reported
+   `codec_name=unknown`, 0×0. Reading a `duplicate()` fixes it.
+2. **The audio thread started before `running = true`**, so its loop exited
+   immediately and every clip had a silent AAC track.
+3. **Detaching the encoder surface left no current EGL drawable**, which made
+   the *next* recording produce zero frames. Rebinding the preview surface
+   after destroy fixes consecutive clips.
