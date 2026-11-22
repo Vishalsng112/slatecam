@@ -14,15 +14,14 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 2 — camera core and preview.**
-> Live preview runs camera → GL → Flutter `SurfaceProducer` texture, with
-> manual ISO, shutter, focus and white balance over a Pigeon bridge. Kotlin owns
-> camera state; Dart only renders snapshots and sends commands. Recording,
-> profiles and LUTs are Phase 3 and 4.
+> **Status: Phase 3 — recording (8-bit working, 10-bit next).**
+> Live preview plus HEVC/AAC capture through the same GL pipeline: 1080p30
+> HEVC Main at ~12 Mbps with 48 kHz stereo AAC, recorded to app storage and
+> verified with ffprobe. 10-bit HLG, MediaStore output and a thermal stress test
+> are the remaining Phase 3 work.
 >
-> Verified on a POCO X6 Pro 5G: preview upright and full-bleed, manual ISO
-> visibly changes exposure and noise, and backgrounding releases and reopens the
-> camera without losing settings. See [docs/test-devices.md](docs/test-devices.md).
+> Phase 2 remains verified on a POCO X6 Pro 5G; see
+> [docs/test-devices.md](docs/test-devices.md).
 
 ---
 

@@ -21,6 +21,10 @@ class CameraState {
     required this.previewWidth,
     required this.previewHeight,
     required this.previewRotationDegrees,
+    required this.isRecording,
+    required this.recordingSeconds,
+    required this.clipPath,
+    required this.recordingError,
   });
 
   bool isOpen;
@@ -41,6 +45,10 @@ class CameraState {
   int previewWidth;
   int previewHeight;
   int previewRotationDegrees;
+  bool isRecording;
+  int recordingSeconds;
+  String? clipPath;
+  String? recordingError;
 }
 
 @HostApi()
@@ -62,6 +70,10 @@ abstract class SlateCamHostApi {
   void setAutoExposure();
 
   void setAutoFocus();
+
+  void startRecording();
+
+  void stopRecording();
 }
 
 @FlutterApi()

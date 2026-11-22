@@ -5,11 +5,13 @@ import android.opengl.EGL14
 import android.opengl.EGLConfig
 import android.opengl.EGLContext
 import android.opengl.EGLDisplay
+import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Log
 import android.view.Surface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -34,6 +36,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var context: EGLContext = EGL14.EGL_NO_CONTEXT
     private var config: EGLConfig? = null
     private var outputEglSurface: EGLSurface = EGL14.EGL_NO_SURFACE
+    private var encoderEglSurface: EGLSurface = EGL14.EGL_NO_SURFACE
 
     private var oesTextureId = 0
     private var surfaceTexture: SurfaceTexture? = null
@@ -105,6 +108,38 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         }
     }
 
+    /** Adds an encoder input surface; every frame is then drawn to both targets. */
+    fun attachEncoderSurface(surface: Surface) {
+        handler.post {
+            if (!started) return@post
+            detachEncoderInternal()
+            encoderEglSurface = EGL14.eglCreateWindowSurface(
+                display,
+                config,
+                surface,
+                intArrayOf(EGL14.EGL_NONE),
+                0,
+            )
+        }
+    }
+
+    fun detachEncoderSurface() {
+        handler.post { detachEncoderInternal() }
+    }
+
+    private fun detachEncoderInternal() {
+        if (encoderEglSurface != EGL14.EGL_NO_SURFACE) {
+            EGL14.eglMakeCurrent(
+                display,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_SURFACE,
+                EGL14.EGL_NO_CONTEXT,
+            )
+            EGL14.eglDestroySurface(display, encoderEglSurface)
+            encoderEglSurface = EGL14.EGL_NO_SURFACE
+        }
+    }
+
     override fun close() {
         val latch = CountDownLatch(1)
         handler.post {
@@ -130,14 +165,28 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             EGL14.EGL_GREEN_SIZE, 8,
             EGL14.EGL_BLUE_SIZE, 8,
             EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+            // MediaCodec input surfaces require a recordable config on some
+            // drivers; without it the encoder receives uninitialised buffers.
+            EGL_RECORDABLE_ANDROID, 1,
             EGL14.EGL_NONE,
         )
         val configs = arrayOfNulls<EGLConfig>(1)
         val count = IntArray(1)
-        check(
-            EGL14.eglChooseConfig(display, configAttribs, 0, configs, 0, 1, count, 0) &&
-                count[0] > 0,
-        ) { "no suitable EGL config" }
+        var chosen = EGL14.eglChooseConfig(display, configAttribs, 0, configs, 0, 1, count, 0) &&
+            count[0] > 0
+        if (!chosen) {
+            val fallback = intArrayOf(
+                EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_NONE,
+            )
+            chosen = EGL14.eglChooseConfig(display, fallback, 0, configs, 0, 1, count, 0) &&
+                count[0] > 0
+            Log.w(TAG, "EGL_RECORDABLE_ANDROID unsupported; encoder output may be wrong")
+        }
+        check(chosen) { "no suitable EGL config" }
         config = configs[0]
 
         context = EGL14.eglCreateContext(
@@ -220,13 +269,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
     private fun drawFrame() {
         val texture = surfaceTexture ?: return
-        val eglSurface = outputEglSurface
-        if (eglSurface == EGL14.EGL_NO_SURFACE) return
 
         runCatching {
             texture.updateTexImage()
             texture.getTransformMatrix(texMatrix)
         }.onFailure { return }
+
+        val timestampNs = System.nanoTime()
+        renderTo(outputEglSurface, timestampNs)
+        renderTo(encoderEglSurface, timestampNs)
+        onFrameRendered()
+    }
+
+    private fun renderTo(surface: EGLSurface, timestampNs: Long) {
+        if (surface == EGL14.EGL_NO_SURFACE) return
+        EGL14.eglMakeCurrent(display, surface, surface, context)
 
         GLES20.glViewport(0, 0, width, height)
         GLES20.glClearColor(0f, 0f, 0f, 1f)
@@ -244,12 +301,17 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glVertexAttribPointer(aTexCoord, 2, GLES20.GL_FLOAT, false, 0, QUAD_TEX_COORDS)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
 
-        EGL14.eglSwapBuffers(display, eglSurface)
-        onFrameRendered()
+        if (surface == encoderEglSurface) {
+            EGLExt.eglPresentationTimeANDROID(display, surface, timestampNs)
+        }
+        if (!EGL14.eglSwapBuffers(display, surface)) {
+            Log.w(TAG, "eglSwapBuffers failed: 0x${Integer.toHexString(EGL14.eglGetError())}")
+        }
     }
 
     private fun teardown() {
         started = false
+        detachEncoderInternal()
         cameraSurface?.release()
         cameraSurface = null
         surfaceTexture?.release()
@@ -319,6 +381,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
     private companion object {
         const val START_TIMEOUT_SECONDS = 5L
+        const val TAG = "SlateCamGl"
+
+        // Android EGL extension: marks a config usable as a MediaCodec input.
+        const val EGL_RECORDABLE_ANDROID = 0x3142
 
         val QUAD_VERTICES: FloatBuffer = floatBuffer(
             floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f),

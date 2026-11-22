@@ -37,6 +37,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:profile"))
     implementation(project(":core:camera"))
+    implementation(project(":core:codec"))
     implementation(project(":core:gpu"))
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")

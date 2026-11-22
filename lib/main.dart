@@ -184,6 +184,44 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   ),
               ],
             ),
+            if (state != null && state.isOpen) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: state.isRecording
+                        ? const Color(0xFFB3261E)
+                        : null,
+                  ),
+                  onPressed: state.isRecording
+                      ? () => _host.stopRecording()
+                      : () => _host.startRecording(),
+                  icon: Icon(state.isRecording ? Icons.stop : Icons.circle),
+                  label: Text(
+                    state.isRecording
+                        ? 'Stop  ${_formatDuration(state.recordingSeconds)}'
+                        : 'Record',
+                  ),
+                ),
+              ),
+              if (state.recordingError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    state.recordingError!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              if (state.clipPath != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: SelectableText(
+                    'Saved: ${state.clipPath}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+            ],
             if (state == null) ...[
               const SizedBox(height: 12),
               const Text('No camera state yet.'),
@@ -290,6 +328,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
         ),
       ),
     );
+  }
+
+  String _formatDuration(int seconds) {
+    final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
+    final remainder = (seconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$remainder';
   }
 
   double _shutterCeiling(CameraState state) {

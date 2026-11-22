@@ -178,3 +178,30 @@ Tested on the POCO X6 Pro 5G (Android 16, MT6897).
 > The Pad 3 was offline during Phase 2 verification (unstable USB and wireless
 > adb). Preview and manual controls are proven on the POCO only. The Pad must
 > still pass the same checklist before Phase 3 recording work is signed off.
+
+## Phase 3 verification — 8-bit HEVC + AAC recording (2026-11-23)
+
+Tested on the POCO X6 Pro 5G (Android 16, MT6897).
+
+| Item | Result |
+|---|---|
+| Container | MP4, 5.01 s, 7,512,802 bytes |
+| Video | HEVC **Main**, 1920×1080, ~30 fps, **11.98 Mbps** |
+| Audio | AAC **LC**, 48 kHz, stereo, 192 kbps, non-silent |
+| Content | ffmpeg-extracted frame matches the live preview |
+| Storage | app-internal `files/recordings/` (MediaStore pending) |
+| Source of frames | the same GL pipeline as preview, rendered a second time |
+
+### Bugs this test found
+
+1. **MediaTek ignored `KEY_BIT_RATE`.** The first clip was 141 MB for 8 seconds
+   — 150 Mbps for a requested 12 Mbps — because the encoder defaulted to a
+   quality mode. Setting `KEY_BITRATE_MODE = BITRATE_MODE_VBR` brought it to
+   11.98 Mbps.
+2. **The video content was garbage.** The EGL config lacked
+   `EGL_RECORDABLE_ANDROID`, so the encoder received uninitialised buffers
+   (a bright green/blue noise frame). Adding the attribute, with a fallback if
+   unsupported, produced correct images.
+
+Both are exactly the class of vendor-HAL problem the probe-first approach was
+built for, and neither is discoverable without recording on real hardware.

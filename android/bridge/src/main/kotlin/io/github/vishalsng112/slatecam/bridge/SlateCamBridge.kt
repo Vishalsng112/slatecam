@@ -1,6 +1,10 @@
 package io.github.vishalsng112.slatecam.bridge
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
+import android.os.SystemClock
 import android.view.Surface
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.view.TextureRegistry
@@ -9,14 +13,15 @@ import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamFlutterApi
 import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamHostApi
 import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
+import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
-import android.os.Handler
-import android.os.Looper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.io.File
+import java.util.concurrent.Executor
 
 /**
  * The single place where Flutter meets Kotlin. Everything else stays native.
@@ -35,21 +40,51 @@ class SlateCamBridge private constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val recorder = ClipRecorder(context)
+
     private var flutterApi: SlateCamFlutterApi? = null
     private var opened = false
     private var resumeOnReturn = false
+    private var lastState: CameraUiState? = null
+
+    private var recordingStartMs = 0L
+    private var clipPath: String? = null
+    private var recordingError: String? = null
+
+    private var powerManager: PowerManager? = null
+    private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
+
+    private val tick = object : Runnable {
+        override fun run() {
+            if (recorder.isRecording) {
+                pushState()
+                mainHandler.postDelayed(this, 1_000)
+            }
+        }
+    }
 
     init {
         controller.listener = CameraController.Listener { state ->
-            val api = flutterApi ?: return@Listener
-            scope.launch {
-                runCatching { api.onState(state.toPigeon()) }
-            }
+            lastState = state
+            pushState()
         }
     }
 
     fun attach(api: SlateCamFlutterApi) {
         flutterApi = api
+    }
+
+    fun registerThermalGuard() {
+        val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val listener = PowerManager.OnThermalStatusChangedListener { status ->
+            if (status >= PowerManager.THERMAL_STATUS_SEVERE && recorder.isRecording) {
+                recordingError = "recording stopped: thermal status $status"
+                stopRecording()
+            }
+        }
+        power.addThermalStatusListener(Executor { mainHandler.post(it) }, listener)
+        powerManager = power
+        thermalListener = listener
     }
 
     override fun openCamera(): Long {
@@ -66,6 +101,7 @@ class SlateCamBridge private constructor(
     }
 
     override fun closeCamera() {
+        if (recorder.isRecording) stopRecording()
         controller.close()
         opened = false
     }
@@ -94,7 +130,60 @@ class SlateCamBridge private constructor(
         controller.setAutoFocus()
     }
 
+    override fun startRecording() {
+        if (!opened) {
+            recordingError = "camera is not open"
+            pushState()
+            return
+        }
+        if (recorder.isRecording) return
+
+        val size = CameraController.choosePreviewSize(context)
+        val directory = File(context.filesDir, "recordings").apply { mkdirs() }
+        val output = File(directory, "slatecam-${System.currentTimeMillis()}.mp4")
+
+        try {
+            val encoderSurface = recorder.start(
+                width = size.width,
+                height = size.height,
+                fps = 30,
+                bitrate = 12_000_000,
+                output = output,
+            )
+            renderer.attachEncoderSurface(encoderSurface)
+            clipPath = null
+            recordingError = null
+            recordingStartMs = SystemClock.elapsedRealtime()
+            mainHandler.post(tick)
+            pushState()
+        } catch (t: Throwable) {
+            recordingError = "recording failed to start: ${t.message}"
+            pushState()
+        }
+    }
+
+    override fun stopRecording() {
+        if (!recorder.isRecording) return
+        renderer.detachEncoderSurface()
+
+        Thread({
+            val file = recorder.stop()
+            clipPath = file?.absolutePath
+            recorder.lastError?.let { recordingError = it }
+            mainHandler.post { pushState() }
+        }, "slatecam-finalize").start()
+
+        pushState()
+    }
+
     fun dispose() {
+        if (recorder.isRecording) {
+            renderer.detachEncoderSurface()
+            recorder.stop()
+        }
+        thermalListener?.let { listener ->
+            runCatching { powerManager?.removeThermalStatusListener(listener) }
+        }
         controller.shutdown()
         renderer.close()
         producer.release()
@@ -103,6 +192,7 @@ class SlateCamBridge private constructor(
 
     /** Releases the camera when the app leaves the foreground. */
     fun pause() {
+        if (recorder.isRecording) stopRecording()
         resumeOnReturn = opened
         controller.close()
         opened = false
@@ -118,10 +208,34 @@ class SlateCamBridge private constructor(
         opened = true
     }
 
+    private fun pushState() {
+        val api = flutterApi ?: return
+        val state = lastState ?: return
+        val elapsedSeconds = if (recorder.isRecording) {
+            ((SystemClock.elapsedRealtime() - recordingStartMs) / 1_000).toInt()
+        } else {
+            0
+        }
+        val pigeon = state.toPigeon(
+            isRecording = recorder.isRecording,
+            recordingSeconds = elapsedSeconds,
+            clipPath = clipPath,
+            recordingError = recordingError ?: recorder.lastError,
+        )
+        scope.launch {
+            runCatching { api.onState(pigeon) }
+        }
+    }
+
     private fun outputSurface(): Surface =
         producer.surface ?: producer.forcedNewSurface
 
-    private fun CameraUiState.toPigeon() = CameraState(
+    private fun CameraUiState.toPigeon(
+        isRecording: Boolean,
+        recordingSeconds: Int,
+        clipPath: String?,
+        recordingError: String?,
+    ) = CameraState(
         isOpen = isOpen,
         error = error,
         iso = iso.toLong(),
@@ -140,6 +254,10 @@ class SlateCamBridge private constructor(
         previewWidth = previewWidth.toLong(),
         previewHeight = previewHeight.toLong(),
         previewRotationDegrees = previewRotationDegrees.toLong(),
+        isRecording = isRecording,
+        recordingSeconds = recordingSeconds.toLong(),
+        clipPath = clipPath,
+        recordingError = recordingError,
     )
 
     companion object {
@@ -166,6 +284,7 @@ class SlateCamBridge private constructor(
 
             SlateCamHostApi.setUp(engine.dartExecutor.binaryMessenger, bridge)
             bridge.attach(SlateCamFlutterApi(engine.dartExecutor.binaryMessenger))
+            bridge.registerThermalGuard()
             return bridge
         }
     }
