@@ -215,11 +215,16 @@ catalog, not hardcoded in the prober. For 1.0 the catalog is:
 | Resolution | Frame rates | Depth |
 |---|---|---|
 | `uhd` | 24, 25, 30 | 10-bit, 8-bit |
-| `uhd` | 60 | 8-bit |
+| `uhd` | 60 | 8-bit, 10-bit |
 | `dci4k` | 24 | 10-bit |
-| `fhd` | 24, 25, 30, 60 | 8-bit |
-| `fhd` | 120 | 8-bit |
+| `fhd` | 24, 25, 30 | 8-bit, 10-bit |
+| `fhd` | 60, 120 | 8-bit |
 | `hd` | 240 | 8-bit |
+
+The 10-bit FHD entries are load-bearing: some devices claim
+`dynamic_range_ten_bit` but only expose a P010 stream at 1080p. Without those
+presets the prober would grant the cinema tier to a phone that cannot record
+10-bit UHD.
 
 Adding a recording mode means adding a preset, so the prober and the UI can
 never disagree about what is supported.
