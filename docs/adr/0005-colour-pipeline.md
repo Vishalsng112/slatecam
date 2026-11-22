@@ -32,11 +32,14 @@ curve and LUT handling live in a pure JVM module.
    crushes dark scenes instead of flattening them.
 4. **Zebra is preview-only.** The encoder pass is rendered with overlays
    disabled, so monitoring marks never end up burned into a recording.
-5. **LUT application will use a 2D-packed 3D texture**, not a 3D sampler, so the
-   pipeline stays on GLES 2.0 and does not require an ES 3 context. The parser
-   and CPU sampler exist now; the GPU packing is the remaining step.
-6. **Histogram and waveform are deferred** to the next slice. They will render a
-   downscaled frame and read it back at a low rate, not per frame.
+5. **LUT application uses a 2D-packed 3D texture**, not a 3D sampler, so the
+   pipeline stays on GLES 2.0. A 17³ LUT becomes a 289×17 texture; the shader
+   samples the two nearest blue slices and blends. The upload is deferred until
+   the EGL context exists — applying a profile before the camera opens otherwise
+   produces a black preview.
+6. **Histogram and waveform come from one 160×90 FBO readback**, done every fifth
+   frame and published at ~5 Hz. The histogram is 64 luma bins; the waveform is
+   64 columns × 16 bins. They are analysis only: overlays never reach recordings.
 
 ## Consequences
 
@@ -46,7 +49,10 @@ curve and LUT handling live in a pure JVM module.
 - The log curve operates on an approximated linear signal (`pow(c, 2.2)`), not a
   measured sensor response. It is a look, not a scene-referred camera log; this
   must be stated in user documentation.
-- LUTs are parsed but not yet applied on the GPU; the colour science is ready
-  and tested.
+- LUTs are parsed, sampled on the CPU for tests, and applied on the GPU;
+  user-supplied `.cube` files still need a picker and a cache.
+- The waveform's horizontal axis is sensor-oriented because the analysis pass
+  renders the unrotated buffer while the preview is rotated in Dart. Histogram
+  is unaffected; aligning waveform columns is a follow-up.
 - The in-app profile dropdown was not reachable through `adb input tap`; profile
   changes were verified through launch extras. Worth revisiting for real users.

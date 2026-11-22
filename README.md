@@ -14,11 +14,12 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 4 — profiles and monitoring tools (in progress).**
-> Picture profiles (`standard`, `slatelog`, `mono`) run in the GL shader, with
-> the SlateLog curve unit-tested on the JVM. Shader zebra is live on the preview
-> path and never reaches recordings. LUT application, histogram and waveform are
-> next.
+> **Status: Phase 4 — profiles and monitoring tools.**
+> Picture profiles (`standard`, `slatelog`, `mono`, `warm` LUT) run in the GL
+> shader, with the SlateLog curve unit-tested on the JVM. Zebra, a 64-bin
+> histogram and a waveform are live on the preview path and never reach
+> recordings. A 17³ LUT is packed into a 2D texture, so the pipeline stays on
+> GLES 2.0.
 >
 > Recording remains 8-bit SDR via MediaStore. HLG is implemented but disabled
 > because the prober proved this device's encoder claims Main10 while emitting
