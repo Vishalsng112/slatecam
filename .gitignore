@@ -44,5 +44,8 @@ Thumbs.db
 *.local
 *.log
 
+# --- Local probe dumps: never publish device reports by accident ----------
+/local-reports/
+
 # --- Keep the Gradle wrapper jar -------------------------------------------
 !gradle/wrapper/gradle-wrapper.jar
