@@ -44,6 +44,13 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uTexMatrix = 0
     private var uTexture = 0
     private var uHlgToSdr = 0
+    private var uExposure = 0
+    private var uContrast = 0
+    private var uSaturation = 0
+    private var uLog = 0
+    private var uMono = 0
+    private var uZebra = 0
+    private var uZebraThreshold = 0
     private var aPosition = 0
     private var aTexCoord = 0
     private val texMatrix = FloatArray(16)
@@ -54,6 +61,33 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile
     private var tenBitSource = false
     private var encoderFrames = 0
+
+    @Volatile private var exposure = 1f
+    @Volatile private var contrast = 1f
+    @Volatile private var saturation = 1f
+    @Volatile private var logEnabled = false
+    @Volatile private var monochrome = false
+    @Volatile private var zebra = false
+    @Volatile private var zebraThreshold = 0.9f
+
+    fun applyProfile(
+        exposure: Float,
+        contrast: Float,
+        saturation: Float,
+        logEnabled: Boolean,
+        monochrome: Boolean,
+    ) {
+        this.exposure = exposure
+        this.contrast = contrast
+        this.saturation = saturation
+        this.logEnabled = logEnabled
+        this.monochrome = monochrome
+    }
+
+    fun setZebra(enabled: Boolean, threshold: Float) {
+        zebra = enabled
+        zebraThreshold = threshold.coerceIn(0.3f, 1f)
+    }
 
     /** Surface the camera must target. Available after [start]. */
     @Volatile
@@ -285,6 +319,13 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uTexMatrix = GLES20.glGetUniformLocation(program, "uTexMatrix")
         uTexture = GLES20.glGetUniformLocation(program, "uTexture")
         uHlgToSdr = GLES20.glGetUniformLocation(program, "uHlgToSdr")
+        uExposure = GLES20.glGetUniformLocation(program, "uExposure")
+        uContrast = GLES20.glGetUniformLocation(program, "uContrast")
+        uSaturation = GLES20.glGetUniformLocation(program, "uSaturation")
+        uLog = GLES20.glGetUniformLocation(program, "uLog")
+        uMono = GLES20.glGetUniformLocation(program, "uMono")
+        uZebra = GLES20.glGetUniformLocation(program, "uZebra")
+        uZebraThreshold = GLES20.glGetUniformLocation(program, "uZebraThreshold")
 
         GLES20.glDeleteShader(vertex)
         GLES20.glDeleteShader(fragment)
@@ -332,12 +373,17 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         }.onFailure { return }
 
         val timestampNs = System.nanoTime()
-        renderTo(outputEglSurface, timestampNs, tonemap = tenBitSource)
-        renderTo(encoderEglSurface, timestampNs, tonemap = false)
+        renderTo(outputEglSurface, timestampNs, tonemap = tenBitSource, overlay = true)
+        renderTo(encoderEglSurface, timestampNs, tonemap = false, overlay = false)
         onFrameRendered()
     }
 
-    private fun renderTo(surface: EGLSurface, timestampNs: Long, tonemap: Boolean) {
+    private fun renderTo(
+        surface: EGLSurface,
+        timestampNs: Long,
+        tonemap: Boolean,
+        overlay: Boolean,
+    ) {
         if (surface == EGL14.EGL_NO_SURFACE) return
         EGL14.eglMakeCurrent(display, surface, surface, context)
 
@@ -350,6 +396,13 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
         GLES20.glUniform1i(uTexture, 0)
         GLES20.glUniform1i(uHlgToSdr, if (tonemap) 1 else 0)
+        GLES20.glUniform1f(uExposure, exposure)
+        GLES20.glUniform1f(uContrast, contrast)
+        GLES20.glUniform1f(uSaturation, saturation)
+        GLES20.glUniform1i(uLog, if (logEnabled) 1 else 0)
+        GLES20.glUniform1i(uMono, if (monochrome) 1 else 0)
+        GLES20.glUniform1i(uZebra, if (overlay && zebra) 1 else 0)
+        GLES20.glUniform1f(uZebraThreshold, zebraThreshold)
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
 
         GLES20.glEnableVertexAttribArray(aPosition)
@@ -435,6 +488,17 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             varying vec2 vTexCoord;
             uniform samplerExternalOES uTexture;
             uniform int uHlgToSdr;
+            uniform float uExposure;
+            uniform float uContrast;
+            uniform float uSaturation;
+            uniform int uLog;
+            uniform int uMono;
+            uniform int uZebra;
+            uniform float uZebraThreshold;
+
+            float luma(vec3 c) {
+                return dot(c, vec3(0.2126, 0.7152, 0.0722));
+            }
 
             // Approximate HLG -> SDR for the preview only. The encoder receives
             // the untouched HLG signal.
@@ -446,11 +510,36 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             }
 
             void main() {
-                vec4 c = texture2D(uTexture, vTexCoord);
+                vec4 src = texture2D(uTexture, vTexCoord);
+                vec3 c = src.rgb;
+
                 if (uHlgToSdr == 1) {
-                    c.rgb = hlgToSdr(c.rgb);
+                    c = hlgToSdr(c);
                 }
-                gl_FragColor = c;
+
+                c *= uExposure;
+                float y = luma(c);
+                c = mix(vec3(y), c, uSaturation);
+                c = (c - 0.5) * uContrast + 0.5;
+
+                if (uMono == 1) {
+                    c = vec3(luma(c));
+                }
+
+                if (uLog == 1) {
+                    vec3 linear = pow(max(c, vec3(0.0)), vec3(2.2));
+                    vec3 encoded = 0.738 + 0.169 * log2(linear + 0.07);
+                    c = clamp(encoded, 0.0, 1.0);
+                }
+
+                c = clamp(c, 0.0, 1.0);
+
+                if (uZebra == 1 && luma(c) >= uZebraThreshold) {
+                    float stripe = step(0.5, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.06));
+                    c = mix(c, vec3(1.0, 0.1, 0.1), stripe * 0.8);
+                }
+
+                gl_FragColor = vec4(c, src.a);
             }
         """
     }

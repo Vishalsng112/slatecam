@@ -25,7 +25,13 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        bridge = SlateCamBridge.install(flutterEngine, applicationContext)
+        val installed = SlateCamBridge.install(flutterEngine, applicationContext)
+        installed.applyStartupOverrides(
+            profile = intent?.getStringExtra(EXTRA_PROFILE),
+            zebra = intent?.getBooleanExtra(EXTRA_ZEBRA, false) == true,
+            zebraThreshold = intent?.getFloatExtra(EXTRA_ZEBRA_THRESHOLD, 0.7f) ?: 0.7f,
+        )
+        bridge = installed
     }
 
     override fun onDestroy() {
@@ -77,5 +83,8 @@ class MainActivity : FlutterActivity() {
         const val TAG = "SlateCam"
         const val CAMERA_REQUEST_CODE = 1001
         const val EXTRA_RUN_PROBE = "run_probe"
+        const val EXTRA_PROFILE = "profile"
+        const val EXTRA_ZEBRA = "zebra"
+        const val EXTRA_ZEBRA_THRESHOLD = "zebra_threshold"
     }
 }

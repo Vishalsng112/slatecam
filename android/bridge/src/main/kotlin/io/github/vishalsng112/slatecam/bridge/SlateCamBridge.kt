@@ -21,6 +21,7 @@ import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
+import io.github.vishalsng112.slatecam.core.profile.PictureProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -73,6 +74,9 @@ class SlateCamBridge private constructor(
     private var powerManager: PowerManager? = null
     private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
 
+    private var profileId = PictureProfile.STANDARD.id
+    private var zebraEnabled = false
+
     private val tick = object : Runnable {
         override fun run() {
             if (recorder.isRecording) {
@@ -88,6 +92,7 @@ class SlateCamBridge private constructor(
             renderer.setTenBitSource(state.isTenBit)
             pushState()
         }
+        applyProfile(PictureProfile.STANDARD)
     }
 
     fun attach(api: SlateCamFlutterApi) {
@@ -148,6 +153,38 @@ class SlateCamBridge private constructor(
 
     override fun setAutoFocus() {
         controller.setAutoFocus()
+    }
+
+    override fun setProfile(profileId: String) {
+        applyProfile(PictureProfile.byId(profileId))
+        pushState()
+    }
+
+    override fun setZebra(enabled: Boolean) {
+        zebraEnabled = enabled
+        renderer.setZebra(enabled, 0.7f)
+        pushState()
+    }
+
+    /** Device-testing hook: apply profile/zebra from launch intent extras. */
+    fun applyStartupOverrides(profile: String?, zebra: Boolean, zebraThreshold: Float = 0.7f) {
+        if (profile != null) setProfile(profile)
+        if (zebra) {
+            zebraEnabled = true
+            renderer.setZebra(true, zebraThreshold)
+            pushState()
+        }
+    }
+
+    private fun applyProfile(profile: PictureProfile) {
+        profileId = profile.id
+        renderer.applyProfile(
+            exposure = profile.exposure,
+            contrast = profile.contrast,
+            saturation = profile.saturation,
+            logEnabled = profile.logEnabled,
+            monochrome = profile.monochrome,
+        )
     }
 
     override fun startRecording() {
@@ -392,6 +429,9 @@ class SlateCamBridge private constructor(
         recordingSeconds = recordingSeconds.toLong(),
         clipPath = clipPath,
         recordingError = recordingError,
+        profile = profileId,
+        profileNames = PictureProfile.all.map { it.id },
+        zebra = zebraEnabled,
     )
 
     companion object {

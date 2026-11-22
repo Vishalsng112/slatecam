@@ -14,15 +14,15 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 3 — recording (8-bit SDR, MediaStore output).**
-> Live preview plus HEVC/AAC capture through the same GL pipeline: 1080p30
-> HEVC Main at ~12 Mbps with 48 kHz stereo AAC, written via MediaStore into
-> `Movies/SlateCam/` and verified with ffprobe as `Main` / `yuv420p` / `bt709`.
+> **Status: Phase 4 — profiles and monitoring tools (in progress).**
+> Picture profiles (`standard`, `slatelog`, `mono`) run in the GL shader, with
+> the SlateLog curve unit-tested on the JVM. Shader zebra is live on the preview
+> path and never reaches recordings. LUT application, histogram and waveform are
+> next.
 >
-> HLG recording is implemented but disabled. The prober now parses the HEVC SPS
-> from encoded bytes, which proved the POCO's encoder claims Main10 while
-> emitting 8-bit Main; the device is `standard`, not `cinema`. See
-> [docs/test-devices.md](docs/test-devices.md).
+> Recording remains 8-bit SDR via MediaStore. HLG is implemented but disabled
+> because the prober proved this device's encoder claims Main10 while emitting
+> 8-bit Main. See [docs/test-devices.md](docs/test-devices.md).
 
 ---
 

@@ -132,6 +132,9 @@ class CameraState {
     required this.recordingSeconds,
     this.clipPath,
     this.recordingError,
+    required this.profile,
+    required this.profileNames,
+    required this.zebra,
   });
 
   bool isOpen;
@@ -178,6 +181,12 @@ class CameraState {
 
   String? recordingError;
 
+  String profile;
+
+  List<String> profileNames;
+
+  bool zebra;
+
   List<Object?> _toList() {
     return <Object?>[
       isOpen,
@@ -202,6 +211,9 @@ class CameraState {
       recordingSeconds,
       clipPath,
       recordingError,
+      profile,
+      profileNames,
+      zebra,
     ];
   }
 
@@ -233,6 +245,9 @@ class CameraState {
       recordingSeconds: result[19]! as int,
       clipPath: result[20] as String?,
       recordingError: result[21] as String?,
+      profile: result[22]! as String,
+      profileNames: (result[23]! as List<Object?>).cast<String>(),
+      zebra: result[24]! as bool,
     );
   }
 
@@ -245,7 +260,7 @@ class CameraState {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(isOpen, other.isOpen) && _deepEquals(error, other.error) && _deepEquals(iso, other.iso) && _deepEquals(isoMin, other.isoMin) && _deepEquals(isoMax, other.isoMax) && _deepEquals(shutterNs, other.shutterNs) && _deepEquals(shutterMinNs, other.shutterMinNs) && _deepEquals(shutterMaxNs, other.shutterMaxNs) && _deepEquals(focusDiopters, other.focusDiopters) && _deepEquals(focusMin, other.focusMin) && _deepEquals(focusMax, other.focusMax) && _deepEquals(whiteBalanceMode, other.whiteBalanceMode) && _deepEquals(whiteBalanceModes, other.whiteBalanceModes) && _deepEquals(autoExposure, other.autoExposure) && _deepEquals(autoFocus, other.autoFocus) && _deepEquals(previewWidth, other.previewWidth) && _deepEquals(previewHeight, other.previewHeight) && _deepEquals(previewRotationDegrees, other.previewRotationDegrees) && _deepEquals(isRecording, other.isRecording) && _deepEquals(recordingSeconds, other.recordingSeconds) && _deepEquals(clipPath, other.clipPath) && _deepEquals(recordingError, other.recordingError);
+    return _deepEquals(isOpen, other.isOpen) && _deepEquals(error, other.error) && _deepEquals(iso, other.iso) && _deepEquals(isoMin, other.isoMin) && _deepEquals(isoMax, other.isoMax) && _deepEquals(shutterNs, other.shutterNs) && _deepEquals(shutterMinNs, other.shutterMinNs) && _deepEquals(shutterMaxNs, other.shutterMaxNs) && _deepEquals(focusDiopters, other.focusDiopters) && _deepEquals(focusMin, other.focusMin) && _deepEquals(focusMax, other.focusMax) && _deepEquals(whiteBalanceMode, other.whiteBalanceMode) && _deepEquals(whiteBalanceModes, other.whiteBalanceModes) && _deepEquals(autoExposure, other.autoExposure) && _deepEquals(autoFocus, other.autoFocus) && _deepEquals(previewWidth, other.previewWidth) && _deepEquals(previewHeight, other.previewHeight) && _deepEquals(previewRotationDegrees, other.previewRotationDegrees) && _deepEquals(isRecording, other.isRecording) && _deepEquals(recordingSeconds, other.recordingSeconds) && _deepEquals(clipPath, other.clipPath) && _deepEquals(recordingError, other.recordingError) && _deepEquals(profile, other.profile) && _deepEquals(profileNames, other.profileNames) && _deepEquals(zebra, other.zebra);
   }
 
   @override
@@ -254,7 +269,7 @@ class CameraState {
 
   @override
   String toString() {
-    return 'CameraState(isOpen: $isOpen, error: $error, iso: $iso, isoMin: $isoMin, isoMax: $isoMax, shutterNs: $shutterNs, shutterMinNs: $shutterMinNs, shutterMaxNs: $shutterMaxNs, focusDiopters: $focusDiopters, focusMin: $focusMin, focusMax: $focusMax, whiteBalanceMode: $whiteBalanceMode, whiteBalanceModes: $whiteBalanceModes, autoExposure: $autoExposure, autoFocus: $autoFocus, previewWidth: $previewWidth, previewHeight: $previewHeight, previewRotationDegrees: $previewRotationDegrees, isRecording: $isRecording, recordingSeconds: $recordingSeconds, clipPath: $clipPath, recordingError: $recordingError)';
+    return 'CameraState(isOpen: $isOpen, error: $error, iso: $iso, isoMin: $isoMin, isoMax: $isoMax, shutterNs: $shutterNs, shutterMinNs: $shutterMinNs, shutterMaxNs: $shutterMaxNs, focusDiopters: $focusDiopters, focusMin: $focusMin, focusMax: $focusMax, whiteBalanceMode: $whiteBalanceMode, whiteBalanceModes: $whiteBalanceModes, autoExposure: $autoExposure, autoFocus: $autoFocus, previewWidth: $previewWidth, previewHeight: $previewHeight, previewRotationDegrees: $previewRotationDegrees, isRecording: $isRecording, recordingSeconds: $recordingSeconds, clipPath: $clipPath, recordingError: $recordingError, profile: $profile, profileNames: $profileNames, zebra: $zebra)';
   }
 }
 
@@ -466,6 +481,40 @@ class SlateCamHostApi {
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+    _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
+  }
+
+  Future<void> setProfile(String profileId) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.setProfile$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[profileId]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+    _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
+  }
+
+  Future<void> setZebra(bool enabled) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.setZebra$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[enabled]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
     _extractReplyValueOrThrow(
         pigeonVar_replyList,

@@ -25,6 +25,9 @@ class CameraState {
     required this.recordingSeconds,
     required this.clipPath,
     required this.recordingError,
+    required this.profile,
+    required this.profileNames,
+    required this.zebra,
   });
 
   bool isOpen;
@@ -49,6 +52,9 @@ class CameraState {
   int recordingSeconds;
   String? clipPath;
   String? recordingError;
+  String profile;
+  List<String> profileNames;
+  bool zebra;
 }
 
 @HostApi()
@@ -74,6 +80,10 @@ abstract class SlateCamHostApi {
   void startRecording();
 
   void stopRecording();
+
+  void setProfile(String profileId);
+
+  void setZebra(bool enabled);
 }
 
 @FlutterApi()

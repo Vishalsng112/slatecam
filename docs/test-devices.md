@@ -282,3 +282,28 @@ app-internal storage:
 3. **Detaching the encoder surface left no current EGL drawable**, which made
    the *next* recording produce zero frames. Rebinding the preview surface
    after destroy fixes consecutive clips.
+
+## Phase 4 verification — profiles and zebra (2026-11-23)
+
+| Item | Result |
+|---|---|
+| `standard` | passthrough |
+| `slatelog` | flat look, shadows lifted (0.09 toe), highlights held |
+| `mono` | grayscale, correct exposure |
+| Zebra | red diagonal stripes above threshold, **preview only** |
+| Switching | applied via launch extras (`--es profile`, `--ez zebra`) |
+| Log maths | unit-tested: 0 → 0.09, 18% → 0.40, 100% → 0.754, round-trip |
+
+### Findings
+
+1. **The first log curve crushed shadows.** `0.75 + 0.1415 * log2(x)` sends
+   everything below ~2.5% linear to pure black, which looks wrong on a dark
+   scene. Adding a 0.07 toe (`log2(x + 0.07)`) lifts black to 0.09 and keeps the
+   18%/100% anchors.
+2. **Zebra looked broken until the threshold was lowered for the test.** At 0.7
+   and 0.9 the dark scene had no qualifying pixels. Verified at 0.35; the
+   production default stays 0.7.
+3. **The in-app profile dropdown did not open under `adb input tap`.** The
+   control is visible and reachable by a real finger, but automated taps on the
+   scrollable panel did not register. Profiles were verified via launch extras
+   instead; the interaction needs a manual pass.

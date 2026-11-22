@@ -296,6 +296,31 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   _host.setWhiteBalanceMode(value);
                 },
               ),
+              _label('Profile', state.profile),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: state.profileNames.contains(state.profile)
+                    ? state.profile
+                    : null,
+                items: [
+                  for (final name in state.profileNames)
+                    DropdownMenuItem(value: name, child: Text(name)),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => state.profile = value);
+                  _host.setProfile(value);
+                },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Zebra'),
+                value: state.zebra,
+                onChanged: (value) {
+                  setState(() => state.zebra = value);
+                  _host.setZebra(value);
+                },
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
