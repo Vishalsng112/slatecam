@@ -147,6 +147,8 @@ class SlateCamBridge private constructor(
                     controller.setTenBit(tenBitGate(state.cameraId).available)
                 }
                 controller.setShadingCorrection(shadingEnabledFor(state.cameraId))
+                controller.setOis(enabledFor(KEY_OIS_OFF, state.cameraId))
+                controller.setEis(enabledFor(KEY_EIS_OFF, state.cameraId))
             }
             renderer.setTenBitSource(state.isTenBit)
             renderer.setDisplayRotation(state.previewRotationDegrees)
@@ -346,8 +348,8 @@ class SlateCamBridge private constructor(
         controller.setZoomRatio(ratio.toFloat())
     }
 
-    override fun setAutoFocus() {
-        controller.setAutoFocus()
+    override fun setFocusMode(mode: String) {
+        controller.setFocusMode(mode)
     }
 
     override fun setProfile(profileId: String) {
@@ -397,9 +399,32 @@ class SlateCamBridge private constructor(
         pushState()
     }
 
+    override fun setOis(enabled: Boolean) {
+        val id = lastState?.cameraId ?: lastCameraId ?: return
+        persistDisabled(KEY_OIS_OFF, id, !enabled)
+        controller.setOis(enabled)
+        pushState()
+    }
+
+    override fun setEis(enabled: Boolean) {
+        val id = lastState?.cameraId ?: lastCameraId ?: return
+        persistDisabled(KEY_EIS_OFF, id, !enabled)
+        controller.setEis(enabled)
+        pushState()
+    }
+
     /** Vignette correction is on unless this sensor was explicitly turned off. */
     private fun shadingEnabledFor(cameraId: String): Boolean =
-        cameraId !in (shootPrefs.getStringSet(KEY_SHADING_OFF, emptySet()) ?: emptySet())
+        enabledFor(KEY_SHADING_OFF, cameraId)
+
+    private fun enabledFor(key: String, cameraId: String): Boolean =
+        cameraId !in (shootPrefs.getStringSet(key, emptySet()) ?: emptySet())
+
+    private fun persistDisabled(key: String, cameraId: String, disabled: Boolean) {
+        val ids = (shootPrefs.getStringSet(key, emptySet()) ?: emptySet()).toMutableSet()
+        if (disabled) ids.add(cameraId) else ids.remove(cameraId)
+        shootPrefs.edit().putStringSet(key, ids).apply()
+    }
 
     override fun setDeviceReportOptIn(enabled: Boolean) {
         deviceDatabase.setReportOptIn(enabled)
@@ -1387,6 +1412,8 @@ class SlateCamBridge private constructor(
         autoExposure = autoExposure,
         autoFocus = autoFocus,
         autoFocusSupported = autoFocusSupported,
+        focusMode = focusMode,
+        focusModes = focusModes,
         previewWidth = previewWidth.toLong(),
         previewHeight = previewHeight.toLong(),
         previewRotationDegrees = previewRotationDegrees.toLong(),
@@ -1425,6 +1452,10 @@ class SlateCamBridge private constructor(
         antibandingModes = antibandingModes,
         shadingCorrection = shadingCorrection,
         shadingSupported = shadingSupported,
+        oisSupported = oisSupported,
+        oisEnabled = oisEnabled,
+        eisSupported = eisSupported,
+        eisEnabled = eisEnabled,
         exposureMode = exposureMode,
         exposureModes = exposureModes,
         deviceKey = deviceSnapshot.identity.deviceKey,
@@ -1450,6 +1481,8 @@ class SlateCamBridge private constructor(
         private const val KEY_SHOOT_PROFILES = "shoot_profiles"
         private const val KEY_ACTIVE_PROFILE = "active_profile"
         private const val KEY_SHADING_OFF = "shading_off_cameras"
+        private const val KEY_OIS_OFF = "ois_off_cameras"
+        private const val KEY_EIS_OFF = "eis_off_cameras"
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")

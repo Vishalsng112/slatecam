@@ -108,6 +108,8 @@ class CameraState {
     required this.autoExposure,
     required this.autoFocus,
     required this.autoFocusSupported,
+    required this.focusMode,
+    required this.focusModes,
     required this.previewWidth,
     required this.previewHeight,
     required this.previewRotationDegrees,
@@ -146,6 +148,10 @@ class CameraState {
     required this.antibandingModes,
     required this.shadingCorrection,
     required this.shadingSupported,
+    required this.oisSupported,
+    required this.oisEnabled,
+    required this.eisSupported,
+    required this.eisEnabled,
     required this.exposureMode,
     required this.exposureModes,
     required this.deviceKey,
@@ -183,6 +189,10 @@ class CameraState {
   bool autoExposure;
   bool autoFocus;
   bool autoFocusSupported;
+  /// Wire focus mode: off | auto | continuous_video | continuous_picture ...
+  String focusMode;
+  /// Focus modes reported by the active camera, excluding unsupported values.
+  List<String> focusModes;
   int previewWidth;
   int previewHeight;
   int previewRotationDegrees;
@@ -233,6 +243,14 @@ class CameraState {
   bool shadingCorrection;
   /// True when the active sensor offers FAST or HIGH_QUALITY shading.
   bool shadingSupported;
+  /// Optical image stabilisation is available on this sensor.
+  bool oisSupported;
+  /// OIS preference; on by default where supported.
+  bool oisEnabled;
+  /// Electronic (video) stabilisation is available on this sensor.
+  bool eisSupported;
+  /// EIS preference; on by default where supported.
+  bool eisEnabled;
   String exposureMode;
   List<String> exposureModes;
   String deviceKey;
@@ -306,7 +324,7 @@ abstract class SlateCamHostApi {
   /// Deletes a shoot profile.
   void deleteShootProfile(String id);
 
-  void setAutoFocus();
+  void setFocusMode(String mode);
 
   void startRecording();
 
@@ -329,6 +347,12 @@ abstract class SlateCamHostApi {
   /// Enables or disables lens-shading (vignette) correction for the active
   /// sensor. The choice is persisted per camera ID.
   void setShadingCorrection(bool enabled);
+
+  /// Optical stabilisation for the active sensor; persisted per camera ID.
+  void setOis(bool enabled);
+
+  /// Electronic (video) stabilisation; persisted per camera ID.
+  void setEis(bool enabled);
 
   /// Opt-in for persisted device reports. Off by default.
   void setDeviceReportOptIn(bool enabled);

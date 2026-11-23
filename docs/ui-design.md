@@ -232,18 +232,24 @@ facing letter is prefixed only when two lenses share a focal length.
 | Zebra threshold for exposure | `setZebra` only takes on/off | Future |
 | Metering mode (matrix/centre/spot) | probe reports regions, no UI yet | Future |
 
-### 5.5 Focus (deferred)
+### 5.5 Focus and stabilisation card
 
-Manual focus, focus speed and AF buttons are removed from the console for now.
-The native controller keeps continuous autofocus, so the preview stays focused
-without UI. The API remains available for the tap-to-focus/AF-lock follow-up.
+The card sits after Exposure in the primary column.
 
 | Element | Native call | Status |
 |---|---|---|
-| Continuous autofocus | `CONTROL_AF_MODE_CONTINUOUS_VIDEO` | Default |
-| Manual focus slider | `setFocusDiopters` | Deferred |
-| Focus shift speed | `setFocusShiftSpeed` | Deferred |
-| Focus distance readout | `focusDiopters` / `focusMax` | Deferred |
+| Focus mode (`MF`, `AF`, `CAF`, `CAF-P`, `MACRO`, `EDOF`) | `setFocusMode` | Current |
+| Manual focus slider (only when `MF`) | `setFocusDiopters` | Current |
+| OIS on/off (only when the sensor advertises `on`) | `setOis` | Current |
+| EIS on/off | `setEis` | Current |
+| Focus shift speed | `setFocusShiftSpeed` | API exists, no UI |
+| Focus distance readout | `focusDiopters` / `focusMax` | Current (in MF) |
+
+Focus modes, OIS and EIS are per sensor: `focusModes`, `oisSupported` and
+`eisSupported` come from live `CameraCharacteristics`; the bridge persists the
+operator's choice per camera ID. A lens that only offers `off` (for example a
+fixed-focus front camera) shows `MF` alone. Continuous-video AF is the default
+when available.
 | Tap to focus | needs metering region API | Future |
 | AF lock / AE lock buttons | probe has lock flags, not wired | Future |
 | Hybrid CDAF | hill-climb focus engine | Future |
@@ -297,7 +303,7 @@ without UI. The API remains available for the tap-to-focus/AF-lock follow-up.
 | Resolution / frame-rate selector | replaced by the recording-mode catalog | **Current** |
 | Codec / bitrate selector | fixed HEVC, bitrate scales with mode | Future |
 | Audio source and level | native selection exists, no UI/state | Future |
-| Stabilisation / OIS | probe reports modes, no state | Future |
+| Stabilisation / OIS / EIS | per-sensor toggles in Focus & stabilisation card | **Current** |
 | RAW / DNG burst | Camera2 still capture not implemented | Future |
 | Photo mode | not implemented | Future |
 

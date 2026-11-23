@@ -807,6 +807,25 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
+### Focus modes, OIS and EIS (Pad 3 + POCO, build 2064)
+
+| Check | Pad 3 back | POCO X6 Pro back |
+|---|---|---|
+| Focus modes advertised | off, auto, macro, continuous_video, continuous_picture, edof | off, auto, macro, continuous_video, continuous_picture |
+| Default request | `CONTROL_AF_MODE [CONTINUOUS_VIDEO]` | `CONTROL_AF_MODE [CONTINUOUS_VIDEO]` |
+| `AF` chip | `[AUTO]` | `[AUTO]` |
+| `MF` chip | `[OFF]`, manual slider appears | `[OFF]`, manual slider appears |
+| OIS advertised | `off` only -> control hidden | `off`/`on` -> control shown |
+| OIS default | n/a | `LENS_OPTICAL_STABILIZATION_MODE [ON]` |
+| OIS off -> on | n/a | `[OFF]` -> `[ON]`; persisted `OFF` across restart |
+| EIS default | `VIDEO_STABILIZATION_MODE [ON]` | `VIDEO_STABILIZATION_MODE [ON]` |
+| EIS off -> on | `[OFF]` -> `[ON]` | `[OFF]` -> `[ON]` |
+| Shading default | `[HIGH_QUALITY]` | `[HIGH_QUALITY]` |
+
+All values were read from `dumpsys media.camera` after each tap. The Pad front
+lens advertises only `off` focus modes, so its card shows `MF` alone. OIS and EIS
+are requested together on the POCO; no HAL-ignored warning appeared.
+
 ### 4K 4:3 and per-sensor vignette correction (Pad 3 + POCO, build 2062)
 
 **4K 4:3 aspect**

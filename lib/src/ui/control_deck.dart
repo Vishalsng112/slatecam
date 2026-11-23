@@ -95,6 +95,7 @@ class _ControlDeckState extends State<ControlDeck> {
                   final primary = <Widget>[
                     _modeCard(context),
                     _exposureCard(context),
+                    _focusCard(context),
                   ];
                   final secondary = <Widget>[
                     _shootSetCard(context),
@@ -1274,6 +1275,150 @@ class _ControlDeckState extends State<ControlDeck> {
       onSelected: onChanged,
       selectedColor: UiTokens.accent.withValues(alpha: 0.18),
       checkmarkColor: UiTokens.accent,
+    );
+  }
+
+  Widget _focusCard(BuildContext context) {
+    final modes = state.focusModes;
+    final focusMax = state.focusMax <= 0 ? 1.0 : state.focusMax;
+    final focusValue = state.focusDiopters.clamp(0.0, focusMax);
+    return DeckCard(
+      title: 'Focus & stabilisation',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (modes.isEmpty)
+            Text(
+              'This camera did not report focus modes.',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          else
+            _focusModeGroup(modes),
+          if (state.focusMode == 'off') ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  'MF',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+                Expanded(
+                  child: Slider(
+                    value: focusValue,
+                    max: focusMax,
+                    onChanged: (value) => widget.host.setFocusDiopters(value),
+                  ),
+                ),
+                SizedBox(
+                  width: 46,
+                  child: Text(
+                    formatDiopters(state.focusDiopters),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (state.oisSupported || state.eisSupported) ...[
+            const Divider(height: 14, color: UiTokens.border),
+            Text(
+              'STABILISATION',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            const SizedBox(height: 4),
+            if (state.oisSupported)
+              _stabilizationRow(
+                'OIS',
+                state.oisEnabled,
+                widget.host.setOis,
+              ),
+            if (state.eisSupported)
+              _stabilizationRow(
+                'EIS',
+                state.eisEnabled,
+                widget.host.setEis,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _focusModeGroup(List<String> modes) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('FOCUS MODE', style: Theme.of(context).textTheme.labelSmall),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            for (final mode in modes)
+              _modeChip(
+                label: _focusModeLabel(mode),
+                tooltip: _focusModeTooltip(mode),
+                selected: state.focusMode == mode,
+                onTap: () => widget.host.setFocusMode(mode),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _focusModeLabel(String mode) => switch (mode) {
+    'off' => 'MF',
+    'auto' => 'AF',
+    'continuous_video' => 'CAF',
+    'continuous_picture' => 'CAF-P',
+    'macro' => 'MACRO',
+    'edof' => 'EDOF',
+    _ => humanizeWireValue(mode).toUpperCase(),
+  };
+
+  String _focusModeTooltip(String mode) => switch (mode) {
+    'off' => 'Manual focus',
+    'auto' => 'Single autofocus',
+    'continuous_video' => 'Continuous autofocus for video',
+    'continuous_picture' => 'Continuous autofocus for stills',
+    'macro' => 'Macro autofocus',
+    'edof' => 'Extended depth of field',
+    _ => humanizeWireValue(mode),
+  };
+
+  Widget _stabilizationRow(
+    String label,
+    bool enabled,
+    ValueChanged<bool> onChanged,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 34,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+          _modeChip(
+            label: 'on',
+            tooltip: '$label on',
+            selected: enabled,
+            onTap: () => onChanged(true),
+          ),
+          const SizedBox(width: 4),
+          _modeChip(
+            label: 'off',
+            tooltip: '$label off',
+            selected: !enabled,
+            onTap: () => onChanged(false),
+          ),
+        ],
+      ),
     );
   }
 

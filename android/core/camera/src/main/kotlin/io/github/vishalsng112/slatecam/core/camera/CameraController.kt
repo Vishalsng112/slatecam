@@ -46,6 +46,8 @@ data class CameraUiState(
     val autoExposure: Boolean,
     val autoFocus: Boolean,
     val autoFocusSupported: Boolean = true,
+    val focusMode: String = "continuous_video",
+    val focusModes: List<String> = emptyList(),
     val previewWidth: Int,
     val previewHeight: Int,
     val previewRotationDegrees: Int,
@@ -67,6 +69,10 @@ data class CameraUiState(
     val shadingCorrection: Boolean = true,
     /** True when the sensor advertises FAST or HIGH_QUALITY shading. */
     val shadingSupported: Boolean = false,
+    val oisSupported: Boolean = false,
+    val oisEnabled: Boolean = false,
+    val eisSupported: Boolean = false,
+    val eisEnabled: Boolean = false,
     val exposureMode: String = ExposureMode.PROGRAM.wireValue,
     val exposureModes: List<String> = ExposureMode.wireValues,
 )
@@ -125,6 +131,8 @@ class CameraController(private val context: Context) {
     private var lastMeteringNs = 0L
     private var autoFocus = true
     private var autoFocusSupported = true
+    private var focusModes: List<String> = emptyList()
+    private var focusMode = "continuous_video"
     private var rotationDegrees = 0
     private var glRotationDegrees = 0
     private var initialized = false
@@ -139,6 +147,12 @@ class CameraController(private val context: Context) {
     private var shadingModes: List<String> = emptyList()
     private var shadingCorrection = true
     private var shadingSupported = false
+    private var oisModes: List<String> = emptyList()
+    private var oisSupported = false
+    private var oisEnabled = true
+    private var videoStabilizationModes: List<String> = emptyList()
+    private var eisSupported = false
+    private var eisEnabled = true
     private var aberrationModes: List<String> = emptyList()
     private var distortionModes: List<String> = emptyList()
 
@@ -385,8 +399,9 @@ class CameraController(private val context: Context) {
 
     fun setFocusDiopters(value: Float) {
         handler.post {
-            focusTarget = value.coerceIn(0f, focusMax)
+            focusMode = FocusMode.OFF
             autoFocus = false
+            focusTarget = value.coerceIn(0f, focusMax)
             startFocusRamp()
         }
     }
@@ -433,13 +448,28 @@ class CameraController(private val context: Context) {
         }
     }
 
-    fun setAutoFocus() {
+    fun setFocusMode(mode: String) {
         handler.post {
-            if (!autoFocusSupported) {
-                autoFocus = false
-            } else {
-                autoFocus = true
-            }
+            if (mode !in focusModes) return@post
+            focusMode = mode
+            autoFocus = FocusMode.isAutomatic(mode)
+            if (mode == FocusMode.OFF) focusTarget = focusDiopters
+            applyAndEmit()
+        }
+    }
+
+    fun setOis(enabled: Boolean) {
+        handler.post {
+            if (oisEnabled == enabled) return@post
+            oisEnabled = enabled
+            applyAndEmit()
+        }
+    }
+
+    fun setEis(enabled: Boolean) {
+        handler.post {
+            if (eisEnabled == enabled) return@post
+            eisEnabled = enabled
             applyAndEmit()
         }
     }
@@ -529,15 +559,27 @@ class CameraController(private val context: Context) {
         shutterMaxNs = exposure?.upper ?: 1_000_000_000L
 
         focusMax = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
-        val afModes = characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
-            ?.toList()
+        focusModes = characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
+            ?.map(::afModeName)
+            ?.distinct()
             ?: emptyList()
-        autoFocusSupported = afModes.any {
-            it == CameraCharacteristics.CONTROL_AF_MODE_AUTO ||
-                it == CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_VIDEO ||
-                it == CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+        autoFocusSupported = focusModes.any { it != "off" }
+        if (focusMode !in focusModes) {
+            focusMode = FocusMode.defaultFor(focusModes)
         }
-        if (!autoFocusSupported) autoFocus = false
+        autoFocus = FocusMode.isAutomatic(focusMode)
+
+        oisModes = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
+            ?.map(::oisModeName)
+            ?.distinct()
+            ?: emptyList()
+        oisSupported = "on" in oisModes
+        videoStabilizationModes =
+            characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)
+                ?.map(::videoStabilizationName)
+                ?.distinct()
+                ?: emptyList()
+        eisSupported = "on" in videoStabilizationModes
 
         wbModes = characteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)
             ?.map(::awbModeName)
@@ -757,14 +799,35 @@ class CameraController(private val context: Context) {
         }
         fpsRange?.let { request.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
 
-        if (autoFocus && autoFocusSupported) {
-            request.set(
-                CaptureRequest.CONTROL_AF_MODE,
-                CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO,
-            )
+        if (focusMode in focusModes && FocusMode.isAutomatic(focusMode)) {
+            request.set(CaptureRequest.CONTROL_AF_MODE, afModeValue(focusMode))
         } else {
-            request.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+            request.set(CaptureRequest.CONTROL_AF_MODE, CameraCharacteristics.CONTROL_AF_MODE_OFF)
             request.set(CaptureRequest.LENS_FOCUS_DISTANCE, focusDiopters)
+        }
+
+        // Optical and electronic stabilisation are independent requests. Each is
+        // applied only when the active sensor advertises it; the bridge keeps the
+        // per-lens preference.
+        if (oisSupported) {
+            request.set(
+                CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+                if (oisEnabled) {
+                    CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON
+                } else {
+                    CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_OFF
+                },
+            )
+        }
+        if (eisSupported) {
+            request.set(
+                CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                if (eisEnabled) {
+                    CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_ON
+                } else {
+                    CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+                },
+            )
         }
 
         request.set(CaptureRequest.CONTROL_AWB_MODE, awbModeValue(wbMode))
@@ -859,6 +922,8 @@ class CameraController(private val context: Context) {
             autoExposure = autoExposure,
             autoFocus = autoFocus,
             autoFocusSupported = autoFocusSupported,
+            focusMode = focusMode,
+            focusModes = focusModes,
             previewWidth = previewSize.width,
             previewHeight = previewSize.height,
             previewRotationDegrees = rotationDegrees,
@@ -877,6 +942,10 @@ class CameraController(private val context: Context) {
             antibandingModes = antibandingModes,
             shadingCorrection = shadingCorrection,
             shadingSupported = shadingSupported,
+            oisSupported = oisSupported,
+            oisEnabled = oisEnabled,
+            eisSupported = eisSupported,
+            eisEnabled = eisEnabled,
             exposureMode = exposureMode.wireValue,
             exposureModes = ExposureMode.wireValues,
         )
@@ -1046,6 +1115,39 @@ class CameraController(private val context: Context) {
         CameraCharacteristics.HOT_PIXEL_MODE_FAST -> "fast"
         CameraCharacteristics.HOT_PIXEL_MODE_HIGH_QUALITY -> "high_quality"
         else -> "mode_$value"
+    }
+
+    private fun afModeName(mode: Int): String = when (mode) {
+        CameraCharacteristics.CONTROL_AF_MODE_OFF -> "off"
+        CameraCharacteristics.CONTROL_AF_MODE_AUTO -> "auto"
+        CameraCharacteristics.CONTROL_AF_MODE_MACRO -> "macro"
+        CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_VIDEO -> "continuous_video"
+        CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_PICTURE -> "continuous_picture"
+        CameraCharacteristics.CONTROL_AF_MODE_EDOF -> "edof"
+        else -> "mode_$mode"
+    }
+
+    private fun afModeValue(mode: String): Int = when (mode) {
+        "off" -> CameraCharacteristics.CONTROL_AF_MODE_OFF
+        "auto" -> CameraCharacteristics.CONTROL_AF_MODE_AUTO
+        "macro" -> CameraCharacteristics.CONTROL_AF_MODE_MACRO
+        "continuous_video" -> CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_VIDEO
+        "continuous_picture" -> CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+        "edof" -> CameraCharacteristics.CONTROL_AF_MODE_EDOF
+        else -> CameraCharacteristics.CONTROL_AF_MODE_OFF
+    }
+
+    private fun oisModeName(mode: Int): String = when (mode) {
+        CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_OFF -> "off"
+        CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON -> "on"
+        else -> "mode_$mode"
+    }
+
+    private fun videoStabilizationName(mode: Int): String = when (mode) {
+        CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_OFF -> "off"
+        CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_ON -> "on"
+        CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION -> "preview"
+        else -> "mode_$mode"
     }
 
     private fun shadingName(value: Int): String = when (value) {

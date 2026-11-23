@@ -74,6 +74,14 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   requests `SHADING_MODE_HIGH_QUALITY` (else `FAST`) instead of forcing `OFF`,
   and the bridge remembers the choice per camera ID. Measured Pad 3
   corner/centre luma ratio rose from 0.284 to 0.455 with correction on.
+- Focus is back as an explicit mode control: `MF`, `AF`, `CAF`, `CAF-P`,
+  `MACRO` and `EDOF` appear only when the active camera reports them.
+  Continuous-video AF remains the default, and selecting `MF` reveals the focus
+  distance slider.
+- OIS is exposed per sensor and enabled by default where the camera advertises
+  `on` (POCO back). EIS is enabled by default where advertised and can be
+  switched off. Both preferences persist per camera ID; the Pad 3 back only
+  advertises OIS `off`, so its OIS control is hidden rather than faked.
 - Exposure mode uses circular **P / S / M** buttons.
 - The Focus card and the bottom-dock focus chip are removed for now; the camera
   keeps continuous autofocus. Manual focus returns with the tap-to-focus/AF-lock
