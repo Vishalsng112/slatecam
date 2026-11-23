@@ -31,6 +31,8 @@ class MainActivity : FlutterActivity() {
             zebra = intent?.getBooleanExtra(EXTRA_ZEBRA, false) == true,
             zebraThreshold = intent?.getFloatExtra(EXTRA_ZEBRA_THRESHOLD, 0.7f) ?: 0.7f,
             falseColor = intent?.getBooleanExtra(EXTRA_FALSE_COLOR, false) == true,
+            peaking = intent?.getBooleanExtra(EXTRA_PEAKING, false) == true,
+            peakingSensitivity = intent?.getFloatExtra(EXTRA_PEAKING_SENSITIVITY, 0.5f) ?: 0.5f,
         )
         installed.setProbeMode(intent?.getBooleanExtra(EXTRA_RUN_PROBE, false) == true)
         bridge = installed
@@ -89,5 +91,7 @@ class MainActivity : FlutterActivity() {
         const val EXTRA_ZEBRA = "zebra"
         const val EXTRA_ZEBRA_THRESHOLD = "zebra_threshold"
         const val EXTRA_FALSE_COLOR = "false_color"
+        const val EXTRA_PEAKING = "peaking"
+        const val EXTRA_PEAKING_SENSITIVITY = "peaking_sensitivity"
     }
 }

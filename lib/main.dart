@@ -429,6 +429,50 @@ class _CaptureScreenState extends State<CaptureScreen> {
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
+                title: const Text('Focus peaking'),
+                value: state.peaking,
+                onChanged: (value) {
+                  setState(() => state.peaking = value);
+                  _host.setPeaking(
+                    value,
+                    state.peakingSensitivity,
+                    state.peakingStrength,
+                  );
+                },
+              ),
+              if (state.peaking) ...[
+                _label(
+                  'Peaking sensitivity',
+                  '${(state.peakingSensitivity * 100).round()}%',
+                ),
+                Slider(
+                  value: state.peakingSensitivity,
+                  onChanged: (value) =>
+                      setState(() => state.peakingSensitivity = value),
+                  onChangeEnd: (value) => _host.setPeaking(
+                    true,
+                    value,
+                    state.peakingStrength,
+                  ),
+                ),
+                _label(
+                  'Peaking strength',
+                  '${(state.peakingStrength * 100).round()}%',
+                ),
+                Slider(
+                  min: 0.1,
+                  value: state.peakingStrength,
+                  onChanged: (value) =>
+                      setState(() => state.peakingStrength = value),
+                  onChangeEnd: (value) => _host.setPeaking(
+                    true,
+                    state.peakingSensitivity,
+                    value,
+                  ),
+                ),
+              ],
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
                 title: const Text('Framing guides'),
                 value: _showGuides,
                 onChanged: (value) => setState(() => _showGuides = value),

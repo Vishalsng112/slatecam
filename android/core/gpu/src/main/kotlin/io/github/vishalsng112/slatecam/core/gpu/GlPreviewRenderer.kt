@@ -57,6 +57,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uInputMatrix = 0
     private var uInputExposure = 0
     private var uInputSaturation = 0
+    private var uPeaking = 0
+    private var uPeakingThreshold = 0
+    private var uPeakingStrength = 0
+    private var uTexelSize = 0
     private var uLut = 0
     private var uLutEnabled = 0
     private var uLutSize = 0
@@ -104,6 +108,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var inputMatrix = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
     @Volatile private var inputExposure = 1f
     @Volatile private var inputSaturation = 1f
+    @Volatile private var peaking = false
+    @Volatile private var peakingThreshold = 0.12f
+    @Volatile private var peakingStrength = 0.8f
+
+    fun setPeaking(enabled: Boolean, sensitivity: Float, strength: Float) {
+        peaking = enabled
+        // Higher sensitivity lowers the edge threshold.
+        peakingThreshold = 0.30f - 0.28f * sensitivity.coerceIn(0f, 1f)
+        peakingStrength = strength.coerceIn(0.1f, 1f)
+    }
 
     /**
      * Per-device normalisation, applied before the creative look. Identity by
@@ -474,6 +488,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uInputMatrix = GLES20.glGetUniformLocation(program, "uInputMatrix")
         uInputExposure = GLES20.glGetUniformLocation(program, "uInputExposure")
         uInputSaturation = GLES20.glGetUniformLocation(program, "uInputSaturation")
+        uPeaking = GLES20.glGetUniformLocation(program, "uPeaking")
+        uPeakingThreshold = GLES20.glGetUniformLocation(program, "uPeakingThreshold")
+        uPeakingStrength = GLES20.glGetUniformLocation(program, "uPeakingStrength")
+        uTexelSize = GLES20.glGetUniformLocation(program, "uTexelSize")
         uLut = GLES20.glGetUniformLocation(program, "uLut")
         uLutEnabled = GLES20.glGetUniformLocation(program, "uLutEnabled")
         uLutSize = GLES20.glGetUniformLocation(program, "uLutSize")
@@ -557,6 +575,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniformMatrix3fv(uInputMatrix, 1, false, inputMatrix, 0)
         GLES20.glUniform1f(uInputExposure, inputExposure)
         GLES20.glUniform1f(uInputSaturation, inputSaturation)
+        GLES20.glUniform1i(uPeaking, if (overlay && peaking) 1 else 0)
+        GLES20.glUniform1f(uPeakingThreshold, peakingThreshold)
+        GLES20.glUniform1f(uPeakingStrength, peakingStrength)
+        GLES20.glUniform2f(uTexelSize, 1f / width.coerceAtLeast(1), 1f / height.coerceAtLeast(1))
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
 
         GLES20.glEnableVertexAttribArray(aPosition)
@@ -791,6 +813,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform mat3 uInputMatrix;
             uniform float uInputExposure;
             uniform float uInputSaturation;
+            uniform int uPeaking;
+            uniform float uPeakingThreshold;
+            uniform float uPeakingStrength;
+            uniform vec2 uTexelSize;
             uniform sampler2D uLut;
             uniform int uLutEnabled;
             uniform float uLutSize;
@@ -875,6 +901,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                         c = vec3(1.0, 0.4, 0.0);
                     } else {
                         c = vec3(1.0, 0.0, 0.0);
+                    }
+                }
+
+                if (uPeaking == 1) {
+                    vec2 uvL = vTexCoord + vec2(-uTexelSize.x, 0.0);
+                    vec2 uvR = vTexCoord + vec2(uTexelSize.x, 0.0);
+                    vec2 uvT = vTexCoord + vec2(0.0, uTexelSize.y);
+                    vec2 uvB = vTexCoord + vec2(0.0, -uTexelSize.y);
+                    float l = luma(texture2D(uTexture, uvL).rgb);
+                    float r = luma(texture2D(uTexture, uvR).rgb);
+                    float t = luma(texture2D(uTexture, uvT).rgb);
+                    float b = luma(texture2D(uTexture, uvB).rgb);
+                    float edge = abs(l - r) + abs(t - b);
+                    if (edge > uPeakingThreshold) {
+                        c = mix(c, vec3(1.0, 0.15, 0.15), uPeakingStrength);
                     }
                 }
 

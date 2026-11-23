@@ -415,3 +415,14 @@ This platform dispatches `onClosed` on that executor, so the task was rejected
 and the process died with `RejectedExecutionException`. Both camera verifiers now
 defer the executor shutdown by 500 ms. A probe-only launch mode also prevents the
 preview from holding a camera while verification runs.
+
+## Focus peaking (2026-11-23)
+
+Luma-gradient edge detection runs in the preview shader and marks edges red.
+Sensitivity (threshold) and strength (opacity) are uniforms driven from the
+control panel, and peaking is gated by the overlay flag so it never reaches a
+recording. At 85% sensitivity the POCO marks the bottle, monitor bezel and shelf
+edges clearly; lower sensitivity removes the noise on textured surfaces.
+
+Temporal decay (how long a peak lingers after focus moves) is not implemented;
+it needs a ping-pong mask buffer and is recorded in the backlog.

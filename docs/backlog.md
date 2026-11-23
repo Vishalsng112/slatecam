@@ -36,6 +36,7 @@ left floating in conversation.
 | MediaStore output (`Movies/SlateCam`) | 3 | gallery path + row |
 | Picture profiles, SlateLog, GPU LUT, zebra, false colour, guides, histogram, waveform | 4 | POCO screenshots |
 | Physical camera inventory + relative lens roles | 1/2 | schema 1.5.0, unit tests |
+| Focus peaking (sensitivity + strength) | 4 | shader edge detection, preview-only, verified on POCO |
 | HAL verification for all seven capture modes | 2 | `CaptureResult` compared; no mismatches on POCO |
 | Audio capability probe (unprocessed, devices, effects) | 1 | schema 1.6.0 |
 | Colour input-profile model (matrix + trims, versioned) | 4 | `InputProfile`, unit-tested; calibration pending |
@@ -70,6 +71,7 @@ left floating in conversation.
 | Creative vignette | Shader effect, distinct from lens-shading correction |
 | Colour calibration data for the input profile | Model and shader stage are done; a ColorChecker workflow pairs with Phase 7 |
 | Control-panel touch pass | Dropdowns did not respond to synthetic taps |
+| Peaking temporal decay | Persistence after focus changes needs a ping-pong mask buffer |
 
 ## Phase 5 — advanced
 

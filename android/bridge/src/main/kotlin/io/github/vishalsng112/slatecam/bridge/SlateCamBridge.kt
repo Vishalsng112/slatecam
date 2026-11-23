@@ -85,6 +85,9 @@ class SlateCamBridge private constructor(
     private var profileId = PictureProfile.STANDARD.id
     private var zebraEnabled = false
     private var falseColorEnabled = false
+    private var peakingEnabled = false
+    private var peakingSensitivity = 0.5f
+    private var peakingStrength = 0.8f
     private var lutEntries: List<LutLibrary.Entry> = emptyList()
     private var probeMode = false
 
@@ -205,6 +208,14 @@ class SlateCamBridge private constructor(
         pushState()
     }
 
+    override fun setPeaking(enabled: Boolean, sensitivity: Double, strength: Double) {
+        peakingEnabled = enabled
+        peakingSensitivity = sensitivity.toFloat().coerceIn(0f, 1f)
+        peakingStrength = strength.toFloat().coerceIn(0.1f, 1f)
+        renderer.setPeaking(peakingEnabled, peakingSensitivity, peakingStrength)
+        pushState()
+    }
+
     override fun setEdgeMode(mode: String) {
         controller.setEdgeMode(mode)
     }
@@ -254,11 +265,18 @@ class SlateCamBridge private constructor(
         zebra: Boolean,
         zebraThreshold: Float = 0.7f,
         falseColor: Boolean = false,
+        peaking: Boolean = false,
+        peakingSensitivity: Float = 0.5f,
     ) {
         if (profile != null) applyProfileById(profile)
         if (falseColor) {
             falseColorEnabled = true
             renderer.setFalseColor(true)
+        }
+        if (peaking) {
+            peakingEnabled = true
+            this.peakingSensitivity = peakingSensitivity.coerceIn(0f, 1f)
+            renderer.setPeaking(true, this.peakingSensitivity, peakingStrength)
         }
         if (zebra) {
             zebraEnabled = true
@@ -563,6 +581,9 @@ class SlateCamBridge private constructor(
         profileNames = PictureProfile.all.map { it.id } + lutEntries.map { it.id },
         zebra = zebraEnabled,
         falseColor = falseColorEnabled,
+        peaking = peakingEnabled,
+        peakingSensitivity = peakingSensitivity.toDouble(),
+        peakingStrength = peakingStrength.toDouble(),
         edgeMode = edgeMode,
         edgeModes = edgeModes,
         noiseReduction = noiseReduction,
