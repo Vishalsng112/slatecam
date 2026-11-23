@@ -36,12 +36,15 @@ val moduleAllowlist: Map<String, Set<String>> = mapOf(
     ":core:gpu" to setOf(":core:common"),
     ":core:codec" to setOf(":core:common"),
     ":core:storage" to setOf(":core:common"),
+    ":core:ai" to emptySet(),
+    ":core:device" to setOf(":core:probe", ":core:profile"),
     ":bridge" to setOf(
         ":core:common",
         ":core:profile",
         ":core:camera",
         ":core:codec",
         ":core:gpu",
+        ":core:device",
     ),
     ":feature:capture" to setOf(
         ":core:common",
@@ -62,6 +65,7 @@ val moduleAllowlist: Map<String, Set<String>> = mapOf(
     ":feature:devicereport" to setOf(
         ":core:common",
         ":core:probe",
+        ":core:device",
         ":bridge",
     ),
     ":app" to setOf(

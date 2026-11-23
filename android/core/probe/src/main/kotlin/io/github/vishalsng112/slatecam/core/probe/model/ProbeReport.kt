@@ -10,8 +10,20 @@ const val SCHEMA_ID = "slatecam.probe"
  * Camera2 does not expose bit depth in the stream configuration map, so 10-bit
  * support at a given size can only ever be claimed until an actual session is
  * created. See docs/probe-schema.md.
+ *
+ * 1.7.0: the 10-bit path is verified per size (UHD and FHD), so
+ * `hevc_main10_encode_fhd` / `camera_hlg10_session_fhd` sit beside the UHD
+ * checks and an UHD pass no longer promotes an FHD preset.
+ *
+ * 1.8.0: encoder limits and HDR feature, per-device audio inputs, gyro,
+ * RAW sizes, max frame duration and lens pose/intrinsics. The verification
+ * checks now read bit depth from the SPS, not just `general_profile_idc`.
+ *
+ * 1.9.0: lens roles (`default` / `ultrawide` / `tele`) with basis and
+ * confidence, 35 mm-equivalent focal lengths, unlisted-camera scan, and the OEM
+ * auxiliary-camera exposure policy.
  */
-const val SCHEMA_VERSION = "1.6.0"
+const val SCHEMA_VERSION = "1.9.0"
 
 @Serializable
 data class ProbeReport(
@@ -27,6 +39,8 @@ data class ProbeReport(
     val audio: AudioInfo? = null,
     val tier: TierVerdict,
     val verification: Verification = Verification(ran = false),
+    /** OEM policy that hides auxiliary lenses from third-party packages. */
+    @SerialName("camera_aux") val cameraAux: CameraAuxInfo? = null,
     @SerialName("quirks_applied") val quirksApplied: List<String> = emptyList(),
     val warnings: List<String> = emptyList(),
 )
@@ -70,6 +84,16 @@ data class SystemInfo(
     @SerialName("total_ram_mb") val totalRamMb: Long,
     @SerialName("free_storage_mb") val freeStorageMb: Long,
     @SerialName("native_page_size_kb") val nativePageSizeKb: Long,
+    /** Motion-sensor facts used by the gyro sidecar; absent when not collected. */
+    val gyro: GyroInfo? = null,
+)
+
+@Serializable
+data class GyroInfo(
+    val available: Boolean,
+    /** Fastest sampling rate the sensor advertises (1_000_000 / min_delay_us). */
+    @SerialName("max_rate_hz") val maxRateHz: Double? = null,
+    @SerialName("min_delay_us") val minDelayUs: Int? = null,
 )
 
 @Serializable
@@ -100,6 +124,31 @@ data class CameraInfo(
     val zoom: ZoomInfo? = null,
     val controls: ControlsInfo? = null,
     @SerialName("dynamic_range") val dynamicRange: DynamicRangeInfo,
+    /**
+     * Lens role within this facing: `default`, `ultrawide`, `tele` or `unknown`.
+     * Relative on purpose — a phone's "wide" is another phone's "ultrawide".
+     */
+    val role: String = "unknown",
+    /** intrinsic_zoom_ratio | fov_ratio | absolute_fov | only_camera | no_optical_data */
+    @SerialName("role_basis") val roleBasis: String = "unknown",
+    /** high | medium | low */
+    @SerialName("role_confidence") val roleConfidence: String = "low",
+    /** Zoom relative to the assessed default lens, using CameraX's convention. */
+    @SerialName("intrinsic_zoom_ratio") val intrinsicZoomRatio: Double? = null,
+    /** 35 mm-equivalent focal length from the first lens, when measurable. */
+    @SerialName("focal_length_35mm_equiv") val focalLength35mmEquiv: Double? = null,
+    /** True when the ID appears in CameraManager.cameraIdList. */
+    val exposed: Boolean = true,
+    /** Set for unlisted IDs: whether this package can actually open them. */
+    val openable: Boolean? = null,
+    /** RAW sensor output sizes, as `WxH`; empty when RAW is not offered. */
+    @SerialName("raw_sizes") val rawSizes: List<String> = emptyList(),
+    /** LENS_POSE_TRANSLATION (x, y, z) in millimetres, when exposed. */
+    @SerialName("lens_pose_translation") val lensPoseTranslation: List<Float>? = null,
+    /** LENS_POSE_ROTATION quaternion (x, y, z, w), when exposed. */
+    @SerialName("lens_pose_rotation") val lensPoseRotation: List<Float>? = null,
+    /** LENS_INTRINSIC_CALIBRATION (fx, fy, cx, cy, skew), when exposed. */
+    @SerialName("lens_intrinsics") val lensIntrinsics: List<Float>? = null,
     val presets: Map<String, PresetInfo> = emptyMap(),
 )
 
@@ -112,6 +161,12 @@ data class PhysicalCameraInfo(
     @SerialName("sensor_size_mm") val sensorSizeMm: List<Float> = emptyList(),
     @SerialName("pixel_array") val pixelArray: List<Int> = emptyList(),
     @SerialName("horizontal_fov_deg") val horizontalFovDeg: Float? = null,
+    /** 35 mm-equivalent focal length from the first lens, when measurable. */
+    @SerialName("focal_length_35mm_equiv") val focalLength35mmEquiv: Double? = null,
+    val role: String = "unknown",
+    @SerialName("role_basis") val roleBasis: String = "unknown",
+    @SerialName("role_confidence") val roleConfidence: String = "low",
+    @SerialName("intrinsic_zoom_ratio") val intrinsicZoomRatio: Double? = null,
     /** ultrawide | wide | tele, relative to the other physical cameras */
     @SerialName("lens_role") val lensRole: String? = null,
 )
@@ -126,6 +181,8 @@ data class SensorInfo(
     @SerialName("timestamp_source") val timestampSource: String,
     @SerialName("iso_range") val isoRange: List<Int>,
     @SerialName("exposure_time_range_ns") val exposureTimeRangeNs: List<Long>,
+    /** SENSOR_INFO_MAX_FRAME_DURATION in nanoseconds, when reported. */
+    @SerialName("max_frame_duration_ns") val maxFrameDurationNs: Long? = null,
     @SerialName("black_level") val blackLevel: Int,
     @SerialName("white_level") val whiteLevel: Int,
 )
@@ -136,6 +193,8 @@ data class LensInfo(
     val aperture: Float,
     @SerialName("min_focus_distance_diopters") val minFocusDistanceDiopters: Float,
     val hyperfocal: Float = 0f,
+    /** 35 mm-equivalent focal length when sensor geometry is known. */
+    @SerialName("focal_length_35mm_equiv") val focalLength35mmEquiv: Double? = null,
 )
 
 @Serializable
@@ -244,6 +303,34 @@ data class EncoderInfo(
     /** pass | fail | not_run */
     @SerialName("main10_verified") val main10Verified: String = "not_run",
     @SerialName("max_instances") val maxInstances: Int = 0,
+    /** FEATURE_HdrEditing: whether the codec accepts HDR metadata edits. */
+    @SerialName("hdr_editing") val hdrEditing: Boolean? = null,
+    /** Surface input accepts COLOR_FormatYUVP010, i.e. 10-bit buffers. */
+    @SerialName("p010_input") val p010Input: Boolean = false,
+    /** getBitrateRange() for this encoder, in bits per second. */
+    @SerialName("bitrate_range") val bitrateRange: IntRange? = null,
+    /** VideoCapabilities width range, when reported. */
+    @SerialName("width_range") val widthRange: IntRange? = null,
+    /** VideoCapabilities height range, when reported. */
+    @SerialName("height_range") val heightRange: IntRange? = null,
+    @SerialName("width_alignment") val widthAlignment: Int = 0,
+    @SerialName("height_alignment") val heightAlignment: Int = 0,
+    /** Frame-rate ceiling per preset size; absent sizes are not offered. */
+    @SerialName("size_limits") val sizeLimits: List<EncoderSizeLimit> = emptyList(),
+)
+
+@Serializable
+data class EncoderSizeLimit(
+    val width: Int,
+    val height: Int,
+    @SerialName("max_fps") val maxFps: Double? = null,
+    /**
+     * True when the size satisfies the encoder's reported range and alignment.
+     * False means the platform's constraint maths says no, but surface input
+     * still accepted the size (observed on MediaTek), so treat it as claimed and
+     * unverified rather than unsupported.
+     */
+    val aligned: Boolean = true,
 )
 
 @Serializable
@@ -260,7 +347,32 @@ data class AudioInfo(
     @SerialName("low_latency") val lowLatency: Boolean,
     @SerialName("unprocessed_supported") val unprocessedSupported: Boolean = false,
     @SerialName("input_devices") val inputDevices: List<String> = emptyList(),
+    /** Per-device rates and channel counts, not just the device class. */
+    @SerialName("input_device_details") val inputDeviceDetails: List<AudioInputDevice> = emptyList(),
     @SerialName("effects_available") val effectsAvailable: List<String> = emptyList(),
+)
+
+@Serializable
+data class AudioInputDevice(
+    /** builtin_mic / usb_device / usb_headset / wired_headset / ... */
+    val type: String,
+    @SerialName("sample_rates") val sampleRates: List<Int> = emptyList(),
+    @SerialName("channel_counts") val channelCounts: List<Int> = emptyList(),
+)
+
+/**
+ * The OEM policy that controls auxiliary-camera exposure. Android has no
+ * standard "show me every sensor" API; vendors commonly gate extra lenses with
+ * a system property (for example `vendor.camera.aux.packagelist`). These values
+ * explain why a device with three rear lenses may expose only one camera ID.
+ */
+@Serializable
+data class CameraAuxInfo(
+    @SerialName("allowlist_property") val allowlistProperty: String? = null,
+    @SerialName("allowlisted_packages") val allowlistedPackages: List<String> = emptyList(),
+    @SerialName("this_app_allowlisted") val thisAppAllowlisted: Boolean? = null,
+    @SerialName("expose_aux_property") val exposeAuxProperty: String? = null,
+    @SerialName("expose_aux_value") val exposeAuxValue: String? = null,
 )
 
 @Serializable

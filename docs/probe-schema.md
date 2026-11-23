@@ -1,7 +1,7 @@
 # Probe report schema
 
 - **Schema id:** `slatecam.probe`
-- **Version:** `1.3.0`
+- **Version:** `1.9.0`
 - **Status:** draft for Phase 1
 - **Owner:** `:core:probe`
 
@@ -61,6 +61,7 @@ field — do not work around it by shipping `full` dumps.
   "cameras": [],
   "encoders": [],
   "audio": {},
+  "camera_aux": {},
   "tier": {},
   "verification": {},
   "quirks_applied": [],
@@ -165,6 +166,21 @@ requires a `Window`, which a background probe does not have.
 Reporting both refresh values matters: a 144 Hz tablet reports `refresh_hz: 60`
 when idle, and monitoring features need the panel maximum, not the current mode.
 
+`system.gyro` answers whether the gyro sidecar can exist at all:
+
+```json
+"system": {
+  "thermal_status": "none",
+  "total_ram_mb": 12288,
+  "free_storage_mb": 41200,
+  "native_page_size_kb": 4,
+  "gyro": { "available": true, "max_rate_hz": 200.0, "min_delay_us": 5000 }
+}
+```
+
+`max_rate_hz` is derived from the sensor's minimum delay, so it is the fastest
+rate the platform will deliver, not the rate the app chooses.
+
 ## 6. Cameras
 
 `cameras[]` is ordered by camera ID as a string (`"0"`, `"1"`, `"2"`), because
@@ -194,12 +210,17 @@ logical camera IDs are not guaranteed contiguous.
     "timestamp_source": "realtime",
     "iso_range": [50, 12800],
     "exposure_time_range_ns": [100000, 500000000],
+    "max_frame_duration_ns": 1000000000,
     "black_level": 64,
     "white_level": 1023
   },
   "lenses": [
     { "focal_length_mm": 6.9, "aperture": 1.68, "min_focus_distance_diopters": 0.0 }
   ],
+  "lens_pose_translation": [0.0, 0.0, 0.0],
+  "lens_pose_rotation": [0.0, 0.0, 0.0, 1.0],
+  "lens_intrinsics": [1500.0, 1500.0, 2040.0, 1530.0, 0.0],
+  "raw_sizes": ["4080x3060"],
   "zoom": {
     "max_digital": 30.0,
     "available_focal_lengths_mm": [2.2, 6.9, 14.0],
@@ -226,6 +247,13 @@ logical camera IDs are not guaranteed contiguous.
     "profiles": ["hlg10"],
     "recommended_profile": "hlg10"
   },
+  "role": "default",
+  "role_basis": "fov_ratio",
+  "role_confidence": "high",
+  "intrinsic_zoom_ratio": 1.0,
+  "focal_length_35mm_equiv": 24.7,
+  "exposed": true,
+  "openable": null,
   "presets": {},
   "tables": {}
 }
@@ -234,6 +262,59 @@ logical camera IDs are not guaranteed contiguous.
 `timestamp_source` matters: gyro metadata alignment is only reliable when it is
 `realtime`. `presets` is defined in section 6.1. `tables` exists only in `full`
 reports (section 6.2).
+
+### 6.3 Lens roles (1.9.0)
+
+Android has no "main camera" flag, so roles are **relative within a facing** and
+computed by the prober:
+
+| Field | Meaning |
+|---|---|
+| `role` | `default`, `ultrawide`, `tele`, `macro`, or `unknown` |
+| `role_basis` | `fov_ratio`, `absolute_fov`, `only_camera`, `no_optical_data`, or `fixed_focus_small_sensor` |
+| `role_confidence` | `high`, `medium`, `low` |
+| `intrinsic_zoom_ratio` | Zoom relative to the assessed default lens (CameraX's convention); `< 1` is wider, `> 1` is narrower |
+| `focal_length_35mm_equiv` | Full-frame-equivalent focal length from focal length + sensor diagonal |
+
+The reference is an explicit policy, because the platform provides none: the
+exposed lens with the highest capability score in the normal-FOV band
+(50°–100°), then the closest to 70°, then ID. An unlisted or low-capability lens
+never becomes the reference by accident. `macro` is assigned when a normal-FOV
+lens is fixed-focus and has at most 2.5 MP while another default lens has more.
+
+`exposed` is true when the ID is in `cameraIdList`. `openable` is set only for
+unlisted IDs that the prober actually opened and closed; its absence does not
+mean "unsupported".
+
+Many ROMs hide auxiliary lenses. The prober scans numeric IDs `0..7` beyond
+`cameraIdList`, reads characteristics where allowed, and records the result with
+`exposed: false`. This is a best-effort diagnostic, not a public guarantee. An
+unlisted camera keeps identity, optics, roles and openability but omits
+`presets` and `controls`, so a device with several hidden lenses still fits the
+summary budget.
+
+### 6.4 Auxiliary-camera policy (1.9.0)
+
+```json
+"camera_aux": {
+  "allowlist_property": "vendor.camera.aux.packagelist",
+  "allowlisted_packages": ["com.vendor.camera"],
+  "this_app_allowlisted": false,
+  "expose_aux_property": "camera.expose_aux",
+  "expose_aux_value": "0"
+}
+```
+
+OEMs commonly gate extra lenses with a system property instead of a Camera2
+flag. This block records the policy verbatim. It is evidence, not a verdict:
+a package outside the allowlist may still find hidden IDs readable or even
+openable on some builds, and that is reported per camera by `exposed` and
+`openable`.
+
+`raw_sizes` are the RAW_SENSOR output sizes as `WxH`; an empty list means the
+camera does not expose RAW. `lens_pose_translation`, `lens_pose_rotation` and
+`lens_intrinsics` are present only when the device exposes calibrated lens data;
+absence means "not reported", never "zero".
 
 ### 6.0 Control-surface fields (1.3.0)
 
@@ -405,29 +486,62 @@ run. The UI must render these as distinct states. "Your phone lacks 10-bit" and
     ],
     "main10_claimed": true,
     "main10_verified": "pass",
-    "max_instances": 2
+    "max_instances": 2,
+    "hdr_editing": true,
+    "p010_input": true,
+    "bitrate_range": { "min": 128000, "max": 160000000 },
+    "width_range": { "min": 128, "max": 4096 },
+    "height_range": { "min": 128, "max": 4096 },
+    "width_alignment": 2,
+    "height_alignment": 2,
+    "size_limits": [
+      { "width": 3840, "height": 2160, "max_fps": 60.0, "aligned": true },
+      { "width": 1920, "height": 1080, "max_fps": 30.0, "aligned": true }
+    ]
   }
 ],
 "audio": {
   "sample_rates": [48000, 44100],
   "max_input_channels": 2,
   "pcm_24bit": true,
-  "low_latency": true
+  "low_latency": true,
+  "unprocessed_supported": true,
+  "input_devices": ["builtin_mic", "usb_device"],
+  "input_device_details": [
+    { "type": "builtin_mic", "sample_rates": [44100, 48000], "channel_counts": [1, 2] },
+    { "type": "usb_device", "sample_rates": [48000], "channel_counts": [2] }
+  ]
 }
 ```
 
 `main10_verified` is one of `pass`, `fail`, `not_run`. A pass requires a real
 short encode; the claim alone never sets it.
 
-**Bitstream verification (prober 1.4.0):** the encode check now parses the
-HEVC SPS from the encoded bytes and requires `general_profile_idc == 2`
-(Main10). A codec that reports Main10 in `MediaCodec.outputFormat` while
-emitting an 8-bit Main stream fails the check. This was observed on MediaTek
-MT6897, where the header claimed `profile=2` and the bitstream was Main.
+`hdr_editing` mirrors `FEATURE_HdrEditing`. `p010_input` means the encoder
+accepts `COLOR_FormatYUVP010` buffers; surface input is reported separately.
+`width_range`, `height_range` and the alignment values are the platform's own
+encoder bounds; `size_limits` lists only the preset-catalogue sizes that fit
+them, with the frame-rate ceiling from
+`VideoCapabilities.getSupportedFrameRatesFor`. Deriving support from the ranges
+is deliberate: `isSizeSupported()` returned false for 1920×1080 on a MediaTek
+encoder that records 1080p correctly. A size inside the ranges but outside the
+reported alignment keeps `aligned: false` (and often a null `max_fps`) instead
+of disappearing; consumers must treat it as claimed, not verified.
 
-`audio.max_input_channels` is the channel count the prober actually opened, not
-a device maximum. `pcm_24bit` means `AudioRecord` accepts 48 kHz/24-bit input,
-not that the microphone is lossless.
+**Bitstream verification (prober 1.7.0):** the encode check parses the HEVC SPS
+from the encoded bytes and requires `general_profile_idc == 2` (Main10) **and**
+`bit_depth_luma_minus8 == 2` (10-bit). The SPS may arrive as Annex B, a
+4-byte length-prefixed stream, or an `hvcC` configuration record; all three are
+understood, because `csd-0` is normally hvcC. A codec that reports Main10 in
+`MediaCodec.outputFormat` while emitting an 8-bit Main stream fails the check.
+This was observed on MediaTek MT6897, where the header claimed `profile=2` and
+the bitstream was Main.
+
+`audio.max_input_channels` is the highest channel count any enumerated input
+device advertises. `pcm_24bit` means `AudioRecord` accepts 48 kHz/24-bit input,
+not that the microphone is lossless. `input_device_details` is per-device data
+(rate and channel lists) because a USB mic that only does 44.1 kHz mono changes
+the UI.
 
 Verification checks record the size they exercised, so consumers never have to
 parse prose:
@@ -439,10 +553,18 @@ parse prose:
     {
       "id": "hevc_main10_encode",
       "status": "pass",
-      "detail": "c2.mtk.hevc.encoder: 11 frames, 75341 bytes, profile=2, transfer=7",
+      "detail": "3840x2160: c2.qti.hevc.encoder: 11 frames, 28437 bytes, profile=2, transfer=7, sps_profile=2, sps_bit_depth=10, sps_chroma=1",
       "width": 3840,
       "height": 2160,
       "duration_ms": 495
+    },
+    {
+      "id": "camera_hlg10_session_fhd",
+      "status": "pass",
+      "detail": "camera 0: HLG10 session configured at 1920x1080",
+      "width": 1920,
+      "height": 1080,
+      "duration_ms": 180
     }
   ]
 }
@@ -455,11 +577,16 @@ Known check ids:
 
 | id | Proves |
 |---|---|
-| `hevc_main10_encode` | The device produced a Main10 stream with HLG colour metadata |
-| `camera_hlg10_session` | The camera configured a session whose output carries the HLG10 profile |
+| `hevc_main10_encode` | The device produced a 10-bit Main10 stream at UHD |
+| `hevc_main10_encode_fhd` | The same, at 1920×1080 |
+| `camera_hlg10_session` | The camera configured a UHD session whose output carries the HLG10 profile |
+| `camera_hlg10_session_fhd` | The same, at 1920×1080 |
+| `concurrent_camera_session` | Two cameras can be configured at once |
 
-A 10-bit preset is only marked `verified: pass` when **both** checks passed at
-the preset's size. Either half alone is not a working 10-bit path.
+A 10-bit preset is only marked `verified: pass` when an encode check and a
+camera-session check passed **at that preset's size and on that camera**. A UHD
+pass does not promote an FHD preset. Either half alone is not a working 10-bit
+path.
 
 ## 9. Versioning and evolution
 
@@ -530,3 +657,22 @@ Schema 1.6.0 adds audio capability fields: `audio.unprocessed_supported`
 USB, wired, Bluetooth) and `audio.effects_available` (noise suppressor, echo
 canceler, AGC). They exist to decide whether clean audio can be captured before
 any noise reduction is designed.
+
+Schema 1.7.0 verifies the 10-bit path per size. `hevc_main10_encode_fhd` and
+`camera_hlg10_session_fhd` join the UHD checks, and a preset is verified only
+when its own size passed both halves on the camera that accepted the session.
+
+Schema 1.8.0 adds operational data needed by the renderer and recorder:
+`system.gyro`, `cameras[].raw_sizes`, `sensor.max_frame_duration_ns`,
+`cameras[].lens_pose_translation` / `lens_pose_rotation` / `lens_intrinsics`,
+`encoders[].hdr_editing` / `p010_input` / `bitrate_range` / `size_limits`, and
+`audio.input_device_details`. It also tightens verification: the encode check
+requires 10-bit depth from the SPS and parses `hvcC` records. All additions are
+optional and additive.
+
+Schema 1.9.0 adds relative lens roles and the data a zoom interface needs:
+`cameras[].role`, `role_basis`, `role_confidence`, `intrinsic_zoom_ratio`,
+`focal_length_35mm_equiv`, `exposed`, `openable`, the same role fields on
+`physical_cameras`, per-lens 35 mm equivalents, and the top-level `camera_aux`
+policy block. Roles are evaluated relative to an explicit default policy, never
+from a device name or a fixed camera ID. All additions are optional.

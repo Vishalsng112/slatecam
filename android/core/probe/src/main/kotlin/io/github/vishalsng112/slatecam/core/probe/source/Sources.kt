@@ -2,6 +2,8 @@ package io.github.vishalsng112.slatecam.core.probe.source
 
 import android.app.ActivityManager
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.hardware.display.DisplayManager
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -17,8 +19,10 @@ import android.system.Os
 import android.system.OsConstants
 import android.view.Display
 import io.github.vishalsng112.slatecam.core.probe.model.AudioInfo
+import io.github.vishalsng112.slatecam.core.probe.model.AudioInputDevice
 import io.github.vishalsng112.slatecam.core.probe.model.DeviceInfo
 import io.github.vishalsng112.slatecam.core.probe.model.DisplayInfo
+import io.github.vishalsng112.slatecam.core.probe.model.GyroInfo
 import io.github.vishalsng112.slatecam.core.probe.model.SystemInfo
 
 object DeviceSource {
@@ -69,6 +73,20 @@ object SystemSource {
             totalRamMb = memoryInfo.totalMem / (1024L * 1024L),
             freeStorageMb = availableBytes / (1024L * 1024L),
             nativePageSizeKb = pageSizeKb(),
+            gyro = gyroInfo(context),
+        )
+    }
+
+    private fun gyroInfo(context: Context): GyroInfo {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val gyro = runCatching {
+            sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+        }.getOrNull()
+        val minDelay = gyro?.minDelay?.takeIf { it > 0 }
+        return GyroInfo(
+            available = gyro != null,
+            maxRateHz = minDelay?.let { 1_000_000.0 / it },
+            minDelayUs = minDelay,
         )
     }
 
@@ -124,20 +142,32 @@ object AudioSource {
             .getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
             ?.toIntOrNull()
             ?: 0
+        val inputDevices = runCatching {
+            audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).toList()
+        }.getOrDefault(emptyList())
+        val details = inputDevices
+            .mapNotNull { device ->
+                val type = inputDeviceName(device.type) ?: return@mapNotNull null
+                AudioInputDevice(
+                    type = type,
+                    sampleRates = runCatching { device.sampleRates.toList().sorted() }
+                        .getOrDefault(emptyList()),
+                    channelCounts = runCatching { device.channelCounts.toList().sorted() }
+                        .getOrDefault(emptyList()),
+                )
+            }
+            .distinctBy { "${it.type}/${it.sampleRates}/${it.channelCounts}" }
+
         return AudioInfo(
             sampleRates = listOf(48_000, 44_100),
-            maxInputChannels = 2,
+            maxInputChannels = details.flatMap { it.channelCounts }.maxOrNull() ?: 2,
             pcm24Bit = supports24BitPcm(),
             lowLatency = outputFrames in 1..192,
             unprocessedSupported = audioManager
                 .getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED)
                 ?.toBoolean() == true,
-            inputDevices = runCatching {
-                audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
-                    .mapNotNull { inputDeviceName(it.type) }
-                    .distinct()
-                    .sorted()
-            }.getOrDefault(emptyList()),
+            inputDevices = details.map { it.type }.distinct().sorted(),
+            inputDeviceDetails = details,
             effectsAvailable = runCatching {
                 buildList {
                     if (NoiseSuppressor.isAvailable()) add("noise_suppressor")

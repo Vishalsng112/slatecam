@@ -42,6 +42,8 @@ include(":core:camera")
 include(":core:gpu")
 include(":core:codec")
 include(":core:storage")
+include(":core:ai")         // Phase 6 contracts; implementation deferred
+include(":core:device")     // Phase 7 device database, quirks and calibration
 
 // Features: depend on core + bridge, never on each other.
 include(":feature:capture")

@@ -33,25 +33,46 @@ import java.util.concurrent.TimeUnit
  */
 class CameraSessionVerifier(private val context: Context) {
 
-    fun verifyHlg10Session(): VerificationCheck {
+    data class Outcome(
+        val check: VerificationCheck,
+        /** Camera that accepted the HLG10 session, or null when none did. */
+        val cameraId: String? = null,
+    )
+
+    /**
+     * Verifies that [width] x [height] can be configured with the HLG10 dynamic
+     * range profile. The size is part of the test: a profile can be accepted at
+     * one resolution and rejected at another, and a preset verdict must cover
+     * only the size that was actually configured.
+     */
+    fun verifyHlg10Session(
+        width: Int,
+        height: Int,
+        checkId: String = CHECK_ID,
+    ): Outcome {
         val started = System.currentTimeMillis()
 
         if (context.checkSelfPermission(Manifest.permission.CAMERA) !=
             PackageManager.PERMISSION_GRANTED
         ) {
-            return VerificationCheck(
-                id = CHECK_ID,
-                status = "not_run",
-                detail = "CAMERA permission not granted",
-                durationMs = System.currentTimeMillis() - started,
+            return Outcome(
+                VerificationCheck(
+                    id = checkId,
+                    status = "not_run",
+                    detail = "CAMERA permission not granted",
+                    durationMs = System.currentTimeMillis() - started,
+                ),
             )
         }
 
         val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val candidate = runCatching { selectCandidate(manager) }.getOrNull()
-            ?: return failure(
-                "no back camera offering HLG10 and a UHD/FHD stream",
-                started,
+        val candidate = runCatching { selectCandidate(manager, width, height) }.getOrNull()
+            ?: return Outcome(
+                failure(
+                    "no back camera offering HLG10 at ${width}x$height",
+                    started,
+                    checkId,
+                ),
             )
 
         val thread = android.os.HandlerThread("probe-session").apply { start() }
@@ -112,19 +133,25 @@ class CameraSessionVerifier(private val context: Context) {
         }
 
         return if (error == null) {
-            VerificationCheck(
-                id = CHECK_ID,
-                status = "pass",
-                detail = "camera ${candidate.id}: HLG10 session configured at " +
-                    "${candidate.width}x${candidate.height}",
-                durationMs = System.currentTimeMillis() - started,
-                width = candidate.width,
-                height = candidate.height,
+            Outcome(
+                check = VerificationCheck(
+                    id = checkId,
+                    status = "pass",
+                    detail = "camera ${candidate.id}: HLG10 session configured at " +
+                        "${candidate.width}x${candidate.height}",
+                    durationMs = System.currentTimeMillis() - started,
+                    width = candidate.width,
+                    height = candidate.height,
+                ),
+                cameraId = candidate.id,
             )
         } else {
-            failure(
-                "camera ${candidate.id} ${candidate.width}x${candidate.height}: $error",
-                started,
+            Outcome(
+                failure(
+                    "camera ${candidate.id} ${candidate.width}x${candidate.height}: $error",
+                    started,
+                    checkId,
+                ),
             )
         }
     }
@@ -158,7 +185,7 @@ class CameraSessionVerifier(private val context: Context) {
 
     private data class Candidate(val id: String, val width: Int, val height: Int)
 
-    private fun selectCandidate(manager: CameraManager): Candidate? {
+    private fun selectCandidate(manager: CameraManager, width: Int, height: Int): Candidate? {
         for (id in manager.cameraIdList) {
             val characteristics = runCatching {
                 manager.getCameraCharacteristics(id)
@@ -192,8 +219,7 @@ class CameraSessionVerifier(private val context: Context) {
             val sizes = runCatching { map.getOutputSizes(ImageFormat.PRIVATE) }.getOrNull()
                 ?: continue
 
-            val chosen = sizes.firstOrNull { it.width == 3840 && it.height == 2160 }
-                ?: sizes.firstOrNull { it.width == 1920 && it.height == 1080 }
+            val chosen = sizes.firstOrNull { it.width == width && it.height == height }
                 ?: continue
 
             return Candidate(id, chosen.width, chosen.height)
@@ -201,8 +227,8 @@ class CameraSessionVerifier(private val context: Context) {
         return null
     }
 
-    private fun failure(detail: String, started: Long) = VerificationCheck(
-        id = CHECK_ID,
+    private fun failure(detail: String, started: Long, checkId: String) = VerificationCheck(
+        id = checkId,
         status = "fail",
         detail = detail,
         durationMs = System.currentTimeMillis() - started,

@@ -1,0 +1,20 @@
+{
+  "schema": "slatecam.device-db",
+  "version": 1,
+  "generated_at": "2026-11-23",
+  "quirks": [
+    {
+      "id": "poco-duchamp-force-8bit",
+      "match": {
+        "device_key": "xiaomi/duchamp",
+        "fingerprint_prefix": "POCO/duchamp_in/duchamp:",
+        "min_sdk": 33
+      },
+      "issue": "ten_bit_encode_claim_unverified",
+      "action": "force_8bit",
+      "reason": "The POCO X6 Pro encoder reports Main10 but writes an 8-bit Main stream. The 10-bit path stays gated until the encoded SPS says profile_idc=2.",
+      "report": "docs/test-devices.md#10-bit-hlg-attempt--rejected-by-evidence-2026-11-23"
+    }
+  ],
+  "calibrations": []
+}

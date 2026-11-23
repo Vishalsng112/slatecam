@@ -13,6 +13,7 @@ import android.media.MediaMuxer
 import android.media.MediaRecorder
 import android.view.Surface
 import io.github.vishalsng112.slatecam.core.common.HevcSps
+import java.nio.ByteBuffer
 
 /**
  * Phase 3 recorder: HEVC video from a GL surface plus AAC audio, muxed to MP4.
@@ -51,6 +52,19 @@ class ClipRecorder(private val context: Context) {
     @Volatile
     private var hlg = false
 
+    /** Video format waiting for csd-0, which some encoders emit with sample 1. */
+    private var pendingVideoFormat: MediaFormat? = null
+    private var pendingVps: ByteArray? = null
+    private var pendingSps: ByteArray? = null
+    private var pendingPps: ByteArray? = null
+
+    /** Audio PTS is normalised to the first audio buffer of this clip. */
+    @Volatile
+    private var audioBaseUs = 0L
+
+    /** Clockwise playback rotation written to the MP4 container. */
+    private var orientationHint = 0
+
     val isRecording: Boolean get() = running
 
     /**
@@ -63,6 +77,7 @@ class ClipRecorder(private val context: Context) {
         bitrate: Int,
         tenBitHlg: Boolean,
         muxer: MediaMuxer,
+        orientationHint: Int = 0,
     ): Surface {
         check(!running) { "already recording" }
         lastError = null
@@ -72,6 +87,12 @@ class ClipRecorder(private val context: Context) {
         videoTrack = -1
         audioTrack = -1
         hlg = tenBitHlg
+        pendingVideoFormat = null
+        pendingVps = null
+        pendingSps = null
+        pendingPps = null
+        audioBaseUs = 0L
+        this.orientationHint = ((orientationHint % 360) + 360) % 360
         this.muxer = muxer
 
         val format = MediaFormat.createVideoFormat(
@@ -103,10 +124,19 @@ class ClipRecorder(private val context: Context) {
                 setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT2020)
                 setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_HLG)
                 setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
+            } else {
+                // Say BT.709 explicitly. Encoder defaults differ per vendor (QTI
+                // tagged SDR clips as smpte170m/bt470bg while MediaTek used
+                // BT.709), so relying on the default mislabels footage on some
+                // devices. SDR is always BT.709 limited range.
+                setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT709)
+                setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_SDR_VIDEO)
+                setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
             }
         }
 
         val video = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC)
+        android.util.Log.i("SlateCam", "video encoder=${video.name}")
         video.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         val inputSurface = video.createInputSurface()
         video.start()
@@ -167,6 +197,8 @@ class ClipRecorder(private val context: Context) {
             setInteger(MediaFormat.KEY_BIT_RATE, AUDIO_BITRATE)
             setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16_384)
         }
+
+        audioBaseUs = System.nanoTime() / 1_000
 
         val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
         encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -248,7 +280,7 @@ class ClipRecorder(private val context: Context) {
                         index,
                         0,
                         size,
-                        System.nanoTime() / 1_000,
+                        audioPresentationUs(),
                         0,
                     )
                     offset += size
@@ -261,13 +293,19 @@ class ClipRecorder(private val context: Context) {
                     index,
                     0,
                     0,
-                    System.nanoTime() / 1_000,
+                    audioPresentationUs(),
                     MediaCodec.BUFFER_FLAG_END_OF_STREAM,
                 )
             }
         } catch (t: Throwable) {
             lastError = "audio: ${t.message}"
         }
+    }
+
+    private fun audioPresentationUs(): Long {
+        val base = audioBaseUs
+        if (base <= 0L) return 0L
+        return (System.nanoTime() / 1_000 - base).coerceAtLeast(0L)
     }
 
     private fun drainLoop() {
@@ -291,59 +329,53 @@ class ClipRecorder(private val context: Context) {
                                 trackFormat.getInteger(MediaFormat.KEY_COLOR_TRANSFER, -1)
                             } range=${
                                 trackFormat.getInteger(MediaFormat.KEY_COLOR_RANGE, -1)
-                            }",
+                            } csd=${trackFormat.containsKey("csd-0")}",
                         )
-                        val csdProfile = runCatching {
+                        val sps = runCatching {
                             trackFormat.getByteBuffer("csd-0")?.let { original ->
                                 // Read a duplicate: advancing the buffer the muxer
                                 // will consume would strip the codec config (hvcC).
                                 val copy = original.duplicate()
                                 val bytes = ByteArray(copy.remaining())
                                 copy.get(bytes)
-                                HevcSps.profileIdc(bytes)
+                                HevcSps.parse(bytes)
                             }
                         }.getOrNull()
-                        android.util.Log.i(
-                            "SlateCam",
-                            "bitstream profile_idc=$csdProfile header_profile=${
-                                trackFormat.getInteger(MediaFormat.KEY_PROFILE, -1)
-                            }",
-                        )
-                        // Never tag HLG unless the encoded bytes are really Main10.
-                        val tagHlg = hlg && csdProfile == HevcSps.PROFILE_MAIN10
-                        if (hlg && !tagHlg) {
-                            android.util.Log.w(
+                        if (sps != null) {
+                            logSps(sps, trackFormat)
+                            applyColourTagging(trackFormat, sps)
+                            videoTrack = runCatching {
+                                muxer?.addTrack(trackFormat) ?: -1
+                            }.getOrDefault(-1)
+                            pendingVideoFormat = null
+                            maybeStartMuxer()
+                        } else {
+                            // QTI emits the config with the first access unit,
+                            // not in outputFormat. Defer addTrack until then.
+                            pendingVideoFormat = trackFormat
+                            android.util.Log.i(
                                 "SlateCam",
-                                "encoder claimed HLG but bitstream is profile_idc=$csdProfile",
+                                "csd-0 missing; waiting for first sample to build hvcC",
                             )
                         }
-                        if (tagHlg) {
-                            // Make the colour signalling explicit on the track so
-                            // players see HLG/BT.2020 rather than guessing.
-                            trackFormat.setInteger(
-                                MediaFormat.KEY_COLOR_STANDARD,
-                                MediaFormat.COLOR_STANDARD_BT2020,
-                            )
-                            trackFormat.setInteger(
-                                MediaFormat.KEY_COLOR_TRANSFER,
-                                MediaFormat.COLOR_TRANSFER_HLG,
-                            )
-                            trackFormat.setInteger(
-                                MediaFormat.KEY_COLOR_RANGE,
-                                MediaFormat.COLOR_RANGE_LIMITED,
-                            )
-                        }
-                        videoTrack = runCatching {
-                            muxer?.addTrack(trackFormat) ?: -1
-                        }.getOrDefault(-1)
-                        maybeStartMuxer()
                         progressed = true
                     }
 
                     MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
 
                     else -> if (index >= 0) {
-                        writeSample(encoder, index, info, videoTrack)
+                        val configBuffer =
+                            info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                        if (videoTrack < 0 && pendingVideoFormat != null) {
+                            if (configBuffer) {
+                                captureConfigNals(encoder, index, info)
+                            } else {
+                                ensureVideoTrackFromSample(encoder, index, info)
+                            }
+                        }
+                        if (!configBuffer) {
+                            writeSample(encoder, index, info, videoTrack)
+                        }
                         if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
                             videoEos = true
                         }
@@ -392,6 +424,113 @@ class ClipRecorder(private val context: Context) {
         }
     }
 
+    private fun logSps(sps: HevcSps.SpsInfo, format: MediaFormat) {
+        android.util.Log.i(
+            "SlateCam",
+            "bitstream profile_idc=${sps.profileIdc} " +
+                "bit_depth=${sps.bitDepthLuma} chroma=${sps.chromaFormatIdc} " +
+                "header_profile=${format.getInteger(MediaFormat.KEY_PROFILE, -1)}",
+        )
+    }
+
+    /** Never tag HLG unless the encoded bytes are really Main10 at 10-bit. */
+    private fun applyColourTagging(format: MediaFormat, sps: HevcSps.SpsInfo?) {
+        val tagHlg = hlg && sps?.isMain10 == true && sps.isTenBit
+        if (hlg && sps != null && !tagHlg) {
+            android.util.Log.w(
+                "SlateCam",
+                "encoder claimed HLG but bitstream is " +
+                    "profile_idc=${sps.profileIdc} bit_depth=${sps.bitDepthLuma}",
+            )
+        }
+        if (tagHlg) {
+            format.setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT2020)
+            format.setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_HLG)
+            format.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
+        } else {
+            // SDR output is BT.709 limited range on every device, whatever the
+            // encoder's default tagging was.
+            format.setInteger(MediaFormat.KEY_COLOR_STANDARD, MediaFormat.COLOR_STANDARD_BT709)
+            format.setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_SDR_VIDEO)
+            format.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
+        }
+    }
+
+    private fun readOutputBuffer(
+        encoder: MediaCodec,
+        index: Int,
+        info: MediaCodec.BufferInfo,
+    ): ByteArray? {
+        if (info.size <= 0) return null
+        val buffer = encoder.getOutputBuffer(index) ?: return null
+        buffer.position(info.offset)
+        buffer.limit(info.offset + info.size)
+        val bytes = ByteArray(info.size)
+        buffer.get(bytes)
+        return bytes
+    }
+
+    private fun rememberNal(nal: ByteArray) {
+        if (nal.size < 2) return
+        when ((nal[0].toInt() shr 1) and 0x3F) {
+            32 -> pendingVps = nal
+            33 -> pendingSps = nal
+            34 -> pendingPps = nal
+        }
+    }
+
+    private fun captureConfigNals(
+        encoder: MediaCodec,
+        index: Int,
+        info: MediaCodec.BufferInfo,
+    ) {
+        val bytes = readOutputBuffer(encoder, index, info) ?: return
+        HevcSps.nalUnits(bytes).forEach(::rememberNal)
+        android.util.Log.i(
+            "SlateCam",
+            "captured codec config: vps=${pendingVps != null} " +
+                "sps=${pendingSps != null} pps=${pendingPps != null}",
+        )
+    }
+
+    /**
+     * QTI emits VPS/SPS/PPS with the first IDR instead of in `outputFormat`.
+     * Build the hvcC from those NAL units so MediaMuxer gets a real sample entry.
+     */
+    private fun ensureVideoTrackFromSample(
+        encoder: MediaCodec,
+        index: Int,
+        info: MediaCodec.BufferInfo,
+    ) {
+        val format = pendingVideoFormat ?: return
+        val bytes = readOutputBuffer(encoder, index, info)
+        if (bytes != null) {
+            HevcSps.nalUnits(bytes).forEach(::rememberNal)
+        }
+        val spsNal = pendingSps
+        if (spsNal == null) {
+            android.util.Log.w("SlateCam", "no SPS in first access unit; track has no config")
+            pendingVideoFormat = null
+            videoTrack = runCatching { muxer?.addTrack(format) ?: -1 }.getOrDefault(-1)
+            maybeStartMuxer()
+            return
+        }
+
+        val csd = HevcSps.buildHvcC(pendingVps, spsNal, pendingPps)
+        val sps = HevcSps.parse(spsNal)
+        if (csd != null) {
+            format.setByteBuffer("csd-0", ByteBuffer.wrap(csd))
+            android.util.Log.i("SlateCam", "built hvcC from first access unit: ${csd.size} bytes")
+        }
+        sps?.let {
+            logSps(it, format)
+            applyColourTagging(format, it)
+        } ?: applyColourTagging(format, null)
+        videoTrack = runCatching { muxer?.addTrack(format) ?: -1 }.getOrDefault(-1)
+        pendingVideoFormat = null
+        maybeStartMuxer()
+    }
+
     private fun writeSample(
         encoder: MediaCodec,
         index: Int,
@@ -412,6 +551,9 @@ class ClipRecorder(private val context: Context) {
         if (muxerStarted) return
         val audioReady = audioEncoder == null || audioTrack >= 0
         if (videoTrack >= 0 && audioReady) {
+            if (orientationHint != 0) {
+                runCatching { muxer?.setOrientationHint(orientationHint) }
+            }
             runCatching { muxer?.start() }
                 .onSuccess { muxerStarted = true }
                 .onFailure { lastError = "muxer start: ${it.message}" }

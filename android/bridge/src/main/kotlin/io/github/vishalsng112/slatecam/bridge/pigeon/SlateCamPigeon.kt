@@ -202,6 +202,153 @@ class FlutterError (
 ) : RuntimeException()
 
 /**
+ * One selectable lens, derived from the probe report rather than a model list.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class LensOption (
+  /** Camera2 ID; may be absent from cameraIdList on vendor-hidden lenses. */
+  val id: String,
+  /** Short UI label, e.g. `0.6x - 16mm`, `1x - 25mm`, `MACRO`. */
+  val label: String,
+  /** default | ultrawide | tele | macro */
+  val role: String,
+  val facing: String,
+  /** Zoom relative to the assessed default lens; < 1 is wider, > 1 narrower. */
+  val zoomRatio: Double,
+  /** 35 mm-equivalent focal length; 0 when unknown. */
+  val focalLength35mm: Double,
+  /** True when this lens was opened successfully by the prober. */
+  val openable: Boolean,
+  /** True when the ID appears in CameraManager.cameraIdList. */
+  val exposed: Boolean
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): LensOption {
+      val id = pigeonVar_list[0] as String
+      val label = pigeonVar_list[1] as String
+      val role = pigeonVar_list[2] as String
+      val facing = pigeonVar_list[3] as String
+      val zoomRatio = pigeonVar_list[4] as Double
+      val focalLength35mm = pigeonVar_list[5] as Double
+      val openable = pigeonVar_list[6] as Boolean
+      val exposed = pigeonVar_list[7] as Boolean
+      return LensOption(id, label, role, facing, zoomRatio, focalLength35mm, openable, exposed)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      id,
+      label,
+      role,
+      facing,
+      zoomRatio,
+      focalLength35mm,
+      openable,
+      exposed,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as LensOption
+    return SlateCamPigeonPigeonUtils.deepEquals(this.id, other.id) && SlateCamPigeonPigeonUtils.deepEquals(this.label, other.label) && SlateCamPigeonPigeonUtils.deepEquals(this.role, other.role) && SlateCamPigeonPigeonUtils.deepEquals(this.facing, other.facing) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomRatio, other.zoomRatio) && SlateCamPigeonPigeonUtils.deepEquals(this.focalLength35mm, other.focalLength35mm) && SlateCamPigeonPigeonUtils.deepEquals(this.openable, other.openable) && SlateCamPigeonPigeonUtils.deepEquals(this.exposed, other.exposed)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.id)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.label)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.role)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.facing)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.zoomRatio)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.focalLength35mm)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.openable)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.exposed)
+    return result
+  }
+  override fun toString(): String {
+    return "LensOption(id=$id, label=$label, role=$role, facing=$facing, zoomRatio=$zoomRatio, focalLength35mm=$focalLength35mm, openable=$openable, exposed=$exposed)"
+  }
+}
+
+/**
+ * One recording mode offered by the selected camera.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class RecordingMode (
+  val id: String,
+  val label: String,
+  val width: Long,
+  val height: Long,
+  val fps: Long,
+  /** True when the mode records 10-bit HLG. */
+  val tenBit: Boolean,
+  val enabled: Boolean,
+  /** Why the mode is disabled; empty when enabled. */
+  val reason: String
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): RecordingMode {
+      val id = pigeonVar_list[0] as String
+      val label = pigeonVar_list[1] as String
+      val width = pigeonVar_list[2] as Long
+      val height = pigeonVar_list[3] as Long
+      val fps = pigeonVar_list[4] as Long
+      val tenBit = pigeonVar_list[5] as Boolean
+      val enabled = pigeonVar_list[6] as Boolean
+      val reason = pigeonVar_list[7] as String
+      return RecordingMode(id, label, width, height, fps, tenBit, enabled, reason)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      id,
+      label,
+      width,
+      height,
+      fps,
+      tenBit,
+      enabled,
+      reason,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other == null || other.javaClass != javaClass) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    val other = other as RecordingMode
+    return SlateCamPigeonPigeonUtils.deepEquals(this.id, other.id) && SlateCamPigeonPigeonUtils.deepEquals(this.label, other.label) && SlateCamPigeonPigeonUtils.deepEquals(this.width, other.width) && SlateCamPigeonPigeonUtils.deepEquals(this.height, other.height) && SlateCamPigeonPigeonUtils.deepEquals(this.fps, other.fps) && SlateCamPigeonPigeonUtils.deepEquals(this.tenBit, other.tenBit) && SlateCamPigeonPigeonUtils.deepEquals(this.enabled, other.enabled) && SlateCamPigeonPigeonUtils.deepEquals(this.reason, other.reason)
+  }
+
+  override fun hashCode(): Int {
+    var result = javaClass.hashCode()
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.id)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.label)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.width)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.height)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.fps)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.tenBit)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.enabled)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.reason)
+    return result
+  }
+  override fun toString(): String {
+    return "RecordingMode(id=$id, label=$label, width=$width, height=$height, fps=$fps, tenBit=$tenBit, enabled=$enabled, reason=$reason)"
+  }
+}
+
+/**
  * Immutable camera snapshot. Kotlin owns this state; Dart only renders it.
  *
  * Generated class from Pigeon that represents data sent in messages.
@@ -209,6 +356,9 @@ class FlutterError (
 data class CameraState (
   val isOpen: Boolean,
   val error: String? = null,
+  val cameraId: String,
+  val cameraIds: List<String>,
+  val cameraLabels: List<String>,
   val iso: Long,
   val isoMin: Long,
   val isoMax: Long,
@@ -223,9 +373,27 @@ data class CameraState (
   val whiteBalanceModes: List<String>,
   val autoExposure: Boolean,
   val autoFocus: Boolean,
+  val autoFocusSupported: Boolean,
   val previewWidth: Long,
   val previewHeight: Long,
   val previewRotationDegrees: Long,
+  /** Current optical/digital zoom ratio applied to the active camera. */
+  val zoomRatio: Double,
+  val zoomMin: Double,
+  val zoomMax: Double,
+  /** Lenses offered by the probe for this device, back lenses only. */
+  val lenses: List<LensOption>,
+  /** Selected recording-mode id. */
+  val recordingMode: String,
+  /** Modes available for the active camera. */
+  val recordingModes: List<RecordingMode>,
+  /** single | movie — movie uses the common mode of all selected lenses. */
+  val shootMode: String,
+  /** True while the camera session or the clip in flight really carries HLG10. */
+  val tenBit: Boolean,
+  /** Probe verdict for this camera, size and frame rate. */
+  val hlgAvailable: Boolean,
+  val hlgReason: String,
   val isRecording: Boolean,
   val recordingSeconds: Long,
   val clipPath: String? = null,
@@ -246,6 +414,17 @@ data class CameraState (
   val noiseReductionModes: List<String>,
   val antibanding: String,
   val antibandingModes: List<String>,
+  val exposureMode: String,
+  val exposureModes: List<String>,
+  val deviceKey: String,
+  val deviceQuirks: List<String>,
+  val deviceCalibrationActive: Boolean,
+  val deviceCalibrationSource: String? = null,
+  val deviceDatabaseVersion: Long,
+  val deviceReportOptIn: Boolean,
+  val deviceReportRunning: Boolean,
+  val deviceReportPath: String? = null,
+  val deviceReportError: String? = null,
   val histogram: List<Long>,
   val waveform: List<Long>,
   val waveformColumns: Long,
@@ -256,54 +435,82 @@ data class CameraState (
     fun fromList(pigeonVar_list: List<Any?>): CameraState {
       val isOpen = pigeonVar_list[0] as Boolean
       val error = pigeonVar_list[1] as String?
-      val iso = pigeonVar_list[2] as Long
-      val isoMin = pigeonVar_list[3] as Long
-      val isoMax = pigeonVar_list[4] as Long
-      val shutterNs = pigeonVar_list[5] as Long
-      val shutterMinNs = pigeonVar_list[6] as Long
-      val shutterMaxNs = pigeonVar_list[7] as Long
-      val focusDiopters = pigeonVar_list[8] as Double
-      val focusMin = pigeonVar_list[9] as Double
-      val focusMax = pigeonVar_list[10] as Double
-      val focusShiftSpeed = pigeonVar_list[11] as Double
-      val whiteBalanceMode = pigeonVar_list[12] as String
-      val whiteBalanceModes = pigeonVar_list[13] as List<String>
-      val autoExposure = pigeonVar_list[14] as Boolean
-      val autoFocus = pigeonVar_list[15] as Boolean
-      val previewWidth = pigeonVar_list[16] as Long
-      val previewHeight = pigeonVar_list[17] as Long
-      val previewRotationDegrees = pigeonVar_list[18] as Long
-      val isRecording = pigeonVar_list[19] as Boolean
-      val recordingSeconds = pigeonVar_list[20] as Long
-      val clipPath = pigeonVar_list[21] as String?
-      val recordingError = pigeonVar_list[22] as String?
-      val shutterAngle = pigeonVar_list[23] as Double
-      val frameRate = pigeonVar_list[24] as Long
-      val gyroSampleCount = pigeonVar_list[25] as Long
-      val profile = pigeonVar_list[26] as String
-      val profileNames = pigeonVar_list[27] as List<String>
-      val zebra = pigeonVar_list[28] as Boolean
-      val falseColor = pigeonVar_list[29] as Boolean
-      val peaking = pigeonVar_list[30] as Boolean
-      val peakingSensitivity = pigeonVar_list[31] as Double
-      val peakingStrength = pigeonVar_list[32] as Double
-      val edgeMode = pigeonVar_list[33] as String
-      val edgeModes = pigeonVar_list[34] as List<String>
-      val noiseReduction = pigeonVar_list[35] as String
-      val noiseReductionModes = pigeonVar_list[36] as List<String>
-      val antibanding = pigeonVar_list[37] as String
-      val antibandingModes = pigeonVar_list[38] as List<String>
-      val histogram = pigeonVar_list[39] as List<Long>
-      val waveform = pigeonVar_list[40] as List<Long>
-      val waveformColumns = pigeonVar_list[41] as Long
-      val waveformBins = pigeonVar_list[42] as Long
-      return CameraState(isOpen, error, iso, isoMin, isoMax, shutterNs, shutterMinNs, shutterMaxNs, focusDiopters, focusMin, focusMax, focusShiftSpeed, whiteBalanceMode, whiteBalanceModes, autoExposure, autoFocus, previewWidth, previewHeight, previewRotationDegrees, isRecording, recordingSeconds, clipPath, recordingError, shutterAngle, frameRate, gyroSampleCount, profile, profileNames, zebra, falseColor, peaking, peakingSensitivity, peakingStrength, edgeMode, edgeModes, noiseReduction, noiseReductionModes, antibanding, antibandingModes, histogram, waveform, waveformColumns, waveformBins)
+      val cameraId = pigeonVar_list[2] as String
+      val cameraIds = pigeonVar_list[3] as List<String>
+      val cameraLabels = pigeonVar_list[4] as List<String>
+      val iso = pigeonVar_list[5] as Long
+      val isoMin = pigeonVar_list[6] as Long
+      val isoMax = pigeonVar_list[7] as Long
+      val shutterNs = pigeonVar_list[8] as Long
+      val shutterMinNs = pigeonVar_list[9] as Long
+      val shutterMaxNs = pigeonVar_list[10] as Long
+      val focusDiopters = pigeonVar_list[11] as Double
+      val focusMin = pigeonVar_list[12] as Double
+      val focusMax = pigeonVar_list[13] as Double
+      val focusShiftSpeed = pigeonVar_list[14] as Double
+      val whiteBalanceMode = pigeonVar_list[15] as String
+      val whiteBalanceModes = pigeonVar_list[16] as List<String>
+      val autoExposure = pigeonVar_list[17] as Boolean
+      val autoFocus = pigeonVar_list[18] as Boolean
+      val autoFocusSupported = pigeonVar_list[19] as Boolean
+      val previewWidth = pigeonVar_list[20] as Long
+      val previewHeight = pigeonVar_list[21] as Long
+      val previewRotationDegrees = pigeonVar_list[22] as Long
+      val zoomRatio = pigeonVar_list[23] as Double
+      val zoomMin = pigeonVar_list[24] as Double
+      val zoomMax = pigeonVar_list[25] as Double
+      val lenses = pigeonVar_list[26] as List<LensOption>
+      val recordingMode = pigeonVar_list[27] as String
+      val recordingModes = pigeonVar_list[28] as List<RecordingMode>
+      val shootMode = pigeonVar_list[29] as String
+      val tenBit = pigeonVar_list[30] as Boolean
+      val hlgAvailable = pigeonVar_list[31] as Boolean
+      val hlgReason = pigeonVar_list[32] as String
+      val isRecording = pigeonVar_list[33] as Boolean
+      val recordingSeconds = pigeonVar_list[34] as Long
+      val clipPath = pigeonVar_list[35] as String?
+      val recordingError = pigeonVar_list[36] as String?
+      val shutterAngle = pigeonVar_list[37] as Double
+      val frameRate = pigeonVar_list[38] as Long
+      val gyroSampleCount = pigeonVar_list[39] as Long
+      val profile = pigeonVar_list[40] as String
+      val profileNames = pigeonVar_list[41] as List<String>
+      val zebra = pigeonVar_list[42] as Boolean
+      val falseColor = pigeonVar_list[43] as Boolean
+      val peaking = pigeonVar_list[44] as Boolean
+      val peakingSensitivity = pigeonVar_list[45] as Double
+      val peakingStrength = pigeonVar_list[46] as Double
+      val edgeMode = pigeonVar_list[47] as String
+      val edgeModes = pigeonVar_list[48] as List<String>
+      val noiseReduction = pigeonVar_list[49] as String
+      val noiseReductionModes = pigeonVar_list[50] as List<String>
+      val antibanding = pigeonVar_list[51] as String
+      val antibandingModes = pigeonVar_list[52] as List<String>
+      val exposureMode = pigeonVar_list[53] as String
+      val exposureModes = pigeonVar_list[54] as List<String>
+      val deviceKey = pigeonVar_list[55] as String
+      val deviceQuirks = pigeonVar_list[56] as List<String>
+      val deviceCalibrationActive = pigeonVar_list[57] as Boolean
+      val deviceCalibrationSource = pigeonVar_list[58] as String?
+      val deviceDatabaseVersion = pigeonVar_list[59] as Long
+      val deviceReportOptIn = pigeonVar_list[60] as Boolean
+      val deviceReportRunning = pigeonVar_list[61] as Boolean
+      val deviceReportPath = pigeonVar_list[62] as String?
+      val deviceReportError = pigeonVar_list[63] as String?
+      val histogram = pigeonVar_list[64] as List<Long>
+      val waveform = pigeonVar_list[65] as List<Long>
+      val waveformColumns = pigeonVar_list[66] as Long
+      val waveformBins = pigeonVar_list[67] as Long
+      return CameraState(isOpen, error, cameraId, cameraIds, cameraLabels, iso, isoMin, isoMax, shutterNs, shutterMinNs, shutterMaxNs, focusDiopters, focusMin, focusMax, focusShiftSpeed, whiteBalanceMode, whiteBalanceModes, autoExposure, autoFocus, autoFocusSupported, previewWidth, previewHeight, previewRotationDegrees, zoomRatio, zoomMin, zoomMax, lenses, recordingMode, recordingModes, shootMode, tenBit, hlgAvailable, hlgReason, isRecording, recordingSeconds, clipPath, recordingError, shutterAngle, frameRate, gyroSampleCount, profile, profileNames, zebra, falseColor, peaking, peakingSensitivity, peakingStrength, edgeMode, edgeModes, noiseReduction, noiseReductionModes, antibanding, antibandingModes, exposureMode, exposureModes, deviceKey, deviceQuirks, deviceCalibrationActive, deviceCalibrationSource, deviceDatabaseVersion, deviceReportOptIn, deviceReportRunning, deviceReportPath, deviceReportError, histogram, waveform, waveformColumns, waveformBins)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       isOpen,
       error,
+      cameraId,
+      cameraIds,
+      cameraLabels,
       iso,
       isoMin,
       isoMax,
@@ -318,9 +525,20 @@ data class CameraState (
       whiteBalanceModes,
       autoExposure,
       autoFocus,
+      autoFocusSupported,
       previewWidth,
       previewHeight,
       previewRotationDegrees,
+      zoomRatio,
+      zoomMin,
+      zoomMax,
+      lenses,
+      recordingMode,
+      recordingModes,
+      shootMode,
+      tenBit,
+      hlgAvailable,
+      hlgReason,
       isRecording,
       recordingSeconds,
       clipPath,
@@ -341,6 +559,17 @@ data class CameraState (
       noiseReductionModes,
       antibanding,
       antibandingModes,
+      exposureMode,
+      exposureModes,
+      deviceKey,
+      deviceQuirks,
+      deviceCalibrationActive,
+      deviceCalibrationSource,
+      deviceDatabaseVersion,
+      deviceReportOptIn,
+      deviceReportRunning,
+      deviceReportPath,
+      deviceReportError,
       histogram,
       waveform,
       waveformColumns,
@@ -355,13 +584,16 @@ data class CameraState (
       return true
     }
     val other = other as CameraState
-    return SlateCamPigeonPigeonUtils.deepEquals(this.isOpen, other.isOpen) && SlateCamPigeonPigeonUtils.deepEquals(this.error, other.error) && SlateCamPigeonPigeonUtils.deepEquals(this.iso, other.iso) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMin, other.isoMin) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMax, other.isoMax) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterNs, other.shutterNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMinNs, other.shutterMinNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMaxNs, other.shutterMaxNs) && SlateCamPigeonPigeonUtils.deepEquals(this.focusDiopters, other.focusDiopters) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMin, other.focusMin) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMax, other.focusMax) && SlateCamPigeonPigeonUtils.deepEquals(this.focusShiftSpeed, other.focusShiftSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceMode, other.whiteBalanceMode) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceModes, other.whiteBalanceModes) && SlateCamPigeonPigeonUtils.deepEquals(this.autoExposure, other.autoExposure) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocus, other.autoFocus) && SlateCamPigeonPigeonUtils.deepEquals(this.previewWidth, other.previewWidth) && SlateCamPigeonPigeonUtils.deepEquals(this.previewHeight, other.previewHeight) && SlateCamPigeonPigeonUtils.deepEquals(this.previewRotationDegrees, other.previewRotationDegrees) && SlateCamPigeonPigeonUtils.deepEquals(this.isRecording, other.isRecording) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingSeconds, other.recordingSeconds) && SlateCamPigeonPigeonUtils.deepEquals(this.clipPath, other.clipPath) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingError, other.recordingError) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterAngle, other.shutterAngle) && SlateCamPigeonPigeonUtils.deepEquals(this.frameRate, other.frameRate) && SlateCamPigeonPigeonUtils.deepEquals(this.gyroSampleCount, other.gyroSampleCount) && SlateCamPigeonPigeonUtils.deepEquals(this.profile, other.profile) && SlateCamPigeonPigeonUtils.deepEquals(this.profileNames, other.profileNames) && SlateCamPigeonPigeonUtils.deepEquals(this.zebra, other.zebra) && SlateCamPigeonPigeonUtils.deepEquals(this.falseColor, other.falseColor) && SlateCamPigeonPigeonUtils.deepEquals(this.peaking, other.peaking) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingSensitivity, other.peakingSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingStrength, other.peakingStrength) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeMode, other.edgeMode) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeModes, other.edgeModes) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReduction, other.noiseReduction) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReductionModes, other.noiseReductionModes) && SlateCamPigeonPigeonUtils.deepEquals(this.antibanding, other.antibanding) && SlateCamPigeonPigeonUtils.deepEquals(this.antibandingModes, other.antibandingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.histogram, other.histogram) && SlateCamPigeonPigeonUtils.deepEquals(this.waveform, other.waveform) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformColumns, other.waveformColumns) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformBins, other.waveformBins)
+    return SlateCamPigeonPigeonUtils.deepEquals(this.isOpen, other.isOpen) && SlateCamPigeonPigeonUtils.deepEquals(this.error, other.error) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraId, other.cameraId) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraIds, other.cameraIds) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraLabels, other.cameraLabels) && SlateCamPigeonPigeonUtils.deepEquals(this.iso, other.iso) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMin, other.isoMin) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMax, other.isoMax) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterNs, other.shutterNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMinNs, other.shutterMinNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMaxNs, other.shutterMaxNs) && SlateCamPigeonPigeonUtils.deepEquals(this.focusDiopters, other.focusDiopters) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMin, other.focusMin) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMax, other.focusMax) && SlateCamPigeonPigeonUtils.deepEquals(this.focusShiftSpeed, other.focusShiftSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceMode, other.whiteBalanceMode) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceModes, other.whiteBalanceModes) && SlateCamPigeonPigeonUtils.deepEquals(this.autoExposure, other.autoExposure) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocus, other.autoFocus) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocusSupported, other.autoFocusSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.previewWidth, other.previewWidth) && SlateCamPigeonPigeonUtils.deepEquals(this.previewHeight, other.previewHeight) && SlateCamPigeonPigeonUtils.deepEquals(this.previewRotationDegrees, other.previewRotationDegrees) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomRatio, other.zoomRatio) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomMin, other.zoomMin) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomMax, other.zoomMax) && SlateCamPigeonPigeonUtils.deepEquals(this.lenses, other.lenses) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingMode, other.recordingMode) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingModes, other.recordingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.shootMode, other.shootMode) && SlateCamPigeonPigeonUtils.deepEquals(this.tenBit, other.tenBit) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgAvailable, other.hlgAvailable) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgReason, other.hlgReason) && SlateCamPigeonPigeonUtils.deepEquals(this.isRecording, other.isRecording) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingSeconds, other.recordingSeconds) && SlateCamPigeonPigeonUtils.deepEquals(this.clipPath, other.clipPath) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingError, other.recordingError) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterAngle, other.shutterAngle) && SlateCamPigeonPigeonUtils.deepEquals(this.frameRate, other.frameRate) && SlateCamPigeonPigeonUtils.deepEquals(this.gyroSampleCount, other.gyroSampleCount) && SlateCamPigeonPigeonUtils.deepEquals(this.profile, other.profile) && SlateCamPigeonPigeonUtils.deepEquals(this.profileNames, other.profileNames) && SlateCamPigeonPigeonUtils.deepEquals(this.zebra, other.zebra) && SlateCamPigeonPigeonUtils.deepEquals(this.falseColor, other.falseColor) && SlateCamPigeonPigeonUtils.deepEquals(this.peaking, other.peaking) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingSensitivity, other.peakingSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingStrength, other.peakingStrength) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeMode, other.edgeMode) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeModes, other.edgeModes) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReduction, other.noiseReduction) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReductionModes, other.noiseReductionModes) && SlateCamPigeonPigeonUtils.deepEquals(this.antibanding, other.antibanding) && SlateCamPigeonPigeonUtils.deepEquals(this.antibandingModes, other.antibandingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureMode, other.exposureMode) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureModes, other.exposureModes) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceKey, other.deviceKey) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceQuirks, other.deviceQuirks) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceCalibrationActive, other.deviceCalibrationActive) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceCalibrationSource, other.deviceCalibrationSource) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceDatabaseVersion, other.deviceDatabaseVersion) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportOptIn, other.deviceReportOptIn) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportRunning, other.deviceReportRunning) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportPath, other.deviceReportPath) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportError, other.deviceReportError) && SlateCamPigeonPigeonUtils.deepEquals(this.histogram, other.histogram) && SlateCamPigeonPigeonUtils.deepEquals(this.waveform, other.waveform) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformColumns, other.waveformColumns) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformBins, other.waveformBins)
   }
 
   override fun hashCode(): Int {
     var result = javaClass.hashCode()
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.isOpen)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.error)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.cameraId)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.cameraIds)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.cameraLabels)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.iso)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.isoMin)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.isoMax)
@@ -376,9 +608,20 @@ data class CameraState (
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.whiteBalanceModes)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.autoExposure)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.autoFocus)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.autoFocusSupported)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.previewWidth)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.previewHeight)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.previewRotationDegrees)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.zoomRatio)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.zoomMin)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.zoomMax)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.lenses)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.recordingMode)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.recordingModes)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.shootMode)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.tenBit)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.hlgAvailable)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.hlgReason)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.isRecording)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.recordingSeconds)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.clipPath)
@@ -399,6 +642,17 @@ data class CameraState (
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.noiseReductionModes)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.antibanding)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.antibandingModes)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.exposureMode)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.exposureModes)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceKey)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceQuirks)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceCalibrationActive)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceCalibrationSource)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceDatabaseVersion)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceReportOptIn)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceReportRunning)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceReportPath)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deviceReportError)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.histogram)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.waveform)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.waveformColumns)
@@ -406,13 +660,23 @@ data class CameraState (
     return result
   }
   override fun toString(): String {
-    return "CameraState(isOpen=$isOpen, error=$error, iso=$iso, isoMin=$isoMin, isoMax=$isoMax, shutterNs=$shutterNs, shutterMinNs=$shutterMinNs, shutterMaxNs=$shutterMaxNs, focusDiopters=$focusDiopters, focusMin=$focusMin, focusMax=$focusMax, focusShiftSpeed=$focusShiftSpeed, whiteBalanceMode=$whiteBalanceMode, whiteBalanceModes=$whiteBalanceModes, autoExposure=$autoExposure, autoFocus=$autoFocus, previewWidth=$previewWidth, previewHeight=$previewHeight, previewRotationDegrees=$previewRotationDegrees, isRecording=$isRecording, recordingSeconds=$recordingSeconds, clipPath=$clipPath, recordingError=$recordingError, shutterAngle=$shutterAngle, frameRate=$frameRate, gyroSampleCount=$gyroSampleCount, profile=$profile, profileNames=$profileNames, zebra=$zebra, falseColor=$falseColor, peaking=$peaking, peakingSensitivity=$peakingSensitivity, peakingStrength=$peakingStrength, edgeMode=$edgeMode, edgeModes=$edgeModes, noiseReduction=$noiseReduction, noiseReductionModes=$noiseReductionModes, antibanding=$antibanding, antibandingModes=$antibandingModes, histogram=$histogram, waveform=$waveform, waveformColumns=$waveformColumns, waveformBins=$waveformBins)"
+    return "CameraState(isOpen=$isOpen, error=$error, cameraId=$cameraId, cameraIds=$cameraIds, cameraLabels=$cameraLabels, iso=$iso, isoMin=$isoMin, isoMax=$isoMax, shutterNs=$shutterNs, shutterMinNs=$shutterMinNs, shutterMaxNs=$shutterMaxNs, focusDiopters=$focusDiopters, focusMin=$focusMin, focusMax=$focusMax, focusShiftSpeed=$focusShiftSpeed, whiteBalanceMode=$whiteBalanceMode, whiteBalanceModes=$whiteBalanceModes, autoExposure=$autoExposure, autoFocus=$autoFocus, autoFocusSupported=$autoFocusSupported, previewWidth=$previewWidth, previewHeight=$previewHeight, previewRotationDegrees=$previewRotationDegrees, zoomRatio=$zoomRatio, zoomMin=$zoomMin, zoomMax=$zoomMax, lenses=$lenses, recordingMode=$recordingMode, recordingModes=$recordingModes, shootMode=$shootMode, tenBit=$tenBit, hlgAvailable=$hlgAvailable, hlgReason=$hlgReason, isRecording=$isRecording, recordingSeconds=$recordingSeconds, clipPath=$clipPath, recordingError=$recordingError, shutterAngle=$shutterAngle, frameRate=$frameRate, gyroSampleCount=$gyroSampleCount, profile=$profile, profileNames=$profileNames, zebra=$zebra, falseColor=$falseColor, peaking=$peaking, peakingSensitivity=$peakingSensitivity, peakingStrength=$peakingStrength, edgeMode=$edgeMode, edgeModes=$edgeModes, noiseReduction=$noiseReduction, noiseReductionModes=$noiseReductionModes, antibanding=$antibanding, antibandingModes=$antibandingModes, exposureMode=$exposureMode, exposureModes=$exposureModes, deviceKey=$deviceKey, deviceQuirks=$deviceQuirks, deviceCalibrationActive=$deviceCalibrationActive, deviceCalibrationSource=$deviceCalibrationSource, deviceDatabaseVersion=$deviceDatabaseVersion, deviceReportOptIn=$deviceReportOptIn, deviceReportRunning=$deviceReportRunning, deviceReportPath=$deviceReportPath, deviceReportError=$deviceReportError, histogram=$histogram, waveform=$waveform, waveformColumns=$waveformColumns, waveformBins=$waveformBins)"
   }
 }
 private open class SlateCamPigeonPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
       129.toByte() -> {
+        (readValue(buffer) as? List<Any?>)?.let {
+          LensOption.fromList(it)
+        }
+      }
+      130.toByte() -> {
+        (readValue(buffer) as? List<Any?>)?.let {
+          RecordingMode.fromList(it)
+        }
+      }
+      131.toByte() -> {
         (readValue(buffer) as? List<Any?>)?.let {
           CameraState.fromList(it)
         }
@@ -422,8 +686,16 @@ private open class SlateCamPigeonPigeonCodec : StandardMessageCodec() {
   }
   override fun writeValue(stream: ByteArrayOutputStream, value: Any?)   {
     when (value) {
-      is CameraState -> {
+      is LensOption -> {
         stream.write(129)
+        writeValue(stream, value.toList())
+      }
+      is RecordingMode -> {
+        stream.write(130)
+        writeValue(stream, value.toList())
+      }
+      is CameraState -> {
+        stream.write(131)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -446,6 +718,21 @@ interface SlateCamHostApi {
   fun setFocusShiftSpeed(dioptersPerSecond: Double)
   fun setWhiteBalanceMode(mode: String)
   fun setAutoExposure()
+  /** Selects the exposure mode: P (HAL AE), S (fixed shutter, auto ISO), or M. */
+  fun setExposureMode(mode: String)
+  /** Switches to another CameraManager camera ID. */
+  fun setCameraId(id: String)
+  /**
+   * Selects a lens from the probe report. Hidden lenses are allowed when the
+   * probe marked them openable.
+   */
+  fun selectLens(id: String)
+  /** Applies a zoom ratio to the active camera (optical or digital). */
+  fun setZoom(ratio: Double)
+  /** Switches recording mode: size, frame rate and bit depth. */
+  fun selectRecordingMode(id: String)
+  /** Selects single-camera or movie/vlog multi-camera mode. */
+  fun setShootMode(mode: String)
   fun setAutoFocus()
   fun startRecording()
   fun stopRecording()
@@ -456,6 +743,12 @@ interface SlateCamHostApi {
   fun setEdgeMode(mode: String)
   fun setNoiseReduction(mode: String)
   fun setAntibanding(mode: String)
+  /** Opt-in for persisted device reports. Off by default. */
+  fun setDeviceReportOptIn(enabled: Boolean)
+  /** Runs the prober on a background thread, closing preview first. */
+  fun runDeviceReport()
+  /** Reloads the bundled + user device database and reapplies calibration/quirks. */
+  fun reloadDeviceDatabase()
   fun reloadLuts()
   /** True when the app was launched to run a probe: preview must stay closed. */
   fun isProbeMode(): Boolean
@@ -614,6 +907,114 @@ interface SlateCamHostApi {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
               api.setAutoExposure()
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.setExposureMode$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val modeArg = args[0] as String
+            val wrapped: List<Any?> = try {
+              api.setExposureMode(modeArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.setCameraId$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val idArg = args[0] as String
+            val wrapped: List<Any?> = try {
+              api.setCameraId(idArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.selectLens$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val idArg = args[0] as String
+            val wrapped: List<Any?> = try {
+              api.selectLens(idArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.setZoom$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val ratioArg = args[0] as Double
+            val wrapped: List<Any?> = try {
+              api.setZoom(ratioArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.selectRecordingMode$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val idArg = args[0] as String
+            val wrapped: List<Any?> = try {
+              api.selectRecordingMode(idArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.setShootMode$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val modeArg = args[0] as String
+            val wrapped: List<Any?> = try {
+              api.setShootMode(modeArg)
               listOf(null)
             } catch (exception: Throwable) {
               SlateCamPigeonPigeonUtils.wrapError(exception)
@@ -790,6 +1191,56 @@ interface SlateCamHostApi {
             val modeArg = args[0] as String
             val wrapped: List<Any?> = try {
               api.setAntibanding(modeArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.setDeviceReportOptIn$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val enabledArg = args[0] as Boolean
+            val wrapped: List<Any?> = try {
+              api.setDeviceReportOptIn(enabledArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.runDeviceReport$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              api.runDeviceReport()
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.reloadDeviceDatabase$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              api.reloadDeviceDatabase()
               listOf(null)
             } catch (exception: Throwable) {
               SlateCamPigeonPigeonUtils.wrapError(exception)

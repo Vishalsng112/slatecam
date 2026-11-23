@@ -1,3 +1,9 @@
+<!-- historical: current status lives in docs/roadmap.md; shipped work in CHANGELOG.md -->
+> **Historical evidence log.** Current phase status is in
+> [`roadmap.md`](roadmap.md); shipped changes are in [`../CHANGELOG.md`](../CHANGELOG.md).
+> Older sections may describe superseded states (for example HLG being gated off
+> before the 2026-11-23 fix).
+
 # Test devices
 
 Real hardware is the source of truth. Emulators are only for CI smoke tests.
@@ -426,3 +432,319 @@ edges clearly; lower sensitivity removes the noise on textured surfaces.
 
 Temporal decay (how long a peak lingers after focus moves) is not implemented;
 it needs a ping-pong mask buffer and is recorded in the backlog.
+
+## Prober 1.7.0 — per-size 10-bit verification and hvcC parsing (2026-11-23)
+
+Both test devices were re-probed with schema **1.8.0** after two changes to the
+verification path: the 10-bit checks now run at both UHD and 1920×1080, and the
+SPS parser reads profile **and bit depth** from Annex B, 4-byte length-prefixed
+and `hvcC` records.
+
+### OnePlus Pad 3 — `cinema`, both sizes verified
+
+| Check | Result |
+|---|---|
+| `hevc_main10_encode` (UHD) | **pass** — `c2.qti.hevc.encoder`, `sps_profile=2`, `sps_bit_depth=10` |
+| `hevc_main10_encode_fhd` | **pass** — same codec, `sps_profile=2`, `sps_bit_depth=10` |
+| `camera_hlg10_session` (UHD) | **pass** — camera 0 |
+| `camera_hlg10_session_fhd` | **pass** — camera 0 |
+| `concurrent_camera_session` | **pass** — cameras 0+1 |
+| Tier | **`cinema`** |
+
+New operational data: HEVC width/height range 96–8192 with 2-pixel alignment,
+bitrate 1–160 Mbps, P010 buffer input, HDR editing unsupported, UHD 120.9 fps
+(informational ceiling), gyro 200 Hz (5 ms), built-in mic 8–48 kHz mono/stereo,
+RAW 4160×3120, max frame duration 260 ms, lens pose and intrinsics reported.
+
+### POCO X6 Pro 5G — `standard`
+
+| Check | Result |
+|---|---|
+| `hevc_main10_encode` (UHD) | **fail** — `profile_idc=1`, `bit_depth=8` on every hardware encoder |
+| `hevc_main10_encode_fhd` | **fail** — same |
+| `camera_hlg10_session` (UHD/FHD) | **pass** — the camera side is capable |
+| `concurrent_camera_session` | **pass** |
+| Tier | **`standard`** (missing `hevc_main10_encoder`) |
+
+The improved parser makes the failure evidence explicit: the codec header claims
+`profile=2`, the SPS says Main profile with 8-bit depth. The earlier conclusion
+("over-reports Main10") stands, now with bit depth in the report.
+
+### Findings
+
+1. **`csd-0` is not always a raw NAL stream.** MediaCodec normally returns an
+   `hvcC` configuration record, which the old parser could not read at all
+   (`profile_idc` came back null). The parser now handles hvcC, Annex B and
+   length-prefixed data, and requires 10-bit depth in the SPS for a Main10 pass.
+2. **`VideoCapabilities.isSizeSupported()` is unreliable.** The POCO's encoder
+   reports 16-pixel height alignment, which excludes 1080, while surface
+   recording at 1080p works. The encoder section now reports the width/height
+   ranges, alignment and a per-size `aligned` flag instead of silently dropping
+   the size. A size in range but out of alignment is *claimed*, not verified.
+3. **The 10-bit production recorder is not ready.** On the Pad, the encoder's
+   `outputFormat` at `INFO_OUTPUT_FORMAT_CHANGED` contains no `csd-0`, so the
+   muxer writes a video track with no codec configuration (ffprobe:
+   `codec_name=unknown`). The prober proves the hardware path; the recorder's
+   HLG route needs its own fix before 10-bit recording is enabled. This is a
+   pipeline bug, not a capability verdict, and the runtime gate stays closed
+   with that reason.
+4. **Capability is gated per size and per camera.** A UHD pass no longer marks
+   FHD presets verified, and a session verified on camera 0 does not credit
+   camera 1. The report's per-camera preset map is the source of truth.
+
+## Lens roles and hidden cameras — prober 1.8.0 / schema 1.9.0 (2026-11-23)
+
+The prober now derives relative lens roles from focal length + sensor
+geometry, using CameraX's convention (`intrinsic_zoom_ratio` 1.0 = default,
+< 1 = wider, > 1 = narrower). It also scans numeric IDs beyond `cameraIdList`
+and records the OEM auxiliary-camera policy.
+
+### OnePlus Pad 3 — two lenses exposed, none hidden
+
+| ID | Facing | Role | Basis | 35 mm eq | Zoom | Sensor |
+|---|---|---|---|---|---|---|
+| 0 | back | default | only_camera | 25.2 mm | 1.000 | 4160×3120 |
+| 1 | front | default | only_camera | 26.0 mm | 1.000 | 3264×2448 |
+
+`vendor.camera.aux.packagelist` contains only `org.codeaurora.snapcam`, but no
+hidden ID was readable or openable on this build. The Pad genuinely exposes two
+cameras.
+
+### POCO X6 Pro 5G — three rear lenses, four hidden IDs openable
+
+Only IDs 0 and 1 are listed, but IDs 2–5 are readable **and openable** by this
+package even though `vendor.camera.aux.packagelist` lists only Xiaomi
+test/factory apps. That is build-specific evidence, not an API guarantee.
+
+| ID | Exposed | Openable | Facing | Role | Basis | 35 mm eq | Zoom | Sensor |
+|---|---|---|---|---|---|---|---|---|
+| 0 | yes | — | back | default | fov_ratio | 25.1 mm | 1.000 | 4624×3472 |
+| 1 | yes | — | front | default | only_camera | 24.3 mm | 1.000 | 2304×1728 |
+| 2 | no | **yes** | back | **ultrawide** | fov_ratio | 15.6 mm | **0.621** | 3264×2448 |
+| 3 | no | **yes** | back | **macro** | fixed_focus_small_sensor | 24.7 mm | 0.984 | 1600×1200 |
+| 4 | no | **yes** | back | default | fov_ratio | 25.1 mm | 1.000 | 4624×3472 |
+| 5 | no | **yes** | back | default | fov_ratio | 25.1 mm | 1.000 | 4624×3472 |
+
+- ID 2 is the 8 MP ultra-wide: 15.6 mm equivalent, 0.621× the main lens.
+- ID 3 is the 2 MP macro: fixed focus, 1.9 MP, normal field of view.
+- IDs 4 and 5 are logical multi-camera groups over physical cameras `0 + 2`,
+  with zoom-ratio ranges 0.6–10.0 and 1.0–10.0. These are the correct cameras
+  to open for a continuous ultra-to-max-zoom experience; ID 2 is the
+  ultrawide-only stream.
+- There is no telephoto lens on this device. Max zoom is digital above 1×.
+
+### Contract for a future zoom UI
+
+- Use `role` + `intrinsic_zoom_ratio` for the lens stops, and 35 mm-equivalent
+  focal length for the labels (15.6 / 25.1 mm, not "0.6×").
+- Offer a hidden lens only when the report says `openable: true`; a readable ID
+  is not enough.
+- Prefer a logical camera with a zoom-ratio range that spans the requested
+  range (POCO ID 4) instead of opening several physical IDs in sequence.
+- Keep `exposed`/`openable` per device in the report: a ROM update can remove
+  the hidden IDs without notice.
+
+## Zoom plugin — lens switching and continuous zoom (2026-11-23)
+
+`ZoomPlugin` (`lib/src/ui/zoom_plugin.dart`) sits above the bottom dock and is
+driven entirely by the probe report. It exposes lens chips and a per-camera zoom
+slider through the new Pigeon calls `selectLens(id)` and `setZoom(ratio)`.
+
+### OnePlus Pad 3
+
+| Item | Result |
+|---|---|
+| Lens chips | one: `1.0× · 25mm` (the only exposed back lens) |
+| Slider | 1–10×, applied through `CONTROL_ZOOM_RATIO` |
+| 10× test | preview visibly crops/zooms, readout `10×`, no error |
+| Hidden lenses | none offered |
+
+### POCO X6 Pro 5G
+
+| Item | Result |
+|---|---|
+| Lens chips | `0.6× · 16mm` (ultra-wide, hidden), `1.0× · 25mm` (main), `MACRO` (hidden) |
+| Ultra-wide selection | opens camera **2**; header becomes `0.6× · 16mm · hidden`; HAL logs `Primary camera id: 2`; FOV visibly widens |
+| Macro selection | opens camera **3**; header `MACRO · hidden`; close-focus preview |
+| Recording on macro | HEVC Main 1920×1080 30 fps, 12.17 Mbps, AAC-LC, **BT.709**; file playable |
+| Slider | continuous per-camera zoom, readout normalised to the default lens |
+
+Hidden chips carry a small "eye-off" mark and a tooltip; they appear only when
+the probe marked the lens `openable`. This is still build-specific evidence —
+a ROM update can remove them.
+
+The macro recording also confirms the explicit SDR colour signalling: the POCO
+clip is tagged `bt709` / `bt709` / `bt709` instead of the vendor default.
+
+## Orientation and aspect fix (2026-11-23)
+
+**Symptom:** the viewfinder looked horizontally stretched and the recorded file
+did not match the preview.
+
+**Measured facts** (both devices, landscape, back camera):
+
+| Field | Value |
+|---|---|
+| Camera stream | 1920×1080 |
+| Preview EGL surface | 1920×1080 |
+| SurfaceTexture transform | 90° reflection matrix |
+| Display rotation | `ROTATION_90`; preview rotation value 270 |
+| Recorded buffer | 1920×1080, rotation metadata 90 (sideways pixels) |
+| Preview path | GL matrix + Flutter `RotatedBox` 270 + 16:9 `cover` |
+
+The recorder wrote sideways pixels and relied on MP4 rotation metadata, while
+the preview applied another rotation and crop in Flutter. Players and the
+viewfinder therefore disagreed, and the preview was stretched.
+
+**Fix (ADR 0006):** rotate in GL from sensor + display orientation, encode
+upright pixels with no rotation hint, and stop rotating in Flutter. The
+viewfinder uses the capture aspect and `BoxFit.contain`.
+
+| Device | Preview | Encoded raw frame | Result |
+|---|---|---|---|
+| Pad 3 back | upright, correct proportions | 1920×1080 upright, no `rotation` tag | pass |
+| POCO back | upright, correct proportions | 1920×1080 upright, no `rotation` tag | pass |
+| POCO front | upright | — | pass (not mirrored) |
+
+The front camera uses sensor 270° in landscape, which is why the back-camera
+rotation rule alone put it sideways; the sensor-based rule covers both.
+
+### Follow-up
+
+- Add a recording-aspect selector (16:9 / 4:3) that picks a matching stream and
+  encoder size. The transform is already aspect-preserving.
+- Mirror the front *preview* only if desired; recordings stay unmirrored.
+- Re-run this test with the tablet rotated 180° (`ROTATION_270`) to exercise the
+  `sensor + 180°` branch.
+
+## Phase 3 completion on the Pad 3 (2026-11-23)
+
+Only the OnePlus Pad 3 was connected for this pass; the POCO cross-device check
+is recorded in the later POCO section.
+
+### 10-bit HLG recording
+
+| Item | Result |
+|---|---|
+| Encoder | `c2.qti.hevc.encoder` (same codec the prober verified) |
+| Config | `csd-0` absent from `outputFormat`; recorder built `hvcC` from VPS/SPS/PPS in the first access unit |
+| Encoder surface | non-recordable RGBA8888; the 10-bit RGBA config is offered by EGL but every swap fails with `EGL_BAD_SURFACE` |
+| Container | HEVC **Main 10**, `yuv420p10le`, BT.2020 NC, **arib-std-b67** (HLG), TV range |
+| Duration/frames | 60 s / 1859 frames at 1080p30 |
+| Bitrate | 15.06 Mbps |
+| Thermal | status 0 before/after; battery 31.3 °C; no dropped frames (1859/1859) |
+
+The SPS guard still runs on the real bitstream; HLG is only tagged when the
+encoded SPS is Main10 at 10-bit. The GL intermediate is RGBA8888 today, so the
+*encoded stream* is 10-bit but the source precision is 8-bit until a true 10-bit
+EGL/FBO path exists (quality follow-up).
+
+### Recording modes
+
+Probe-driven: size must exist in the camera stream map, fps must have an exact
+AE range, and 10-bit must be `verified: pass` for that size/fps.
+
+| Mode | State on Pad 3 |
+|---|---|
+| 1920×1080 · 24p · 16:9 · 10-bit HLG | enabled, recorded (Main10, avg 24/1 over 10 s) |
+| 1920×1080 · 30p · 16:9 · 10-bit HLG | enabled, 60 s clip verified |
+| 1920×1080 · 24p/30p · 16:9 · 8-bit SDR | enabled, 60 s at 24p: 1488 frames, 11.3 Mbps |
+| 1440×1080 · 24p/30p · 4:3 · 8-bit SDR | enabled, 4:3 clip is 1440×1080 Main BT.709 |
+| 1920×1080 · 25p | disabled — no `25–25` AE range; the stream supports 25 but cannot be frame-locked |
+| 1440×1080 · 10-bit | disabled — 4:3 10-bit is not probe-verified yet |
+| 1280×720 · 16:9 · 8-bit | enabled |
+
+Mode changes resize the producer, the camera stream and the encoder together;
+the transform preserves aspect, so 4:3 is pillarboxed in the landscape viewfinder
+rather than stretched.
+
+### Remaining before the phase can be signed off across devices
+
+1. Re-run this checklist on the POCO; it must stay 8-bit because its SPS fails
+   Main10.
+2. 20-minute thermal run (60 s is clean).
+3. Probe and enable 4:3 10-bit if the hardware verifies it.
+4. Optional quality: true 10-bit GL intermediate.
+
+## Phase 5.5 foundation — shoot profiles and Movie/Vlog mode (2026-11-23)
+
+Tested on the Pad 3 only; the POCO lens set is the real multi-lens exercise and
+is still pending.
+
+### Per-camera capability modes
+
+- Modes are built from live `CameraCharacteristics` per camera: size, exact AE
+  frame-rate range, 10-bit claim, AF modes and zoom range.
+- 10-bit is enabled only when the probe verified that camera at that size/rate.
+- Switching from the back lens (30p 10-bit) to the front while idle
+  automatically fell back to **1920×1080 30p 8-bit** instead of sending the
+  front camera a 10-bit request it had not verified.
+- Attempting an invalid configuration now produces a reason, not a failed
+  camera session.
+
+### Movie/Vlog common mode
+
+The shoot set is every probe-visible, openable, non-macro lens (Pad: back +
+front). On the Pad the strict common mode is **1920×1080 30p 8-bit**, because the
+front camera's 10-bit is `not_run` in the probe report.
+
+| Test | Result |
+|---|---|
+| Back → front during recording | accepted; recorder/encoder/audio/gyro stayed alive |
+| Front → back during recording | accepted; clip continued |
+| Long switch clip | 229.6 s, 6876 frames, 1920×1080 Main 8-bit, one file |
+| Short regression clip | 7.87 s, 236 frames, one file |
+| Crashes / session failures | none |
+| 4K single-camera | 3840×2160 30p **Main10 HLG**, 111 frames / 3.7 s, 49.97 Mbps |
+
+### Autofocus and colour
+
+- AF modes are read per camera; a lens without AF is forced to manual and the
+  AF action is disabled in the focus tab.
+- On every lens switch the bridge refreshes the device snapshot and applies that
+  camera's calibrated input profile before the shared creative profile/LUT.
+  No measured calibration matrices ship yet, so colour parity currently means
+  identity for every lens.
+
+### Remaining for Phase 5.5
+
+1. Probe and verify 10-bit per lens (including hidden/openable ones) and add
+   4:3 checks; then the common movie mode can be 10-bit where all lenses qualify.
+2. Shoot-set editor (include/exclude lenses, save profiles) instead of the
+   current all-non-macro default.
+3. Measured pairwise ColorChecker matrices in the device database.
+4. POCO cross-device pass over main, ultra-wide and macro lenses (completed in
+   the later POCO section).
+5. Optional seamless pre-open switch to remove the short visual gap.
+
+## Phase 3 + 5.5 on the POCO X6 Pro 5G (2026-11-23, build 2037)
+
+### Phase 3 — recording
+
+| Item | Result |
+|---|---|
+| Probe | `standard`; `hevc_main10_encode` and `_fhd` fail with `profile_idc=1`, `bit_depth=8`; HLG10 sessions pass; hidden IDs 2–5 openable |
+| 10-bit gate | disabled with the quirk reason `poco-duchamp-force-8bit` plus the SPS verdict |
+| Mode list | 4K 24/30, 1080p 24/30, 4:3 1440×1080 24/30, 720p 24/30, all 8-bit; 25p disabled (no exact AE range) |
+| 4K 30p | 3840×2160 HEVC **Main**, 117 frames / 3.97 s, 40.2 Mbps, BT.709 |
+| 4:3 30p | 1440×1080 HEVC **Main**, BT.709 |
+| 1080p30 60 s | 1859 frames / 61.96 s, 11.99 Mbps, thermal 0, battery 39.8 °C |
+
+No 10-bit/HLG clip was produced; the device stays SDR by report and quirk, as
+intended.
+
+### Phase 5.5 — movie mode
+
+| Item | Result |
+|---|---|
+| Shoot set | main `0`, ultra-wide `2` (hidden/openable), front `1`; macro `3` excluded |
+| Common mode | 1920×1080 30p 8-bit (10-bit blocked for the set) |
+| Main → ultra-wide | accepted mid-recording; header `0.6× · 16mm · hidden`; REC continued |
+| Macro while recording | rejected: “lens 3 is not part of the movie lens set”; REC continued |
+| Ultra-wide → front | accepted mid-recording; header `1 · front`; REC continued |
+| Clip | one file, 125.3 s, 3733 frames, 1920×1080 HEVC Main 8-bit |
+| Crashes / session failures | none |
+
+The POCO’s per-camera difference is visible in the UI: 4K modes are available on
+the main sensor, the macro is not part of the movie set, and all 10-bit modes
+carry the quirk/verdict reason.

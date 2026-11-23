@@ -44,6 +44,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var surfaceTexture: SurfaceTexture? = null
     private var program = 0
     private var uTexMatrix = 0
+    private var uRotation = 0
     private var uTexture = 0
     private var uHlgToSdr = 0
     private var uExposure = 0
@@ -74,6 +75,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var analysisFbo = 0
     private var analysisTexture = 0
     private var frameCounter = 0
+    private var firstFrameLogged = false
 
     @Volatile
     private var analysisEnabled = false
@@ -96,6 +98,15 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile
     private var captureEncoderTimestamps = false
 
+    /**
+     * MediaCodec surface input treats the EGL presentation time as the sample
+     * PTS. Camera timestamps are absolute (since boot), and passing them through
+     * unchanged produces MP4 durations measured from the boot epoch. Normalise
+     * the encoder PTS against the first submitted frame so every clip starts at
+     * t=0. The original camera timestamp is still recorded for gyro alignment.
+     */
+    private var encoderBaseTimestampNs = -1L
+
     @Volatile private var exposure = 1f
     @Volatile private var contrast = 1f
     @Volatile private var saturation = 1f
@@ -105,6 +116,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var zebraThreshold = 0.9f
     @Volatile private var falseColor = false
     @Volatile private var displayRotation = 0
+    @Volatile private var glRotation = 0
     @Volatile private var inputMatrix = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
     @Volatile private var inputExposure = 1f
     @Volatile private var inputSaturation = 1f
@@ -161,10 +173,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         displayRotation = ((degrees % 360) + 360) % 360
     }
 
+    /** Rotation the shader applies so encoded and preview pixels are upright. */
+    fun setGlRotation(degrees: Int) {
+        glRotation = ((degrees % 360) + 360) % 360
+    }
+
     /** Records the timestamp submitted with each encoded frame. */
     fun startEncoderTimestampCapture() {
         synchronized(encoderTimestamps) {
             encoderTimestamps.clear()
+            encoderBaseTimestampNs = -1L
             captureEncoderTimestamps = true
         }
     }
@@ -247,6 +265,15 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     var cameraSurface: Surface? = null
         private set
 
+    /** Changes the camera/output size without recreating the EGL context. */
+    fun setPreviewSize(previewWidth: Int, previewHeight: Int) {
+        handler.post {
+            width = previewWidth
+            height = previewHeight
+            surfaceTexture?.setDefaultBufferSize(previewWidth, previewHeight)
+        }
+    }
+
     fun start(target: Surface, previewWidth: Int, previewHeight: Int) {
         val latch = CountDownLatch(1)
         var failure: Throwable? = null
@@ -259,6 +286,11 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 setupProgram()
                 setupTexture()
                 started = true
+                Log.i(
+                    TAG,
+                    "started camera=${previewWidth}x$previewHeight " +
+                        "previewSurface=${eglSurfaceSize(outputEglSurface)}",
+                )
                 pendingLutData?.let { data ->
                     val size = pendingLutSize
                     pendingLutData = null
@@ -277,8 +309,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         failure?.let { throw it }
     }
 
-    /**
-     * Re-targets rendering when Flutter recreates the producer surface
+    /** Re-targets rendering when Flutter recreates the producer surface
      * (for example after the app returns to the foreground).
      */
     fun updateTarget(target: Surface) {
@@ -316,16 +347,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             if (!started) return@post
             detachEncoderInternal()
 
-            val targetConfig = if (tenBitHlg) pickTenBitConfig() ?: config else config
-            val attributes = if (tenBitHlg) {
-                intArrayOf(
-                    EGL_GL_COLORSPACE_KHR,
-                    EGL_GL_COLORSPACE_BT2020_HLG_EXT,
-                    EGL14.EGL_NONE,
-                )
+            val targetConfig = if (tenBitHlg) {
+                pickHlgSurfaceConfig() ?: config
             } else {
-                intArrayOf(EGL14.EGL_NONE)
+                config
             }
+            // The encoder surface does not need the EGL BT2020/HLG attribute on
+            // this driver; attaching it makes eglSwapBuffers fail with
+            // EGL_BAD_SURFACE. MediaFormat carries the colour signalling instead,
+            // matching the prober's verified encode path.
+            val attributes = intArrayOf(EGL14.EGL_NONE)
 
             encoderEglSurface = EGL14.eglCreateWindowSurface(
                 display,
@@ -341,9 +372,48 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 )
             } else {
                 encoderFrames = 0
-                Log.i(TAG, "encoder surface attached (tenBit=$tenBitHlg)")
+                Log.i(
+                    TAG,
+                    "encoder surface attached (tenBit=$tenBitHlg) " +
+                        "size=${eglSurfaceSize(encoderEglSurface)} camera=${width}x$height",
+                )
             }
         }
+    }
+
+    private fun eglSurfaceSize(surface: EGLSurface): String {
+        if (surface == EGL14.EGL_NO_SURFACE) return "none"
+        val w = IntArray(1)
+        val h = IntArray(1)
+        EGL14.eglQuerySurface(display, surface, EGL14.EGL_WIDTH, w, 0)
+        EGL14.eglQuerySurface(display, surface, EGL14.EGL_HEIGHT, h, 0)
+        return "${w[0]}x${h[0]}"
+    }
+
+    /**
+     * The prober's working HLG encode uses a plain, non-recordable RGBA8888
+     * config. On this driver the encoder's 10-bit input surface rejects a
+     * recordable config at swap time.
+     */
+    private fun pickHlgSurfaceConfig(): EGLConfig? {
+        val attributes = intArrayOf(
+            EGL14.EGL_RED_SIZE, 8,
+            EGL14.EGL_GREEN_SIZE, 8,
+            EGL14.EGL_BLUE_SIZE, 8,
+            EGL14.EGL_ALPHA_SIZE, 8,
+            EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+            EGL14.EGL_NONE,
+        )
+        val configs = arrayOfNulls<EGLConfig>(1)
+        val count = IntArray(1)
+        val chosen = EGL14.eglChooseConfig(display, attributes, 0, configs, 0, 1, count, 0) &&
+            count[0] > 0
+        if (!chosen) {
+            Log.w(TAG, "no HLG encoder EGL config")
+            return null
+        }
+        Log.i(TAG, "HLG encoder EGL config RGBA=8/8/8/8")
+        return configs[0]
     }
 
     private fun pickTenBitConfig(): EGLConfig? {
@@ -353,14 +423,26 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             EGL14.EGL_BLUE_SIZE, 10,
             EGL14.EGL_ALPHA_SIZE, 2,
             EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
-            EGL_RECORDABLE_ANDROID, 1,
+            EGL14.EGL_SURFACE_TYPE, EGL14.EGL_WINDOW_BIT,
+            EGL14.EGL_COLOR_BUFFER_TYPE, EGL14.EGL_RGB_BUFFER,
             EGL14.EGL_NONE,
         )
         val configs = arrayOfNulls<EGLConfig>(1)
         val count = IntArray(1)
         val chosen = EGL14.eglChooseConfig(display, attributes, 0, configs, 0, 1, count, 0) &&
             count[0] > 0
-        return if (chosen) configs[0] else null
+        if (!chosen) {
+            Log.w(TAG, "no 10-bit EGL config")
+            return null
+        }
+        val config = configs[0] ?: return null
+        val sizes = IntArray(4)
+        EGL14.eglGetConfigAttrib(display, config, EGL14.EGL_RED_SIZE, sizes, 0)
+        EGL14.eglGetConfigAttrib(display, config, EGL14.EGL_GREEN_SIZE, sizes, 1)
+        EGL14.eglGetConfigAttrib(display, config, EGL14.EGL_BLUE_SIZE, sizes, 2)
+        EGL14.eglGetConfigAttrib(display, config, EGL14.EGL_ALPHA_SIZE, sizes, 3)
+        Log.i(TAG, "10-bit EGL config RGBA=${sizes.joinToString("/")}")
+        return config
     }
 
     fun detachEncoderSurface() {
@@ -475,6 +557,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         aPosition = GLES20.glGetAttribLocation(program, "aPosition")
         aTexCoord = GLES20.glGetAttribLocation(program, "aTexCoord")
         uTexMatrix = GLES20.glGetUniformLocation(program, "uTexMatrix")
+        uRotation = GLES20.glGetUniformLocation(program, "uRotation")
         uTexture = GLES20.glGetUniformLocation(program, "uTexture")
         uHlgToSdr = GLES20.glGetUniformLocation(program, "uHlgToSdr")
         uExposure = GLES20.glGetUniformLocation(program, "uExposure")
@@ -541,9 +624,40 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             texture.getTransformMatrix(texMatrix)
         }.onFailure { return }
 
-        val timestampNs = android.os.SystemClock.elapsedRealtimeNanos()
-        renderTo(outputEglSurface, timestampNs, tonemap = tenBitSource, overlay = true)
-        renderTo(encoderEglSurface, timestampNs, tonemap = false, overlay = false)
+        if (!firstFrameLogged) {
+            firstFrameLogged = true
+            Log.i(
+                TAG,
+                "first frame previewSurface=${eglSurfaceSize(outputEglSurface)} " +
+                    "rotation=$glRotation",
+            )
+        }
+
+        val frameTimestampNs = texture.timestamp
+            .takeIf { it > 0L }
+            ?: android.os.SystemClock.elapsedRealtimeNanos()
+        renderTo(
+            outputEglSurface,
+            frameTimestampNs,
+            tonemap = tenBitSource,
+            overlay = true,
+            frameTimestampNs = frameTimestampNs,
+        )
+        val encoderTimestampNs = synchronized(encoderTimestamps) {
+            if (encoderBaseTimestampNs < 0L) {
+                encoderBaseTimestampNs = frameTimestampNs
+                0L
+            } else {
+                (frameTimestampNs - encoderBaseTimestampNs).coerceAtLeast(0L)
+            }
+        }
+        renderTo(
+            encoderEglSurface,
+            encoderTimestampNs,
+            tonemap = false,
+            overlay = false,
+            frameTimestampNs = frameTimestampNs,
+        )
 
         frameCounter++
         if (analysisEnabled && frameCounter % ANALYSIS_INTERVAL == 0) {
@@ -580,6 +694,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform1f(uPeakingStrength, peakingStrength)
         GLES20.glUniform2f(uTexelSize, 1f / width.coerceAtLeast(1), 1f / height.coerceAtLeast(1))
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
+        GLES20.glUniform1f(uRotation, glRotation.toFloat())
 
         GLES20.glEnableVertexAttribArray(aPosition)
         GLES20.glVertexAttribPointer(aPosition, 2, GLES20.GL_FLOAT, false, 0, QUAD_VERTICES)
@@ -699,6 +814,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         timestampNs: Long,
         tonemap: Boolean,
         overlay: Boolean,
+        frameTimestampNs: Long = timestampNs,
     ) {
         if (surface == EGL14.EGL_NO_SURFACE) return
         EGL14.eglMakeCurrent(display, surface, surface, context)
@@ -711,12 +827,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
         if (surface == encoderEglSurface) {
             if (captureEncoderTimestamps) {
-                synchronized(encoderTimestamps) { encoderTimestamps += timestampNs }
+                synchronized(encoderTimestamps) { encoderTimestamps += frameTimestampNs }
             }
             EGLExt.eglPresentationTimeANDROID(display, surface, timestampNs)
         }
         if (!EGL14.eglSwapBuffers(display, surface)) {
-            Log.w(TAG, "eglSwapBuffers failed: 0x${Integer.toHexString(EGL14.eglGetError())}")
+            val target = if (surface == encoderEglSurface) "encoder" else "preview"
+            Log.w(
+                TAG,
+                "eglSwapBuffers failed ($target): 0x${Integer.toHexString(EGL14.eglGetError())}",
+            )
         }
         if (surface == encoderEglSurface) {
             encoderFrames++
@@ -789,10 +909,18 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             attribute vec4 aPosition;
             attribute vec4 aTexCoord;
             uniform mat4 uTexMatrix;
+            uniform float uRotation;
             varying vec2 vTexCoord;
             void main() {
                 gl_Position = aPosition;
-                vTexCoord = (uTexMatrix * aTexCoord).xy;
+                vec2 uv = (uTexMatrix * aTexCoord).xy;
+                float rad = radians(uRotation);
+                vec2 p = uv - 0.5;
+                uv = vec2(
+                    p.x * cos(rad) - p.y * sin(rad),
+                    p.x * sin(rad) + p.y * cos(rad)
+                ) + 0.5;
+                vTexCoord = uv;
             }
         """
 

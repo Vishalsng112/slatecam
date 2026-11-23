@@ -1,0 +1,88 @@
+# Changelog
+
+All notable changes to SlateCam are recorded here. Shipped work belongs in this
+file; forward-looking work belongs in [`docs/backlog.md`](docs/backlog.md), and
+phase order/status belongs in [`docs/roadmap.md`](docs/roadmap.md).
+
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The app is
+pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
+
+## [Unreleased]
+
+### Added — Phase 5.5 shoot profiles
+- Per-camera capability reader (`CameraCapabilitiesReader`) for sizes, exact AE
+  frame rates, autofocus modes, 10-bit claim and zoom range. Hidden/openable
+  lenses are included.
+- `RecordingModeCatalog`: 4K, 1080p, 1440×1080 4:3 and 720p; 24/25/30 fps; 8-bit
+  and probe-verified 10-bit. Invalid modes are disabled with a reason.
+- Movie/Vlog shoot mode: strict common-mode intersection across probe-visible,
+  openable, non-macro lenses.
+- Validated switch-while-recording. Single mode rejects; movie mode accepts only
+  when the target lens supports the active mode. Recorder/encoder/audio/gyro
+  stay alive.
+- Atomic configure-and-switch when idle, so a mode change and lens change do not
+  race two session reopens.
+- Autofocus is read per camera; a lens without AF is forced to manual and the UI
+  disables the AF action.
+- Per-camera input profile is applied on every lens switch; measured ColorChecker
+  matrices are still data to add.
+- POCO multi-lens pass: movie mode main → ultra-wide → front in one continuous
+  125.3 s clip (3733 frames). Selecting the macro is rejected with
+  “lens 3 is not part of the movie lens set”; recording continues.
+
+### Changed — Phase 3 recording completion (Pad 3)
+- 10-bit HLG recording enabled by probe verification and SPS checks.
+- Recorder builds `hvcC` from VPS/SPS/PPS in the first access unit when
+  `outputFormat` has no `csd-0`.
+- HLG encoder surface uses a non-recordable RGBA8888 EGL config; the 10-bit
+  config is rejected by the driver at swap time.
+- Recording modes: 16:9/4:3, 24/30 fps, 8/10-bit, selected in the Capture tab.
+- Bitrate scales with resolution and frame rate.
+- Verified on Pad 3: 4K 30p Main10 HLG; 1080p30 60 s (1859 frames, thermal 0);
+  1080p24 8-bit 60 s (1488 frames); 4:3 1440×1080 8-bit.
+- Verified on POCO X6 Pro: 4K 30p 8-bit (40.2 Mbps), 4:3 1440×1080 8-bit,
+  1080p30 60 s (1859 frames, 12.0 Mbps, thermal 0). 10-bit stays disabled by the
+  `poco-duchamp-force-8bit` quirk and the SPS Main/8-bit verdict.
+
+### Changed — orientation and aspect (ADR 0006)
+- GL applies sensor/display rotation to preview and encoder; encoded pixels are
+  upright and the MP4 rotation hint is 0.
+- Flutter no longer rotates the preview; it fits the capture aspect with
+  `BoxFit.contain`, removing the horizontal stretch.
+- Front camera uses its own sensor rotation (270° in landscape).
+
+### Added — zoom/lens plugin
+- `ZoomPlugin` above the transport dock: probe-verified back-lens chips
+  (role + 35 mm equivalent), continuous zoom, hidden lenses marked.
+- Bridge commands `selectLens`, `setZoom`; per-camera zoom state.
+
+### Added — prober 1.8.0 / schema 1.9.0
+- Per-size 10-bit verification (`hevc_main10_encode_fhd`,
+  `camera_hlg10_session_fhd`) and SPS bit-depth parsing for Annex B,
+  length-prefixed and hvcC records.
+- Lens roles (`default`/`ultrawide`/`tele`/`macro`), role basis/confidence,
+  intrinsic zoom ratio and 35 mm equivalents.
+- Hidden-camera scan with `exposed`/`openable`, and OEM auxiliary-camera policy
+  (`camera_aux`).
+- Encoder limits/HDR/P010, per-device audio inputs, gyro, RAW sizes, max frame
+  duration and lens pose/intrinsics.
+
+### Fixed
+- Pad 3 front/back 10-bit configuration no longer fails the session; the mode
+  falls back only where the target lens is not verified.
+- Preview/recording framing now match; 4:3 no longer stretches.
+
+## Earlier phases (0–4)
+- Phase 0: identity, licence, module graph, probe schema.
+- Phase 1: capability prober with claimed-vs-verified verdicts.
+- Phase 2: Camera2 preview, manual ISO/shutter/focus/WB, P/S/M exposure.
+- Phase 3: 8-bit HEVC + AAC recording, MediaStore, thermal guard.
+- Phase 4: SlateLog, profiles, GPU LUT, zebra, false colour, peaking,
+  histogram, waveform, framing guides.
+- Phase 5: shutter angle, gyro sidecar/alignment, concurrent-camera
+  verification, focus shift speed.
+- Phase 7: versioned device database, quirks, calibration loading, opt-in
+  reports.
+- UI: cockpit layout, tablet two-column deck, monitor rail.
+
+Detailed historical evidence is in [`docs/test-devices.md`](docs/test-devices.md).

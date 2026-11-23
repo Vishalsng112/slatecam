@@ -27,4 +27,5 @@ dependencies {
     implementation(project(":bridge"))
     implementation(project(":core:common"))
     implementation(project(":core:probe"))
+    implementation(project(":core:device"))
 }

@@ -2,8 +2,11 @@ package io.github.vishalsng112.slatecam.core.probe.source
 
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
+import io.github.vishalsng112.slatecam.core.probe.eval.PresetCatalog
 import io.github.vishalsng112.slatecam.core.probe.model.EncoderInfo
 import io.github.vishalsng112.slatecam.core.probe.model.EncoderProfile
+import io.github.vishalsng112.slatecam.core.probe.model.EncoderSizeLimit
+import io.github.vishalsng112.slatecam.core.probe.model.IntRange
 
 class EncoderSource {
 
@@ -37,6 +40,43 @@ class EncoderSource {
             )
         }
         val main10 = profiles.any { it.profile.startsWith("main10") }
+        val video = runCatching { caps.videoCapabilities }.getOrNull()
+        val bitrateRange = runCatching { video?.bitrateRange }.getOrNull()?.let {
+            IntRange(it.lower, it.upper)
+        }
+        val widthRange = runCatching { video?.supportedWidths }.getOrNull()?.let {
+            IntRange(it.lower, it.upper)
+        }
+        val heightRange = runCatching { video?.supportedHeights }.getOrNull()?.let {
+            IntRange(it.lower, it.upper)
+        }
+        val widthAlignment = runCatching { video?.widthAlignment }.getOrNull() ?: 1
+        val heightAlignment = runCatching { video?.heightAlignment }.getOrNull() ?: 1
+        val sizeLimits = PresetCatalog.v1
+            .map { it.width to it.height }
+            .distinct()
+            .mapNotNull { (width, height) ->
+                // VideoCapabilities.isSizeSupported() is not trustworthy on some
+                // vendor encoders (MediaTek returned false for 1920x1080 while
+                // surface recording there works). The ranges plus alignment are
+                // the platform's own definition; report those and derive support.
+                val inRange = widthRange != null && heightRange != null &&
+                    width >= widthRange.min && width <= widthRange.max &&
+                    height >= heightRange.min && height <= heightRange.max
+                if (!inRange) return@mapNotNull null
+                val aligned = (widthAlignment <= 1 || width % widthAlignment == 0) &&
+                    (heightAlignment <= 1 || height % heightAlignment == 0)
+                val maxFps = runCatching {
+                    video?.getSupportedFrameRatesFor(width, height)?.upper
+                }.getOrNull()
+                EncoderSizeLimit(
+                    width = width,
+                    height = height,
+                    maxFps = maxFps,
+                    aligned = aligned,
+                )
+            }
+
         return EncoderInfo(
             mime = mime,
             name = info.name,
@@ -50,6 +90,18 @@ class EncoderSource {
             main10Claimed = main10,
             main10Verified = "not_run",
             maxInstances = caps.maxSupportedInstances,
+            hdrEditing = runCatching {
+                caps.isFeatureSupported(MediaCodecInfo.CodecCapabilities.FEATURE_HdrEditing)
+            }.getOrNull(),
+            p010Input = caps.colorFormats.contains(
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUVP010,
+            ),
+            bitrateRange = bitrateRange,
+            widthRange = widthRange,
+            heightRange = heightRange,
+            widthAlignment = widthAlignment,
+            heightAlignment = heightAlignment,
+            sizeLimits = sizeLimits,
         )
     }
 

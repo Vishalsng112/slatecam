@@ -1,10 +1,68 @@
 import 'package:pigeon/pigeon.dart';
 
+/// One selectable lens, derived from the probe report rather than a model list.
+class LensOption {
+  LensOption({
+    required this.id,
+    required this.label,
+    required this.role,
+    required this.facing,
+    required this.zoomRatio,
+    required this.focalLength35mm,
+    required this.openable,
+    required this.exposed,
+  });
+
+  /// Camera2 ID; may be absent from cameraIdList on vendor-hidden lenses.
+  String id;
+  /// Short UI label, e.g. `0.6x - 16mm`, `1x - 25mm`, `MACRO`.
+  String label;
+  /// default | ultrawide | tele | macro
+  String role;
+  String facing;
+  /// Zoom relative to the assessed default lens; < 1 is wider, > 1 narrower.
+  double zoomRatio;
+  /// 35 mm-equivalent focal length; 0 when unknown.
+  double focalLength35mm;
+  /// True when this lens was opened successfully by the prober.
+  bool openable;
+  /// True when the ID appears in CameraManager.cameraIdList.
+  bool exposed;
+}
+
+/// One recording mode offered by the selected camera.
+class RecordingMode {
+  RecordingMode({
+    required this.id,
+    required this.label,
+    required this.width,
+    required this.height,
+    required this.fps,
+    required this.tenBit,
+    required this.enabled,
+    required this.reason,
+  });
+
+  String id;
+  String label;
+  int width;
+  int height;
+  int fps;
+  /// True when the mode records 10-bit HLG.
+  bool tenBit;
+  bool enabled;
+  /// Why the mode is disabled; empty when enabled.
+  String reason;
+}
+
 /// Immutable camera snapshot. Kotlin owns this state; Dart only renders it.
 class CameraState {
   CameraState({
     required this.isOpen,
     required this.error,
+    required this.cameraId,
+    required this.cameraIds,
+    required this.cameraLabels,
     required this.iso,
     required this.isoMin,
     required this.isoMax,
@@ -19,9 +77,20 @@ class CameraState {
     required this.whiteBalanceModes,
     required this.autoExposure,
     required this.autoFocus,
+    required this.autoFocusSupported,
     required this.previewWidth,
     required this.previewHeight,
     required this.previewRotationDegrees,
+    required this.zoomRatio,
+    required this.zoomMin,
+    required this.zoomMax,
+    required this.lenses,
+    required this.recordingMode,
+    required this.recordingModes,
+    required this.shootMode,
+    required this.tenBit,
+    required this.hlgAvailable,
+    required this.hlgReason,
     required this.isRecording,
     required this.recordingSeconds,
     required this.clipPath,
@@ -42,6 +111,17 @@ class CameraState {
     required this.noiseReductionModes,
     required this.antibanding,
     required this.antibandingModes,
+    required this.exposureMode,
+    required this.exposureModes,
+    required this.deviceKey,
+    required this.deviceQuirks,
+    required this.deviceCalibrationActive,
+    required this.deviceCalibrationSource,
+    required this.deviceDatabaseVersion,
+    required this.deviceReportOptIn,
+    required this.deviceReportRunning,
+    required this.deviceReportPath,
+    required this.deviceReportError,
     required this.histogram,
     required this.waveform,
     required this.waveformColumns,
@@ -50,6 +130,9 @@ class CameraState {
 
   bool isOpen;
   String? error;
+  String cameraId;
+  List<String> cameraIds;
+  List<String> cameraLabels;
   int iso;
   int isoMin;
   int isoMax;
@@ -64,9 +147,27 @@ class CameraState {
   List<String> whiteBalanceModes;
   bool autoExposure;
   bool autoFocus;
+  bool autoFocusSupported;
   int previewWidth;
   int previewHeight;
   int previewRotationDegrees;
+  /// Current optical/digital zoom ratio applied to the active camera.
+  double zoomRatio;
+  double zoomMin;
+  double zoomMax;
+  /// Lenses offered by the probe for this device, back lenses only.
+  List<LensOption> lenses;
+  /// Selected recording-mode id.
+  String recordingMode;
+  /// Modes available for the active camera.
+  List<RecordingMode> recordingModes;
+  /// single | movie — movie uses the common mode of all selected lenses.
+  String shootMode;
+  /// True while the camera session or the clip in flight really carries HLG10.
+  bool tenBit;
+  /// Probe verdict for this camera, size and frame rate.
+  bool hlgAvailable;
+  String hlgReason;
   bool isRecording;
   int recordingSeconds;
   String? clipPath;
@@ -87,6 +188,17 @@ class CameraState {
   List<String> noiseReductionModes;
   String antibanding;
   List<String> antibandingModes;
+  String exposureMode;
+  List<String> exposureModes;
+  String deviceKey;
+  List<String> deviceQuirks;
+  bool deviceCalibrationActive;
+  String? deviceCalibrationSource;
+  int deviceDatabaseVersion;
+  bool deviceReportOptIn;
+  bool deviceReportRunning;
+  String? deviceReportPath;
+  String? deviceReportError;
   List<int> histogram;
   List<int> waveform;
   int waveformColumns;
@@ -115,6 +227,25 @@ abstract class SlateCamHostApi {
 
   void setAutoExposure();
 
+  /// Selects the exposure mode: P (HAL AE), S (fixed shutter, auto ISO), or M.
+  void setExposureMode(String mode);
+
+  /// Switches to another CameraManager camera ID.
+  void setCameraId(String id);
+
+  /// Selects a lens from the probe report. Hidden lenses are allowed when the
+  /// probe marked them openable.
+  void selectLens(String id);
+
+  /// Applies a zoom ratio to the active camera (optical or digital).
+  void setZoom(double ratio);
+
+  /// Switches recording mode: size, frame rate and bit depth.
+  void selectRecordingMode(String id);
+
+  /// Selects single-camera or movie/vlog multi-camera mode.
+  void setShootMode(String mode);
+
   void setAutoFocus();
 
   void startRecording();
@@ -134,6 +265,15 @@ abstract class SlateCamHostApi {
   void setNoiseReduction(String mode);
 
   void setAntibanding(String mode);
+
+  /// Opt-in for persisted device reports. Off by default.
+  void setDeviceReportOptIn(bool enabled);
+
+  /// Runs the prober on a background thread, closing preview first.
+  void runDeviceReport();
+
+  /// Reloads the bundled + user device database and reapplies calibration/quirks.
+  void reloadDeviceDatabase();
 
   void reloadLuts();
 

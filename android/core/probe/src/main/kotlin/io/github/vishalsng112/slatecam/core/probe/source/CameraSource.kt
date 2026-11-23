@@ -3,15 +3,19 @@ package io.github.vishalsng112.slatecam.core.probe.source
 import android.content.Context
 import android.graphics.ImageFormat
 import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.params.DynamicRangeProfiles
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.Range
+import io.github.vishalsng112.slatecam.core.probe.eval.CameraRoles
 import io.github.vishalsng112.slatecam.core.probe.eval.HighSpeedEntry
-import io.github.vishalsng112.slatecam.core.probe.eval.LensRoles
 import io.github.vishalsng112.slatecam.core.probe.eval.PresetCatalog
 import io.github.vishalsng112.slatecam.core.probe.eval.PresetEvaluator
 import io.github.vishalsng112.slatecam.core.probe.eval.StreamEntry
 import io.github.vishalsng112.slatecam.core.probe.eval.StreamFormat
+import io.github.vishalsng112.slatecam.core.probe.model.CameraAuxInfo
 import io.github.vishalsng112.slatecam.core.probe.model.CameraInfo
 import io.github.vishalsng112.slatecam.core.probe.model.ControlsInfo
 import io.github.vishalsng112.slatecam.core.probe.model.DynamicRangeInfo
@@ -23,8 +27,7 @@ import io.github.vishalsng112.slatecam.core.probe.model.MaxRegions
 import io.github.vishalsng112.slatecam.core.probe.model.PhysicalCameraInfo
 import io.github.vishalsng112.slatecam.core.probe.model.SensorInfo
 import io.github.vishalsng112.slatecam.core.probe.model.ZoomInfo
-import kotlin.math.PI
-import kotlin.math.atan
+import kotlin.math.hypot
 
 class CameraSource(private val context: Context) {
 
@@ -44,20 +47,66 @@ class CameraSource(private val context: Context) {
             emptySet<Set<String>>()
         }
 
-        return ids.mapNotNull { id ->
+        val exposed = ids.mapNotNull { id ->
             try {
-                readCamera(manager, id, concurrentSets)
+                readCamera(manager, id, concurrentSets, exposed = true)
             } catch (t: Throwable) {
                 warnings += "camera $id probe failed: ${t.javaClass.simpleName}: ${t.message}"
                 null
             }
         }
+        val unlisted = readUnlistedCameras(manager, ids.toSet(), concurrentSets, warnings)
+        return assignRoles(exposed + unlisted)
+    }
+
+    /**
+     * Reads the OEM auxiliary-camera policy. Android has no standard way to see
+     * sensors hidden from `cameraIdList`; most vendors gate them with a system
+     * property instead. Reporting the policy explains why a three-lens phone can
+     * expose only one back camera to this package.
+     */
+    fun auxInfo(): CameraAuxInfo? {
+        val allowKey = "vendor.camera.aux.packagelist"
+        val allowlist = systemProperty(allowKey)
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.distinct()
+
+        val expose = listOf("camera.expose_aux", "persist.vendor.camera.expose_aux")
+            .firstNotNullOfOrNull { key -> systemProperty(key)?.let { key to it } }
+
+        if (allowlist.isNullOrEmpty() && expose == null) return null
+        return CameraAuxInfo(
+            allowlistProperty = allowKey.takeIf { !allowlist.isNullOrEmpty() },
+            allowlistedPackages = allowlist ?: emptyList(),
+            thisAppAllowlisted = allowlist?.let { context.packageName in it },
+            exposeAuxProperty = expose?.first,
+            exposeAuxValue = expose?.second,
+        )
+    }
+
+    private fun systemProperty(key: String): String? {
+        val reflected = runCatching {
+            Class.forName("android.os.SystemProperties")
+                .getMethod("get", String::class.java)
+                .invoke(null, key) as? String
+        }.getOrNull()
+        if (!reflected.isNullOrBlank()) return reflected
+
+        return runCatching {
+            val process = ProcessBuilder("getprop", key).start()
+            process.inputStream.bufferedReader().use { it.readText() }
+                .trim()
+                .takeIf { it.isNotEmpty() }
+        }.getOrNull()
     }
 
     private fun readCamera(
         manager: CameraManager,
         id: String,
         concurrentSets: Set<Set<String>>,
+        exposed: Boolean,
     ): CameraInfo {
         val c = manager.getCameraCharacteristics(id)
 
@@ -124,9 +173,24 @@ class CameraSource(private val context: Context) {
                 profiles = if (tenBit) listOf("hlg10") else emptyList(),
                 recommendedProfile = if (tenBit) recommendedTenBitProfile(c) else null,
             ),
+            rawSizes = rawSizes(map),
+            lensPoseTranslation = c.get(CameraCharacteristics.LENS_POSE_TRANSLATION)?.toList(),
+            lensPoseRotation = c.get(CameraCharacteristics.LENS_POSE_ROTATION)?.toList(),
+            lensIntrinsics = c.get(CameraCharacteristics.LENS_INTRINSIC_CALIBRATION)?.toList(),
             presets = presets,
+            exposed = exposed,
         )
     }
+
+    private fun rawSizes(
+        map: android.hardware.camera2.params.StreamConfigurationMap?,
+    ): List<String> = runCatching {
+        map?.getOutputSizes(ImageFormat.RAW_SENSOR)
+            ?.map { "${it.width}x${it.height}" }
+            ?.distinct()
+            ?.sorted()
+            ?: emptyList()
+    }.getOrDefault(emptyList())
 
     /**
      * Reads whatever characteristics the platform exposes for physical sub-cameras
@@ -143,11 +207,17 @@ class CameraSource(private val context: Context) {
                     ?.toList() ?: emptyList()
                 val size = pc.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
                 val array = pc.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
-                val fov = if (size != null && focal.isNotEmpty()) {
-                    (2.0 * atan((size.width / 2.0) / focal[0]) * 180.0 / PI).toFloat()
-                } else {
-                    null
-                }
+                val width = size?.width?.toDouble()
+                val height = size?.height?.toDouble()
+                val fov = CameraRoles.horizontalFovDegrees(
+                    focal.firstOrNull()?.toDouble(),
+                    width,
+                )
+                val focal35mm = CameraRoles.focalLength35mmEquivalent(
+                    focal.firstOrNull()?.toDouble(),
+                    width,
+                    height,
+                )
                 PhysicalCameraInfo(
                     id = id,
                     facing = facingName(pc.get(CameraCharacteristics.LENS_FACING)),
@@ -157,12 +227,198 @@ class CameraSource(private val context: Context) {
                     focalLengthsMm = focal,
                     sensorSizeMm = size?.let { listOf(it.width, it.height) } ?: emptyList(),
                     pixelArray = array?.let { listOf(it.width, it.height) } ?: emptyList(),
-                    horizontalFovDeg = fov,
+                    horizontalFovDeg = fov?.toFloat(),
+                    focalLength35mmEquiv = focal35mm,
                 )
             }
         }
-        val roles = LensRoles.classify(partial.map { it.horizontalFovDeg?.toDouble() })
-        return partial.mapIndexed { index, info -> info.copy(lensRole = roles.getOrNull(index)) }
+        val roles = CameraRoles.classify(
+            partial.map { info ->
+                CameraRoles.Candidate(
+                    id = info.id,
+                    facing = info.facing ?: "unknown",
+                    hfovDeg = info.horizontalFovDeg?.toDouble(),
+                    score = physicalScore(info),
+                )
+            },
+        )
+        return partial.map { info ->
+            val role = roles[info.id]
+            info.copy(
+                role = role?.role ?: "unknown",
+                roleBasis = role?.basis ?: "no_optical_data",
+                roleConfidence = role?.confidence ?: "low",
+                intrinsicZoomRatio = role?.intrinsicZoomRatio,
+                lensRole = when (role?.role) {
+                    "default" -> "wide"
+                    "ultrawide" -> "ultrawide"
+                    "tele" -> "tele"
+                    "macro" -> "macro"
+                    else -> null
+                },
+            )
+        }
+    }
+
+    /**
+     * Some ROMs let an app read characteristics for camera IDs that are not in
+     * `cameraIdList`. This is not a public guarantee, so the scan is capped and
+     * every result is marked `exposed = false`.
+     */
+    private fun readUnlistedCameras(
+        manager: CameraManager,
+        listed: Set<String>,
+        concurrentSets: Set<Set<String>>,
+        warnings: MutableList<String>,
+    ): List<CameraInfo> {
+        if (context.checkSelfPermission(android.Manifest.permission.CAMERA) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return emptyList()
+        }
+        val found = mutableListOf<CameraInfo>()
+        for (index in 0..MAX_SCAN_CAMERA_ID) {
+            val id = index.toString()
+            if (id in listed) continue
+            runCatching { manager.getCameraCharacteristics(id) }.getOrNull() ?: continue
+            val camera = runCatching {
+                readCamera(manager, id, concurrentSets, exposed = false)
+            }.getOrNull() ?: continue
+            val openable = canOpen(manager, id)
+            // A hidden camera is a discovery result, not a recording proposal:
+            // keep identity, optics, roles and openability, but leave the full
+            // preset/control tables out of the summary. They can be probed on
+            // demand if the user selects the lens.
+            found += camera.copy(
+                openable = openable,
+                presets = emptyMap(),
+                controls = null,
+            )
+            warnings += if (openable) {
+                "camera $id is readable but not listed by cameraIdList (vendor-hidden, openable)"
+            } else {
+                "camera $id is readable but not openable by this package (vendor-hidden)"
+            }
+        }
+        return found
+    }
+
+    /**
+     * Best-effort open/close test for an unlisted ID. This is the only way to
+     * know whether a vendor-hidden lens is usable, as opposed to merely
+     * readable.
+     */
+    private fun canOpen(manager: CameraManager, id: String): Boolean {
+        if (context.checkSelfPermission(android.Manifest.permission.CAMERA) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
+        val thread = HandlerThread("probe-open-$id").apply { start() }
+        val handler = Handler(thread.looper)
+        val executor = java.util.concurrent.Executor { handler.post(it) }
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var opened = false
+        var device: CameraDevice? = null
+
+        val callback = object : CameraDevice.StateCallback() {
+            override fun onOpened(camera: CameraDevice) {
+                opened = true
+                device = camera
+                latch.countDown()
+            }
+
+            override fun onDisconnected(camera: CameraDevice) {
+                device = camera
+                latch.countDown()
+            }
+
+            override fun onError(camera: CameraDevice, error: Int) {
+                device = camera
+                latch.countDown()
+            }
+        }
+
+        runCatching { manager.openCamera(id, executor, callback) }
+            .onFailure { latch.countDown() }
+        latch.await(2, java.util.concurrent.TimeUnit.SECONDS)
+        runCatching { device?.close() }
+        // device.close() dispatches onClosed on this executor.
+        handler.postDelayed({ thread.quitSafely() }, 500)
+        return opened
+    }
+
+    private fun assignRoles(cameras: List<CameraInfo>): List<CameraInfo> {
+        val candidates = cameras.map { camera ->
+            val focal = camera.lenses.firstOrNull()?.focalLengthMm?.toDouble()
+            val width = camera.sensor?.physicalSizeMm?.getOrNull(0)?.toDouble()
+            CameraRoles.Candidate(
+                id = camera.id,
+                facing = camera.facing,
+                hfovDeg = CameraRoles.horizontalFovDegrees(focal, width),
+                score = cameraScore(camera),
+                exposed = camera.exposed,
+                fixedFocus = (camera.lenses.firstOrNull()?.minFocusDistanceDiopters ?: 0f) <= 0f,
+                pixelCount = cameraPixelCount(camera),
+            )
+        }
+        val roles = CameraRoles.classify(candidates)
+
+        return cameras.map { camera ->
+            val role = roles[camera.id]
+            val width = camera.sensor?.physicalSizeMm?.getOrNull(0)?.toDouble()
+            val height = camera.sensor?.physicalSizeMm?.getOrNull(1)?.toDouble()
+            val lenses = camera.lenses.map { lens ->
+                lens.copy(
+                    focalLength35mmEquiv = CameraRoles.focalLength35mmEquivalent(
+                        lens.focalLengthMm.toDouble(),
+                        width,
+                        height,
+                    ),
+                )
+            }
+            camera.copy(
+                role = role?.role ?: "unknown",
+                roleBasis = role?.basis ?: "no_optical_data",
+                roleConfidence = role?.confidence ?: "low",
+                intrinsicZoomRatio = role?.intrinsicZoomRatio,
+                focalLength35mmEquiv = lenses.firstOrNull()?.focalLength35mmEquiv,
+                lenses = lenses,
+            )
+        }
+    }
+
+    private fun cameraScore(camera: CameraInfo): Int {
+        val pixels = cameraPixelCount(camera)
+        val level = when (camera.hardwareLevel) {
+            "level_3", "full" -> 2
+            "limited" -> 1
+            else -> 0
+        }
+        val raw = if ("raw" in camera.capabilities) 1 else 0
+        val tenBit = if (camera.dynamicRange.tenBitStreams) 1 else 0
+        return level * 10_000_000 +
+            (raw + tenBit) * 1_000_000 +
+            (pixels / 100_000).toInt()
+    }
+
+    private fun cameraPixelCount(camera: CameraInfo): Long =
+        camera.sensor?.pixelArray
+            ?.takeIf { it.size == 2 }
+            ?.let { it[0].toLong() * it[1].toLong() }
+            ?: 0L
+
+    private fun physicalScore(camera: PhysicalCameraInfo): Int {
+        val pixels = camera.pixelArray
+            .takeIf { it.size == 2 }
+            ?.let { it[0].toLong() * it[1] }
+            ?: 0L
+        val level = when (camera.hardwareLevel) {
+            "level_3", "full" -> 2
+            "limited" -> 1
+            else -> 0
+        }
+        return level * 10_000_000 + (pixels / 100_000).toInt()
     }
 
     private fun readSensor(c: CameraCharacteristics): SensorInfo? {
@@ -190,6 +446,7 @@ class CameraSource(private val context: Context) {
             ),
             isoRange = iso?.let { listOf(it.lower, it.upper) } ?: emptyList(),
             exposureTimeRangeNs = exposure?.let { listOf(it.lower, it.upper) } ?: emptyList(),
+            maxFrameDurationNs = c.get(CameraCharacteristics.SENSOR_INFO_MAX_FRAME_DURATION),
             blackLevel = blackLevel,
             whiteLevel = whiteLevel,
         )
@@ -463,6 +720,9 @@ class CameraSource(private val context: Context) {
     }.getOrNull()
 
     private companion object {
+        /** Numeric IDs above the last listed camera are worth a read attempt. */
+        const val MAX_SCAN_CAMERA_ID = 7
+
         val CAPABILITY_NAMES: Map<Int, String> = mapOf(
             CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE
                 to "backward_compatible",

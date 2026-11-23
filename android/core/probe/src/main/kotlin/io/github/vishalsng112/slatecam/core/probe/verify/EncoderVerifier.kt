@@ -35,15 +35,30 @@ class EncoderVerifier {
         val height: Int = 0,
     )
 
-    fun verifyHevcMain10(): Outcome {
+    /**
+     * Verifies a real Main10 encode at one size. Every hardware HEVC encoder is
+     * tried, because two encoders on the same device can disagree.
+     *
+     * A verdict covers exactly this size: the prober runs this once per size the
+     * app records, so an UHD pass never promotes an FHD preset.
+     */
+    fun verifyHevcMain10(
+        width: Int,
+        height: Int,
+        checkId: String = CHECK_ID,
+    ): Outcome {
         val started = System.currentTimeMillis()
 
         val candidates = runCatching {
             MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos
                 .filter { it.isEncoder && "video/hevc" in it.supportedTypes && it.isHardwareAccelerated }
-        }.getOrElse { return Outcome(failure("encoder enumeration failed: ${it.message}", started), null) }
+        }.getOrElse {
+            return Outcome(failure("encoder enumeration failed: ${it.message}", started, checkId), null)
+        }
 
-        if (candidates.isEmpty()) return Outcome(failure("no hardware HEVC encoder", started), null)
+        if (candidates.isEmpty()) {
+            return Outcome(failure("no hardware HEVC encoder", started, checkId), null)
+        }
 
         for (info in candidates) {
             val formats = runCatching {
@@ -55,37 +70,33 @@ class EncoderVerifier {
 
         val errors = mutableListOf<String>()
         val deadline = started + OVERALL_TIMEOUT_MS
-        // Largest first: verifying UHD is the answer that matters. Falling back
-        // to FHD still proves the Main10 path, just at a smaller preset.
-        for ((width, height) in TEST_SIZES) {
-            for (name in codecNames) {
-                if (System.currentTimeMillis() > deadline) {
-                    errors += "verification time limit reached"
-                    return Outcome(failure(errors.joinToString(" | "), started), null)
-                }
-                val attempt = runCatching { encode(name, width, height) }
-                attempt.onSuccess { detail ->
-                    return Outcome(
-                        check = VerificationCheck(
-                            id = CHECK_ID,
-                            status = "pass",
-                            detail = detail,
-                            durationMs = System.currentTimeMillis() - started,
-                            width = width,
-                            height = height,
-                        ),
-                        passingCodec = name,
+        for (name in codecNames) {
+            if (System.currentTimeMillis() > deadline) {
+                errors += "verification time limit reached"
+                return Outcome(failure(errors.joinToString(" | "), started, checkId), null)
+            }
+            val attempt = runCatching { encode(name, width, height) }
+            attempt.onSuccess { detail ->
+                return Outcome(
+                    check = VerificationCheck(
+                        id = checkId,
+                        status = "pass",
+                        detail = "$width x $height: $detail",
+                        durationMs = System.currentTimeMillis() - started,
                         width = width,
                         height = height,
-                    )
-                }
-                attempt.onFailure { error ->
-                    errors += "${width}x$height/$name: " +
-                        (error.message ?: error.javaClass.simpleName)
-                }
+                    ),
+                    passingCodec = name,
+                    width = width,
+                    height = height,
+                )
+            }
+            attempt.onFailure { error ->
+                errors += "${width}x$height/$name: " +
+                    (error.message ?: error.javaClass.simpleName)
             }
         }
-        return Outcome(failure(errors.joinToString(" | "), started), null)
+        return Outcome(failure(errors.joinToString(" | "), started, checkId), null)
     }
 
     private fun encode(codecName: String, width: Int, height: Int): String {
@@ -133,7 +144,7 @@ class EncoderVerifier {
             var frames = 0
             var profile = -1
             var transfer = -1
-            var realProfile: Int? = null
+            var sps: HevcSps.SpsInfo? = null
             val deadline = System.currentTimeMillis() + DRAIN_TIMEOUT_MS
 
             while (System.currentTimeMillis() < deadline) {
@@ -143,11 +154,11 @@ class EncoderVerifier {
                         val output = codec.outputFormat
                         profile = output.getInteger(MediaFormat.KEY_PROFILE, -1)
                         transfer = output.getInteger(MediaFormat.KEY_COLOR_TRANSFER, -1)
-                        realProfile = runCatching {
+                        sps = runCatching {
                             output.getByteBuffer("csd-0")?.let { buffer ->
                                 val bytes = ByteArray(buffer.remaining())
                                 buffer.get(bytes)
-                                HevcSps.profileIdc(bytes)
+                                HevcSps.parse(bytes)
                             }
                         }.getOrNull()
                     }
@@ -166,8 +177,10 @@ class EncoderVerifier {
             }
 
             check(frames > 0 && bytes > 0L) { "no output frames (bytes=$bytes)" }
-            check(realProfile == HevcSps.PROFILE_MAIN10) {
-                "encoded bitstream is profile_idc=$realProfile, not Main10 " +
+            check(sps != null) { "no SPS in csd-0, cannot verify the bitstream" }
+            check(sps.profileIdc == HevcSps.PROFILE_MAIN10 && sps.isTenBit) {
+                "encoded bitstream is profile_idc=${sps.profileIdc} " +
+                    "bit_depth=${sps.bitDepthLuma}, not Main10 " +
                     "(codec header claimed profile=$profile)"
             }
 
@@ -175,7 +188,9 @@ class EncoderVerifier {
                 append("$codecName: $frames frames, $bytes bytes")
                 if (profile >= 0) append(", profile=$profile")
                 if (transfer >= 0) append(", transfer=$transfer")
-                append(", sps_profile=$realProfile")
+                append(", sps_profile=${sps.profileIdc}")
+                append(", sps_bit_depth=${sps.bitDepthLuma}")
+                append(", sps_chroma=${sps.chromaFormatIdc}")
             }
         } finally {
             runCatching { window?.close() }
@@ -184,8 +199,8 @@ class EncoderVerifier {
         }
     }
 
-    private fun failure(detail: String, started: Long) = VerificationCheck(
-        id = CHECK_ID,
+    private fun failure(detail: String, started: Long, checkId: String) = VerificationCheck(
+        id = checkId,
         status = "fail",
         detail = detail,
         durationMs = System.currentTimeMillis() - started,
@@ -266,8 +281,6 @@ class EncoderVerifier {
         const val FRAME_COUNT = 10
         const val DRAIN_TIMEOUT_MS = 15_000L
         const val OVERALL_TIMEOUT_MS = 60_000L
-
-        val TEST_SIZES = listOf(3840 to 2160, 1920 to 1080, 1280 to 720)
 
         // Not exposed by android.opengl.EGL14.
         const val EGL_GL_COLORSPACE_KHR = 0x309D

@@ -36,6 +36,10 @@ can request verification from the device report screen.
 3. If the device needs a workaround, a quirk entry is added.
 4. The entry ships in the next device table update.
 
+The implemented database format, matching rules, calibration workflow and
+opt-in report paths are documented in
+[device-database.md](device-database.md).
+
 ## Quirk entries
 
 Quirks are narrow, evidence-backed overrides. Each entry records:

@@ -1,31 +1,27 @@
 package io.github.vishalsng112.slatecam.feature.devicereport
 
 import android.content.Context
-import io.github.vishalsng112.slatecam.core.probe.ProbeRunner
+import io.github.vishalsng112.slatecam.core.device.DeviceDatabaseRepository
+import io.github.vishalsng112.slatecam.core.device.DeviceReportResult
 import java.io.File
 
 /**
- * Phase 1 entry point: run the probe and persist the JSON so it can be pulled
- * from the device. The interactive Flutter surface arrives with Pigeon in
- * Phase 2; this service is what the bridge will eventually call.
+ * Device-report entry point used by the app shell and the bridge.
+ *
+ * The repository owns opt-in state, report archiving and the device database;
+ * this service only exposes the two launch paths.
  */
 class DeviceReportService(private val context: Context) {
 
-    fun runAndPersist(): File {
-        val json = ProbeRunner(context.applicationContext).runJson()
-        val internal = File(context.filesDir, FILE_NAME)
-        internal.writeText(json)
+    private val repository = DeviceDatabaseRepository(context.applicationContext)
 
-        // Convenience copy for adb pull on builds where that path is reachable.
-        runCatching {
-            val externalDir = context.getExternalFilesDir(null) ?: return@runCatching
-            File(externalDir, FILE_NAME).writeText(json)
-        }
+    /** Debug path used by the `run_probe` launch extra; bypasses opt-in. */
+    fun runAndPersist(): File = repository.runReport(requireOptIn = false).latest
 
-        return internal
-    }
+    /** User path: requires the opt-in preference and archives the summary. */
+    fun runOptedInReport(): DeviceReportResult = repository.runReport(requireOptIn = true)
 
     companion object {
-        const val FILE_NAME = "probe.json"
+        const val FILE_NAME = DeviceDatabaseRepository.LATEST_REPORT_NAME
     }
 }

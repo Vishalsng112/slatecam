@@ -14,15 +14,17 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 5 — advanced features (in progress).**
-> Shutter angle is implemented from the exposure/fps relationship and shown
-> live (20 ms at 30 fps reads 216°). Gyro samples are captured during recording
-> with realtime timestamps and written to a sidecar. Frame alignment and
-> container embedding remain, as do RAW burst and dual camera.
->
-> Phases 0–4 are complete: preview, manual and capture controls, 8-bit SDR
-> recording via MediaStore, profiles, LUTs, and monitoring tools. HLG remains
-> gated because this device's encoder claims Main10 while emitting 8-bit Main.
+> **Status: Phase 3 complete on both test devices. Phase 5.5 shoot-profile
+> foundation is complete on Pad 3 and POCO; remaining work is per-lens
+> 10-bit/4:3 verification, shoot-set editing and colour matrices.**
+> Phases 0–4 are complete: preview, manual and P/S/M exposure, 8-bit SDR and
+> **10-bit HLG** recording via MediaStore, recording modes (16:9/4:3,
+> 24/30 fps), profiles, LUTs, and monitoring tools. Phase 5 adds shutter angle,
+> gyro sidecars, and concurrent-camera verification. Phase 6 is an AI contract
+> only; no LiteRT engine ships yet. Phase 7 adds the versioned device database,
+> quirks, calibration loading and opt-in reports. HLG is enabled by the probe
+> and verified from the encoded SPS; the POCO stays 8-bit because its SPS says
+> Main/8-bit.
 
 ---
 
@@ -80,49 +82,52 @@ listed as unsupported. See [docs/compatibility.md](docs/compatibility.md).
 
 ## Architecture at a glance
 
-```
-Flutter (Dart)            Kotlin (single source of truth)
-  ├─ controls / menus  ←→  Pigeon commands
-  ├─ profile editor    ←   EventChannel state + telemetry
-  └─ device reports    ←   GPU texture preview (never pixel data)
-```
-
-Planned layout (monolithic modular, Flutter-first — the Gradle root is
-`android/`, not the repository root):
+Kotlin owns camera state and pixels; Flutter renders snapshots and sends
+commands. Camera frames go through one GL pipeline to preview, recorder and
+analysis; no pixels cross the Pigeon bridge.
 
 ```
-lib/                     Dart UI only
-android/app              Flutter host, wiring only
-android/bridge           Pigeon + EventChannel contracts
-android/core/common      units, timecode, Result, JSON helpers
-android/core/probe       capability prober + versioned schema
-android/core/camera      Camera2 sessions, state machine, quirks table
-android/core/gpu         EGL/GLES pipeline, shaders, 10-bit path
-android/core/codec       MediaCodec / MediaMuxer, audio
-android/core/profile     log curve, LUTs, color science (pure Kotlin)
-android/core/storage     MediaStore, free space, thermal guard
-android/feature/*        capture, playback, device reports
+Flutter UI  ──Pigeon commands──►  :bridge  ──►  :core:camera / :core:codec / :core:gpu
+     ▲                                  │
+     └────── CameraState (Pigeon) ◄─────┘
+
+Camera2 ─► SurfaceTexture ─► GlPreviewRenderer ─┬─► preview texture
+                                                 ├─► HEVC encoder surface
+                                                 └─► analysis FBO
 ```
 
-Dependencies point downward only (`app → feature → core`); a `checkModuleGraph`
-task fails the build otherwise. See
-[docs/adr/0003-modules.md](docs/adr/0003-modules.md).
+The full module map, runtime flows, contracts and “where to change what” table
+are in [`docs/codebase-map.md`](docs/codebase-map.md). Module boundaries are
+enforced by `checkModuleGraph`; see
+[`docs/adr/0003-modules.md`](docs/adr/0003-modules.md).
 
-## Roadmap
+Key modules:
 
-| Phase | Theme | Outcome |
-|---|---|---|
-| 0 | Foundation | Name, license, repo, layout, test phones |
-| 1 | Prober | Capability prober running on real devices; verified feature dictionary |
-| 2 | Camera core + preview | Camera2 session, Pigeon bridge, texture preview, manual ISO/shutter/focus/WB |
-| 3 | Recording | 8-bit then 10-bit HLG HEVC with audio, storage, thermal guard |
-| 4 | GPU + profiles | Log curve, LUTs, picture profiles, shader-based histogram/zebra/waveform |
-| 5 | Advanced | RAW burst, shutter angle, framing guides, gyro metadata, dual camera |
-| 6 | AI (optional) | LiteRT subject tracking and focus assist; optional local assistant |
-| 7 | Device database | Opt-in reports, device table, per-device quirk overrides |
-| 8 | Quality | Real-device stress tests, profiling, multi-version checks |
-| 9 | Release | Signed APKs, F-Droid, user docs, beta feedback |
-| 10 | Maintenance | Track new Android APIs, grow the device database |
+| Module | Role |
+|---|---|
+| `lib/src/ui` | capture screen, control deck, zoom plugin, overlays |
+| `:bridge` | Pigeon API and camera state mapping |
+| `:core:camera` | Camera2 controller, per-camera capabilities, recording modes |
+| `:core:gpu` | EGL/GLES renderer and colour/monitoring shader |
+| `:core:codec` | HEVC/AAC recorder, gyro recorder |
+| `:core:probe` | capability prober, verifiers, lens roles |
+| `:core:device` | device database, quirks, calibration, capability gates |
+| `:core:profile` | SlateLog, picture profiles, LUTs |
+| `:core:common` | pure helpers, HEVC SPS inspection |
+| `:core:ai` | AI contracts only |
+
+## Documentation
+
+- [`CHANGELOG.md`](CHANGELOG.md) — what shipped
+- [`docs/roadmap.md`](docs/roadmap.md) — phase order, scope, status
+- [`docs/backlog.md`](docs/backlog.md) — not-yet-shipped work
+- [`docs/codebase-map.md`](docs/codebase-map.md) — navigation and change guide
+- [`docs/test-devices.md`](docs/test-devices.md) — device evidence log
+- [`docs/compatibility.md`](docs/compatibility.md) — tiers and quirks policy
+- [`docs/device-database.md`](docs/device-database.md) — database and calibration
+- [`docs/probe-schema.md`](docs/probe-schema.md) — probe JSON contract
+- [`docs/ui-design.md`](docs/ui-design.md) — UI specification
+- [`docs/adr/`](docs/adr/) — architecture decisions
 
 ## Building
 

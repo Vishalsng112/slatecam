@@ -11,17 +11,20 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 | Area | Fields |
 |---|---|
 | Identity | `device_key`, manufacturer, brand, model, device, product, board, hardware, fingerprint, build id, Android release, SDK, security patch, SoC, ABIs, emulator flag, low-RAM flag |
-| System | thermal status, total RAM, free storage, native page size |
+| System | thermal status, total RAM, free storage, native page size, gyro availability and max rate |
 | Display | active refresh, max refresh, wide gamut, HDR types, peak luminance |
 | Camera identity | facing, hardware level, capabilities, logical multi-camera, physical IDs, concurrent IDs |
-| Sensor | pixel/active array, physical size, orientation, colour filter, timestamp source, ISO range, exposure range, black/white level |
-| Optics | focal lengths, apertures, min focus distance, hyperfocal, max digital zoom |
+| Sensor | pixel/active array, physical size, orientation, colour filter, timestamp source, ISO range, exposure range, max frame duration, black/white level |
+| Optics | focal lengths, apertures, min focus distance, hyperfocal, max digital zoom, lens pose, intrinsics |
+| Lens identity | relative role (`default`/`ultrawide`/`tele`/`macro`), role basis/confidence, intrinsic zoom ratio, 35 mm-equivalent focal length, exposed/openable, OEM aux policy |
+| RAW | output sizes |
 | Controls | available AE / AF / AWB / OIS / video-stabilisation modes |
 | Streams | output sizes for `PRIVATE` and `YUV_420_888` with min frame durations; high-speed sizes with max fps |
 | Presets | per-preset verdicts with reason codes, basis and verification status |
-| Encoders | mime, codec name, hardware/software/vendor, surface input, profiles and levels, Main10 claim, max instances |
-| Encoders (verified) | real Main10 + HLG encode, size, duration, output profile/transfer |
+| Encoders | mime, codec name, hardware/software/vendor, surface input, P010 input, HDR editing, profiles and levels, Main10 claim, bitrate range, per-size frame-rate ceilings, max instances |
+| Encoders (verified) | real 10-bit Main10 SPS (profile + bit depth) obtained from the encoded `csd-0` |
 | Audio (output path) | 48/44.1 kHz, stereo, 24-bit PCM acceptance, low-latency hint |
+| Audio (input path) | input device classes, per-device sample rates and channel counts, unprocessed-source support |
 | Tier | `cinema` / `cinema_claimed` / `standard` / `basic` / `unsupported` with reasons |
 
 ## Missing for Phase 2 — camera session and controls
@@ -45,11 +48,11 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 
 | Requirement | Source | Why it matters |
 |---|---|---|
-| ⬜ Encoder size/fps/bitrate limits | `VideoCapabilities` | Knowing a codec exists is not knowing it does 4K60 at 100 Mbps |
-| ⬜ HDR encode feature | `FEATURE_HdrEditing` / codec features | Main10 support is necessary, not sufficient |
-| ⬜ P010 buffer input | `CodecCapabilities.colorFormats` | Surface input is covered; buffer input is not |
-| ⬜ Input audio devices | `AudioManager.getDevices(INPUTS)` | USB mics and headsets are the point of a cinema app |
-| ⬜ Per-device audio rates/channels | `AudioDeviceInfo` | A mic that only does 44.1 kHz mono changes the UI |
+| ✅ Encoder size/fps/bitrate limits (1.8.0) | `VideoCapabilities` | Knowing a codec exists is not knowing it does 4K60 at 100 Mbps |
+| ✅ HDR encode feature (1.8.0) | `FEATURE_HdrEditing` / codec features | Main10 support is necessary, not sufficient |
+| ✅ P010 buffer input (1.8.0) | `CodecCapabilities.colorFormats` | Surface input is covered; buffer input is not |
+| ✅ Input audio devices (1.8.0) | `AudioManager.getDevices(INPUTS)` | USB mics and headsets are the point of a cinema app |
+| ✅ Per-device audio rates/channels (1.8.0) | `AudioDeviceInfo` | A mic that only does 44.1 kHz mono changes the UI |
 | ⬜ Storage throughput | `StorageManager`, write benchmark | Bitrate planning and drop detection |
 | ⬜ Sustained performance mode | `Window` | Requires the app, not the prober |
 | 🕒 Thermal throttling curve | timed encode run | A snapshot says nothing about a 20-minute take |
@@ -58,10 +61,10 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 
 | Requirement | Source |
 |---|---|
-| ⬜ RAW output sizes | `getOutputSizes(ImageFormat.RAW_SENSOR)` |
-| ⬜ Max frame duration | `SENSOR_INFO_MAX_FRAME_DURATION` |
-| ⬜ Gyro availability and rate | `SensorManager`, `HIGH_SAMPLING_RATE_SENSORS` |
-| ⬜ Lens pose and intrinsics | `LENS_POSE_*`, `LENS_INTRINSIC_CALIBRATION` |
+| ✅ RAW output sizes (1.8.0) | `getOutputSizes(ImageFormat.RAW_SENSOR)` |
+| ✅ Max frame duration (1.8.0) | `SENSOR_INFO_MAX_FRAME_DURATION` |
+| ✅ Gyro availability and rate (1.8.0) | `SensorManager`, `Sensor.getMinDelay` |
+| ✅ Lens pose and intrinsics (1.8.0) | `LENS_POSE_*`, `LENS_INTRINSIC_CALIBRATION` |
 
 ## Verdict
 
@@ -70,11 +73,15 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 - **The Phase 2 control surface is covered as of 1.3.0.** FPS ranges, EV
   compensation, lock flags, focus/meter regions, zoom ratios, focus
   calibration, rotate-and-crop and stall durations are all reported.
-- **Phase 3 operational data is still partial.** Encoder size/fps/bitrate
-  limits, HDR encode features, audio input devices and storage throughput are
-  not yet collected.
+- **Phase 3 operational data is covered as of 1.8.0, except sustained
+  measurement.** Encoder size/fps/bitrate limits, HDR editing, P010 input,
+  audio inputs and per-device audio formats are reported. Storage throughput is
+  a benchmark and thermal behaviour is a time series; neither belongs in a
+  single-shot prober.
+- **Phase 5 metadata inputs are covered as of 1.8.0.** RAW sizes, max frame
+  duration, gyro rate, lens pose and intrinsics are reported.
 - **Some facts are only knowable by opening a session.** HLG10 configuration is
-  now proven by the `camera_hlg10_session` check. Concurrent stream
+  proven per size by the `camera_hlg10_session` checks. Concurrent stream
   combinations and long-take thermal behaviour still are not.
 
 Phases 2 and 3 each add their section above to the probe, and the

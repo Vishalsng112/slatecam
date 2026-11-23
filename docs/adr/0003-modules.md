@@ -42,7 +42,9 @@ slatecam/
 │  │  ├─ gpu/               EGL/GLES pipeline, shaders, 10-bit path
 │  │  ├─ codec/             MediaCodec / MediaMuxer, audio
 │  │  ├─ profile/           log curve, LUTs, colour science
-│  │  └─ storage/           MediaStore, free space, thermal guard
+│  │  ├─ storage/           MediaStore, free space, thermal guard
+│  │  ├─ ai/                Phase 6 contracts (LiteRT implementation deferred)
+│  │  └─ device/            device database, quirks, calibration, opt-in reports
 │  └─ feature/
 │     ├─ capture/           record screen logic and state wiring
 │     ├─ playback/          clip review
@@ -66,6 +68,8 @@ which adds build fragility for no benefit when the host app is the product.
 | `:core:gpu` | `:core:common` | no | Owns the EGL/GLES thread |
 | `:core:codec` | `:core:common` | no | Encoder, muxer, audio capture |
 | `:core:storage` | `:core:common` | no | MediaStore, thermal, free space |
+| `:core:ai` | — | no | Phase 6 AI contracts; LiteRT implementation deferred |
+| `:core:device` | `:core:probe`, `:core:profile` | no | Device database, quirks, calibration, opt-in reports |
 | `:bridge` | `:core:common` | **yes** | Pigeon DTOs and channel adapters |
 | `:feature:capture` | all `:core:*`, `:bridge` | yes | May not be depended on by other features |
 | `:feature:playback` | `:core:common`, `:bridge` | yes | |
