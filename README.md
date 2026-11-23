@@ -14,9 +14,9 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 3 complete on both test devices. Phase 5.5 shoot-profile
-> foundation is complete on Pad 3 and POCO; remaining work is per-lens
-> 10-bit/4:3 verification, shoot-set editing and colour matrices.**
+> **Status: Phase 3 complete on both test devices. Phase 5.5 per-lens
+> verification is complete (Pad 10-bit HLG movie mode across lenses); remaining
+> work is the shoot-set editor, colour matrices and seamless switching.**
 > Phases 0–4 are complete: preview, manual and P/S/M exposure, 8-bit SDR and
 > **10-bit HLG** recording via MediaStore, recording modes (16:9/4:3,
 > 24/30 fps), profiles, LUTs, and monitoring tools. Phase 5 adds shutter angle,

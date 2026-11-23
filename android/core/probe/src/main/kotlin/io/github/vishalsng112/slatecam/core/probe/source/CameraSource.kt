@@ -291,7 +291,9 @@ class CameraSource(private val context: Context) {
             // demand if the user selects the lens.
             found += camera.copy(
                 openable = openable,
-                presets = emptyMap(),
+                // Keep the 10-bit verdict surface so movie-mode alignment can be
+                // evaluated, but drop the rest of the summary payload.
+                presets = camera.presets.filterKeys { it.endsWith("_10bit") },
                 controls = null,
             )
             warnings += if (openable) {

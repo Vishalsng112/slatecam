@@ -49,6 +49,7 @@ class CameraSessionVerifier(private val context: Context) {
         width: Int,
         height: Int,
         checkId: String = CHECK_ID,
+        cameraId: String? = null,
     ): Outcome {
         val started = System.currentTimeMillis()
 
@@ -66,10 +67,12 @@ class CameraSessionVerifier(private val context: Context) {
         }
 
         val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val candidate = runCatching { selectCandidate(manager, width, height) }.getOrNull()
+        val candidate = runCatching {
+            selectCandidate(manager, width, height, cameraId)
+        }.getOrNull()
             ?: return Outcome(
                 failure(
-                    "no back camera offering HLG10 at ${width}x$height",
+                    "camera ${cameraId ?: "any back"} does not offer HLG10 at ${width}x$height",
                     started,
                     checkId,
                 ),
@@ -185,13 +188,20 @@ class CameraSessionVerifier(private val context: Context) {
 
     private data class Candidate(val id: String, val width: Int, val height: Int)
 
-    private fun selectCandidate(manager: CameraManager, width: Int, height: Int): Candidate? {
-        for (id in manager.cameraIdList) {
+    private fun selectCandidate(
+        manager: CameraManager,
+        width: Int,
+        height: Int,
+        requestedId: String? = null,
+    ): Candidate? {
+        val ids = requestedId?.let { listOf(it) } ?: manager.cameraIdList.toList()
+        for (id in ids) {
             val characteristics = runCatching {
                 manager.getCameraCharacteristics(id)
             }.getOrNull() ?: continue
 
-            if (characteristics.get(CameraCharacteristics.LENS_FACING) !=
+            if (requestedId == null &&
+                characteristics.get(CameraCharacteristics.LENS_FACING) !=
                 CameraCharacteristics.LENS_FACING_BACK
             ) {
                 continue

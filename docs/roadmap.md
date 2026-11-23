@@ -16,7 +16,7 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | 3 | Recording | Done on Pad 3 and POCO X6 Pro |
 | 4 | GPU + profiles | Done |
 | 5 | Advanced capture | Mostly done: shutter angle, gyro, focus shift, concurrent verification. Pro AE and hybrid AF remain |
-| **5.5** | **Shoot profiles / Movie-Vlog** | **Foundation complete on Pad + POCO; remaining per-lens 10-bit/4:3, shoot-set editor, matrices** |
+| **5.5** | **Shoot profiles / Movie-Vlog** | **Per-lens verification complete; remaining shoot-set editor, colour matrices, seamless switch** |
 | 6 | AI (optional) | Contract only |
 | 7 | Device database | Done |
 | 8 | Quality | Not started |
@@ -71,8 +71,9 @@ Phase 5.5 ──────► Phase 8 quality (cross-device stress)
 - Per-camera colour path applied on switch; calibration data tracked separately.
 - Pad back↔front and POCO main→ultra-wide→front verified; macro correctly
   rejected mid-recording.
-- Remaining: per-lens 10-bit/4:3 verification, shoot-set editor, measured colour
-  matrices, seamless-switch polish.
+- Per-lens 10-bit/4:3 verification is complete: Pad back verifies 4K/FHD/4:3,
+  Pad front verifies FHD/4:3, so 10-bit HLG movie mode is enabled across both.
+- Remaining: shoot-set editor, measured colour matrices, seamless-switch polish.
 
 ## Next phase
 

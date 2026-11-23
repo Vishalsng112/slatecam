@@ -29,6 +29,8 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - POCO multi-lens pass: movie mode main → ultra-wide → front in one continuous
   125.3 s clip (3733 frames). Selecting the macro is rejected with
   “lens 3 is not part of the movie lens set”; recording continues.
+- Pad 10-bit movie mode: per-lens verification is complete, so the common mode
+  includes 1080p and 4:3 10-bit HLG; a back→front switch kept one Main10 clip.
 
 ### Changed — Phase 3 recording completion (Pad 3)
 - 10-bit HLG recording enabled by probe verification and SPS checks.
@@ -56,7 +58,12 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   (role + 35 mm equivalent), continuous zoom, hidden lenses marked.
 - Bridge commands `selectLens`, `setZoom`; per-camera zoom state.
 
-### Added — prober 1.8.0 / schema 1.9.0
+### Added — prober 1.9.0 / schema 1.10.0
+- 4:3 presets (`fhd43_*`) and per-lens HLG10 verification: every
+  exposed/openable lens gets its own `camera_hlg10_session_c<id>_<size>` verdict.
+- Pad 3 now verifies 10-bit at 4K/FHD/4:3 on the back lens and FHD/4:3 on the
+  front lens, enabling **10-bit HLG movie mode** across both.
+- Movie mode back→front verified as one continuous 166.6 s Main10/HLG clip.
 - Per-size 10-bit verification (`hevc_main10_encode_fhd`,
   `camera_hlg10_session_fhd`) and SPS bit-depth parsing for Annex B,
   length-prefixed and hvcC records.

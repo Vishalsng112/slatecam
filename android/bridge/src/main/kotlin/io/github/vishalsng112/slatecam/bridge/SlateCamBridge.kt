@@ -998,6 +998,7 @@ class SlateCamBridge private constructor(
                         val presetId = when {
                             width == 3840 && height == 2160 -> "uhd${fps}_10bit"
                             width == 1920 && height == 1080 -> "fhd${fps}_10bit"
+                            width == 1440 && height == 1080 -> "fhd43_${fps}_10bit"
                             else -> null
                         }
                         if (presetId == null) {

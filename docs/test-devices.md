@@ -748,3 +748,35 @@ intended.
 The POCO’s per-camera difference is visible in the UI: 4K modes are available on
 the main sensor, the macro is not part of the movie set, and all 10-bit modes
 carry the quirk/verdict reason.
+
+## Phase 5.5 per-lens 10-bit / 4:3 verification (2026-11-23, prober 1.9.0)
+
+Schema 1.10.0 adds 4:3 presets and a session verdict per lens. The prober now
+runs the encoder at UHD/FHD/1440×1080 and configures HLG10 on each
+exposed/openable lens at every supported 10-bit size.
+
+### OnePlus Pad 3
+
+| Check | Result |
+|---|---|
+| Encoder UHD/FHD/4:3 | pass — `profile_idc=2`, `bit_depth=10` at all three |
+| Back camera | 10-bit verified at 3840×2160, 1920×1080, 1440×1080 |
+| Front camera | 10-bit verified at 1920×1080 and 1440×1080 (no UHD stream) |
+| Tier | `cinema` |
+| Movie mode | 10-bit HLG common mode enabled at 1080p and 4:3; 4K disabled because the front lens has no UHD stream |
+| Movie switch test | back → front kept one **Main10/HLG** clip, 166.6 s, 4990 frames |
+| 4:3 10-bit | preset verified; available in single and common movie mode |
+
+### POCO X6 Pro 5G
+
+| Check | Result |
+|---|---|
+| Encoder UHD/FHD/4:3 | fail — SPS `profile_idc=1`, `bit_depth=8` |
+| HLG10 sessions | pass on main, front, ultra-wide and macro at supported sizes |
+| 10-bit presets | remain `not_run`; no lens can be promoted |
+| Movie mode | stays 8-bit; goal is a common mode that honest hardware can satisfy |
+| Tier | `standard` |
+
+The Pad demonstrates the target behaviour: a 10-bit movie profile is offered
+only after *every* lens in the set is verified at that size, and a switch keeps
+one encoded clip alive.

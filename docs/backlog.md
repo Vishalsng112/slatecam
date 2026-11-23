@@ -14,7 +14,6 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 
 | Item | State | Notes |
 |---|---|---|
-| 4:3 10-bit verification | planned | Add 1440×1080 (and 1920×1440) to the prober's 10-bit checks; only then enable 4:3 10-bit |
 | True 10-bit GL intermediate | quality follow-up | Encoded stream is Main10, but the encoder surface is RGBA8888 because the driver rejects 10-bit EGL swaps. Add a 10-bit FBO/surface path when the driver supports it |
 | 20-minute thermal test | planned | 60 s at 1080p30 10-bit verified thermal 0 |
 | Colour-space menu | planned, gated | SDR enabled; HLG only when verified. Never offer what the probe did not verify |
@@ -51,7 +50,6 @@ AF handling). Remaining:
 
 | Item | Notes |
 |---|---|
-| Per-lens 10-bit and 4:3 verification | Movie mode is limited by the weakest lens. Verify each hidden/openable lens and each size before enabling |
 | Shoot-set editor | Current set is all probe-visible, openable, non-macro lenses; let the user include/exclude and save a named profile |
 | Per-camera colour matrices | Apply pairwise ColorChecker matrices so lenses match; input-profile plumbing is ready |
 | Seamless switch polish | Current switch has a short visual gap; pre-open/dual-session is a later refinement |

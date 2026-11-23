@@ -140,10 +140,10 @@ installs can drop adbd. Probe launch:
 ## Known current limits
 
 - True 10-bit GL intermediate is not available; HLG encoder surface is
-  RGBA8888, but the encoded stream is Main10/HLG and SPS-checked.
-- 4:3 and per-lens 10-bit are not probe-verified yet; movie mode is limited by
-  the weakest lens (Pad: 1080p30 8-bit common).
+  RGBA8888, but the encoded stream is Main10/HLG and SPS-checked. Pad movie mode
+  is 10-bit; POCO stays SDR because its encoder fails Main10.
 - Colour matching depends on measured per-camera matrices (not shipped).
-- Phase 5.5 remaining: per-lens 10-bit/4:3 verification, shoot-set editor,
-  measured colour matrices, seamless-switch polish.
+- Phase 5.5 remaining: shoot-set editor, measured colour matrices,
+  seamless-switch polish.
+
 - Feature modules `:feature:capture` and `:feature:playback` are empty.

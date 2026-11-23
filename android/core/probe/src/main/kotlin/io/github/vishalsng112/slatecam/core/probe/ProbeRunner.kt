@@ -9,6 +9,7 @@ import io.github.vishalsng112.slatecam.core.probe.model.ProbeReport
 import io.github.vishalsng112.slatecam.core.probe.model.ReportMeta
 import io.github.vishalsng112.slatecam.core.probe.model.TierVerdict
 import io.github.vishalsng112.slatecam.core.probe.model.Verification
+import io.github.vishalsng112.slatecam.core.probe.model.VerificationCheck
 import io.github.vishalsng112.slatecam.core.probe.source.AudioSource
 import io.github.vishalsng112.slatecam.core.probe.source.CameraSource
 import io.github.vishalsng112.slatecam.core.probe.source.DeviceSource
@@ -20,6 +21,7 @@ import io.github.vishalsng112.slatecam.core.probe.verify.ConcurrentSessionVerifi
 import io.github.vishalsng112.slatecam.core.probe.verify.EncoderVerifier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.math.roundToInt
 import java.time.Instant
 import java.util.UUID
 
@@ -57,9 +59,17 @@ class ProbeRunner(private val context: Context) {
         val encoders = EncoderSource().read(warnings)
         val audio = AudioSource.read(context)
 
-        // Verify every size the app can record in 10-bit. A verdict covers only
-        // the size that was actually exercised, so both halves of the path are
-        // run per size instead of letting a UHD pass promote an FHD preset.
+        // Verify every size the app can record in 10-bit, and every lens that
+        // participates in a shoot set. A verdict covers only the size and camera
+        // that were actually exercised.
+        val primaryCameraInfo = cameras
+            .filter { it.facing == "back" }
+            .minWithOrNull(
+                compareBy<CameraInfo> { if (it.role == "default") 0 else 1 }
+                    .thenBy { it.id.toIntOrNull() ?: Int.MAX_VALUE },
+            )
+            ?: cameras.firstOrNull()
+
         val claimedTenBitSizes = cameras
             .flatMap { camera -> camera.presets.filterValues { it.supported }.keys }
             .mapNotNull { id -> PresetCatalog.v1.firstOrNull { it.id == id } }
@@ -81,24 +91,52 @@ class ProbeRunner(private val context: Context) {
         } else {
             emptyList()
         }
-        val sessionOutcomes = if (verify) {
-            sizesToVerify.mapIndexed { index, (width, height) ->
-                CameraSessionVerifier(context).verifyHlg10Session(
-                    width = width,
-                    height = height,
-                    checkId = checkId("camera_hlg10_session", width, height, index),
-                )
+
+        val sessionResults = mutableListOf<SessionResult>()
+        if (verify) {
+            val sessionVerifier = CameraSessionVerifier(context)
+            if (primaryCameraInfo != null) {
+                sizesToVerify.forEachIndexed { index, (width, height) ->
+                    val result = sessionVerifier.verifyHlg10Session(
+                        width = width,
+                        height = height,
+                        checkId = checkId("camera_hlg10_session", width, height, index),
+                        cameraId = primaryCameraInfo.id,
+                    )
+                    sessionResults += SessionResult(
+                        primaryCameraInfo.id,
+                        width,
+                        height,
+                        result.check,
+                    )
+                }
             }
-        } else {
-            emptyList()
+
+            for (camera in uniqueVerificationCameras(cameras, primaryCameraInfo?.id)) {
+                for ((width, height) in sizesToVerify) {
+                    if (!supportsTenBitAt(camera, width, height)) continue
+                    val result = sessionVerifier.verifyHlg10Session(
+                        width = width,
+                        height = height,
+                        checkId = "camera_hlg10_session_c${camera.id}_" + sizeTag(width, height),
+                        cameraId = camera.id,
+                    )
+                    sessionResults += SessionResult(camera.id, width, height, result.check)
+                }
+            }
         }
         val concurrentCheck = if (verify) ConcurrentSessionVerifier(context).verify() else null
 
-        // The primary pair is the largest claimed size. Tier evaluation uses it,
-        // so a mixed result (encode at one size, session at another) cannot be
-        // promoted to cinema.
+        // Tier uses the primary camera's largest claimed pair, so a mix of sizes
+        // or cameras cannot be promoted to cinema.
+        val primarySize = sizesToVerify.firstOrNull()
         val primaryEncode = encodeOutcomes.firstOrNull()?.check
-        val primarySession = sessionOutcomes.firstOrNull()?.check
+        val primarySession = primarySize?.let { size ->
+            sessionResults.firstOrNull {
+                it.cameraId == primaryCameraInfo?.id &&
+                    it.width == size.first && it.height == size.second
+            }?.check
+        }
         val primaryPairPass = primaryEncode?.status == "pass" && primarySession?.status == "pass"
         val main10Verified = when {
             !verify -> "not_run"
@@ -126,15 +164,16 @@ class ProbeRunner(private val context: Context) {
             }
         }
 
-        // A preset is verified only when both halves of the 10-bit path passed at
-        // the same size and on the camera that accepted the session.
+        // A preset is verified only when the encoder passed at that size and the
+        // session for that exact camera and size also passed.
         val verifiedSizesByCamera = buildMap<String, MutableSet<Pair<Int, Int>>> {
-            sizesToVerify.forEachIndexed { index, size ->
-                val encodeOk = encodeOutcomes.getOrNull(index)?.check?.status == "pass"
-                val session = sessionOutcomes.getOrNull(index)
-                val cameraId = session?.cameraId
-                if (encodeOk && session?.check?.status == "pass" && cameraId != null) {
-                    getOrPut(cameraId) { mutableSetOf() }.add(size)
+            sessionResults.forEach { result ->
+                val sizeIndex = sizesToVerify.indexOf(result.width to result.height)
+                val encodeOk = sizeIndex >= 0 &&
+                    encodeOutcomes.getOrNull(sizeIndex)?.check?.status == "pass"
+                if (encodeOk && result.check.status == "pass") {
+                    getOrPut(result.cameraId) { mutableSetOf() }
+                        .add(result.width to result.height)
                 }
             }
         }
@@ -160,13 +199,9 @@ class ProbeRunner(private val context: Context) {
             it.mime == "video/hevc" && it.hardware && it.main10Claimed
         }
 
-        val primaryCamera = camerasWithVerification
-            .filter { it.facing == "back" }
-            .minWithOrNull(
-                compareBy<CameraInfo> { if (it.role == "default") 0 else 1 }
-                    .thenBy { it.id.toIntOrNull() ?: Int.MAX_VALUE },
-            )
-            ?: camerasWithVerification.firstOrNull()
+        val primaryCamera = primaryCameraInfo?.let { primary ->
+            camerasWithVerification.firstOrNull { it.id == primary.id }
+        } ?: camerasWithVerification.firstOrNull()
 
         val tier = if (primaryCamera == null) {
             warnings += "no camera reported by the device"
@@ -217,10 +252,10 @@ class ProbeRunner(private val context: Context) {
             tier = tier,
             verification = Verification(
                 ran = encodeOutcomes.isNotEmpty() ||
-                    sessionOutcomes.isNotEmpty() ||
+                    sessionResults.isNotEmpty() ||
                     concurrentCheck != null,
                 checks = encodeOutcomes.map { it.check } +
-                    sessionOutcomes.map { it.check } +
+                    sessionResults.map { it.check } +
                     listOfNotNull(concurrentCheck),
             ),
             cameraAux = cameraAux,
@@ -231,8 +266,47 @@ class ProbeRunner(private val context: Context) {
     fun runJson(kind: String = "summary", verify: Boolean = true): String =
         json.encodeToString(run(kind, verify))
 
+    private data class SessionResult(
+        val cameraId: String,
+        val width: Int,
+        val height: Int,
+        val check: VerificationCheck,
+    )
+
+    /**
+     * Cameras whose 10-bit path is worth exercising outside the primary lens:
+     * exposed or probe-openable, de-duplicated by facing/role/focal length so
+     * logical aliases do not repeat the same session.
+     */
+    private fun uniqueVerificationCameras(
+        cameras: List<CameraInfo>,
+        primaryId: String?,
+    ): List<CameraInfo> {
+        val seen = mutableSetOf<String>()
+        return cameras
+            .asSequence()
+            .filter { it.id != primaryId && (it.exposed || it.openable == true) }
+            .sortedWith(
+                compareByDescending<CameraInfo> { it.exposed }
+                    .thenBy { it.id.toIntOrNull() ?: Int.MAX_VALUE },
+            )
+            .filter { camera ->
+                val key = "${camera.facing}:${camera.role}:" +
+                    ((camera.focalLength35mmEquiv ?: 0.0).roundToInt())
+                seen.add(key)
+            }
+            .toList()
+    }
+
+    private fun supportsTenBitAt(camera: CameraInfo, width: Int, height: Int): Boolean =
+        camera.presets.any { (id, info) ->
+            info.supported && PresetCatalog.v1.firstOrNull { it.id == id }?.let {
+                it.tenBit && it.width == width && it.height == height
+            } == true
+        }
+
     companion object {
-        const val PROBER_VERSION = "1.8.0"
+        const val PROBER_VERSION = "1.9.0"
 
         /**
          * Sizes the prober exercises for the 10-bit path. UHD first: it is the
@@ -240,17 +314,23 @@ class ProbeRunner(private val context: Context) {
          * recorder currently captures, and a preset verdict covers only the size
          * that actually encoded.
          */
-        private val VERIFY_SIZES = listOf(3840 to 2160, 1920 to 1080)
+        private val VERIFY_SIZES = listOf(
+            3840 to 2160,
+            1920 to 1080,
+            1440 to 1080,
+        )
         private val FALLBACK_VERIFY_SIZE = 1920 to 1080
 
         private fun checkId(base: String, width: Int, height: Int, index: Int): String {
             if (index == 0) return base
-            val suffix = when (width to height) {
-                3840 to 2160 -> "uhd"
-                1920 to 1080 -> "fhd"
-                else -> "${width}x$height"
-            }
-            return "${base}_$suffix"
+            return "${base}_${sizeTag(width, height)}"
+        }
+
+        private fun sizeTag(width: Int, height: Int): String = when (width to height) {
+            3840 to 2160 -> "uhd"
+            1920 to 1080 -> "fhd"
+            1440 to 1080 -> "fhd43"
+            else -> "${width}x$height"
         }
 
         val json: Json = Json {

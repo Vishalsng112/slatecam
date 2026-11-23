@@ -1,7 +1,7 @@
 # Probe report schema
 
 - **Schema id:** `slatecam.probe`
-- **Version:** `1.9.0`
+- **Version:** `1.10.0`
 - **Status:** draft for Phase 1
 - **Owner:** `:core:probe`
 
@@ -350,6 +350,7 @@ catalog, not hardcoded in the prober. For 1.0 the catalog is:
 | `uhd` | 60 | 8-bit, 10-bit |
 | `dci4k` | 24 | 10-bit |
 | `fhd` | 24, 25, 30 | 8-bit, 10-bit |
+| `fhd43` (1440×1080) | 24, 25, 30 | 8-bit, 10-bit |
 | `fhd` | 60, 120 | 8-bit |
 | `hd` | 240 | 8-bit |
 
@@ -579,8 +580,11 @@ Known check ids:
 |---|---|
 | `hevc_main10_encode` | The device produced a 10-bit Main10 stream at UHD |
 | `hevc_main10_encode_fhd` | The same, at 1920×1080 |
-| `camera_hlg10_session` | The camera configured a UHD session whose output carries the HLG10 profile |
-| `camera_hlg10_session_fhd` | The same, at 1920×1080 |
+| `hevc_main10_encode_fhd43` | The same, at 1440×1080 (4:3) |
+| `camera_hlg10_session` | The primary camera configured a UHD HLG10 session |
+| `camera_hlg10_session_fhd` | The same primary camera at 1920×1080 |
+| `camera_hlg10_session_fhd43` | The same primary camera at 1440×1080 |
+| `camera_hlg10_session_c<id>_<size>` | A specific lens configured HLG10 at that size |
 | `concurrent_camera_session` | Two cameras can be configured at once |
 
 A 10-bit preset is only marked `verified: pass` when an encode check and a
@@ -676,3 +680,10 @@ Schema 1.9.0 adds relative lens roles and the data a zoom interface needs:
 `physical_cameras`, per-lens 35 mm equivalents, and the top-level `camera_aux`
 policy block. Roles are evaluated relative to an explicit default policy, never
 from a device name or a fixed camera ID. All additions are optional.
+
+Schema 1.10.0 adds 4:3 presets (`fhd43_24/25/30_8bit/10bit`) and verifies the
+HLG10 session per lens. The extra checks use
+`camera_hlg10_session_c<id>_<size>`, so movie-mode alignment can require every
+camera in the shoot set to pass at the same size. A preset is verified only on
+the camera and size it exercised; one lens never inherits another lens's pass.
+

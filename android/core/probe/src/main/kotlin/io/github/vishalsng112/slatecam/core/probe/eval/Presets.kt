@@ -44,6 +44,9 @@ object PresetCatalog {
         cinemaRates.forEach { fps -> add(Preset("fhd${fps}_8bit", 1920, 1080, fps, false)) }
         // 10-bit at FHD matters: some devices only expose P010 below UHD.
         cinemaRates.forEach { fps -> add(Preset("fhd${fps}_10bit", 1920, 1080, fps, true)) }
+        // 4:3 is a first-class shoot mode; its 10-bit path is verified per lens.
+        cinemaRates.forEach { fps -> add(Preset("fhd43_${fps}_8bit", 1440, 1080, fps, false)) }
+        cinemaRates.forEach { fps -> add(Preset("fhd43_${fps}_10bit", 1440, 1080, fps, true)) }
         add(Preset("fhd60_8bit", 1920, 1080, 60, false))
         add(Preset("fhd120_8bit", 1920, 1080, 120, false))
         add(Preset("hd240_8bit", 1280, 720, 240, false))

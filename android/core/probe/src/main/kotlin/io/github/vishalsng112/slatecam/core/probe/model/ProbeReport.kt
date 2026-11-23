@@ -22,8 +22,11 @@ const val SCHEMA_ID = "slatecam.probe"
  * 1.9.0: lens roles (`default` / `ultrawide` / `tele`) with basis and
  * confidence, 35 mm-equivalent focal lengths, unlisted-camera scan, and the OEM
  * auxiliary-camera exposure policy.
+ *
+ * 1.10.0: 4:3 presets (`fhd43_*`) and per-lens HLG10 session checks, so every
+ * camera in a shoot set carries its own verified 10-bit verdict.
  */
-const val SCHEMA_VERSION = "1.9.0"
+const val SCHEMA_VERSION = "1.10.0"
 
 @Serializable
 data class ProbeReport(
