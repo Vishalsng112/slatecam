@@ -16,7 +16,7 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | 3 | Recording | Done on Pad 3 and POCO X6 Pro |
 | 4 | GPU + profiles | Done |
 | 5 | Advanced capture | Mostly done: shutter angle, gyro, focus shift, concurrent verification. Pro AE and hybrid AF remain |
-| **5.5** | **Shoot profiles / Movie-Vlog** | **Per-lens verification + shoot-set editor complete; remaining colour matrices, named profiles, seamless switch** |
+| **5.5** | **Shoot profiles / Movie-Vlog** | **Per-lens verification, shoot-set editor and named profiles complete; remaining colour matrices, seamless switch** |
 | 6 | AI (optional) | Contract only |
 | 7 | Device database | Done |
 | 8 | Quality | Not started |
@@ -74,13 +74,14 @@ Phase 5.5 ──────► Phase 8 quality (cross-device stress)
 - Per-lens 10-bit/4:3 verification is complete: Pad back verifies 4K/FHD/4:3,
   Pad front verifies FHD/4:3, so 10-bit HLG movie mode is enabled across both.
 - Shoot-set editor: include/exclude lenses; selection persists.
-- Remaining: measured colour matrices, named shoot profiles, seamless-switch
-  polish.
+- Named shoot profiles: save/apply/rename/delete, per-device persistence,
+  case-insensitive name updates, last-profile guard; unit-tested.
+- Remaining: measured colour matrices, seamless-switch polish.
 
 ## Next phase
 
-Finish the remaining Phase 5.5 scope (per-lens 10-bit/4:3 verification,
-shoot-set editor, measured colour matrices, seamless switch), then Phase 5
+Finish the remaining Phase 5.5 scope (measured colour matrices, seamless
+switch), then Phase 5
 remaining items (Pro AE, hybrid AF) or Phase 6 AI. Phase 8/9 after cross-device
 Phase 3 + 5.5 sign-off.
 

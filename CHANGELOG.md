@@ -29,11 +29,20 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Shoot-set editor: include/exclude any eligible lens; selection is persisted in
   `shoot-profile` and survives restart. Fewer than two selected lenses disables
   Movie mode with a reason; the editor stays visible so it can be fixed.
+- Named shoot profiles: save the current lens set, apply, rename and delete.
+  Saving an existing name (case-insensitive) updates it instead of duplicating;
+  the last profile cannot be deleted. Profiles store probe-stable lens keys
+  (`facing:role:focal`), so they still apply if camera ids are renumbered.
+- `ShootProfileStore` is pure Kotlin behind a storage interface and covered by
+  17 JVM tests (seeding, round-trip, name matching, active fallback, stale
+  keys, last-profile guard).
 - POCO multi-lens pass: movie mode main → ultra-wide → front in one continuous
   125.3 s clip (3733 frames). Selecting the macro is rejected with
   “lens 3 is not part of the movie lens set”; recording continues.
 - Pad 10-bit movie mode: per-lens verification is complete, so the common mode
   includes 1080p and 4:3 10-bit HLG; a back→front switch kept one Main10 clip.
+- Profile name prompt is a compact dialog that survives the POCO landscape IME;
+  controller disposal no longer runs while the route is animating out.
 
 ### Changed — Phase 3 recording completion (Pad 3)
 - 10-bit HLG recording enabled by probe verification and SPS checks.

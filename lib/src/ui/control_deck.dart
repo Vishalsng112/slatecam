@@ -583,6 +583,60 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
+  Future<String?> _askProfileName(String title, String initial) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => _ProfileNameDialog(title: title, initial: initial),
+    );
+    if (name == null || name.isEmpty) return null;
+    return name;
+  }
+
+  Future<void> _saveShootProfile() async {
+    final name = await _askProfileName(
+      'Save shoot profile',
+      'Profile ${state.shootProfiles.length + 1}',
+    );
+    if (name != null) widget.host.saveShootProfile(name);
+  }
+
+  Future<void> _renameShootProfile() async {
+    final current = state.shootProfiles.firstWhere(
+      (profile) => profile.id == state.activeShootProfile,
+      orElse: () => ShootProfile(id: '', name: '', lensCount: 0),
+    );
+    if (current.id.isEmpty) return;
+    final name = await _askProfileName('Rename shoot profile', current.name);
+    if (name != null) widget.host.renameShootProfile(current.id, name);
+  }
+
+  Future<void> _deleteShootProfile() async {
+    final profiles = state.shootProfiles;
+    if (profiles.length <= 1) return;
+    final current = profiles.firstWhere(
+      (profile) => profile.id == state.activeShootProfile,
+      orElse: () => profiles.first,
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete shoot profile?'),
+        content: Text('“${current.name}” will be removed.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) widget.host.deleteShootProfile(current.id);
+  }
+
   Widget _capture(BuildContext context) {
     final lastClip = state.clipPath;
     final shootLenses = state.shootLenses;
@@ -694,6 +748,65 @@ class _ControlDeckState extends State<ControlDeck> {
                                 'selected lenses. Macro lenses are never part of the '
                                 'shoot set.',
                       style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value:
+                                  state.shootProfiles.any(
+                                    (profile) =>
+                                        profile.id == state.activeShootProfile,
+                                  )
+                                  ? state.activeShootProfile
+                                  : null,
+                              items: [
+                                for (final profile in state.shootProfiles)
+                                  DropdownMenuItem(
+                                    value: profile.id,
+                                    child: Text(
+                                      '${profile.name} · ${profile.lensCount}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                              onChanged: state.isRecording
+                                  ? null
+                                  : (id) {
+                                      if (id != null) {
+                                        widget.host.applyShootProfile(id);
+                                      }
+                                    },
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Save as profile',
+                          onPressed: state.isRecording
+                              ? null
+                              : _saveShootProfile,
+                          icon: const Icon(Icons.save_outlined),
+                        ),
+                        IconButton(
+                          tooltip: 'Rename profile',
+                          onPressed: state.isRecording
+                              ? null
+                              : _renameShootProfile,
+                          icon: const Icon(Icons.drive_file_rename_outline),
+                        ),
+                        IconButton(
+                          tooltip: 'Delete profile',
+                          onPressed:
+                              state.shootProfiles.length > 1 &&
+                                  !state.isRecording
+                              ? _deleteShootProfile
+                              : null,
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -993,5 +1106,69 @@ class _ControlDeckState extends State<ControlDeck> {
     return state.shutterMaxNs < oneFrameAt24
         ? state.shutterMaxNs.toDouble()
         : oneFrameAt24.toDouble();
+  }
+}
+
+/// Owns the text controller so it outlives the dialog's exit animation.
+class _ProfileNameDialog extends StatefulWidget {
+  const _ProfileNameDialog({required this.title, required this.initial});
+
+  final String title;
+  final String initial;
+
+  @override
+  State<_ProfileNameDialog> createState() => _ProfileNameDialogState();
+}
+
+class _ProfileNameDialogState extends State<_ProfileNameDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initial,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.of(context).pop(_controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    // Landscape IMEs can leave little room above the keyboard, so the prompt
+    // stays a single compact row instead of a title + stacked buttons.
+    return Dialog(
+      alignment: Alignment.topCenter,
+      insetPadding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: widget.title,
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => _submit(),
+                ),
+              ),
+              const SizedBox(width: 4),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(onPressed: _submit, child: const Text('Save')),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

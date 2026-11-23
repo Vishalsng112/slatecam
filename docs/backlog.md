@@ -50,7 +50,6 @@ AF handling). Remaining:
 
 | Item | Notes |
 |---|---|
-| Named shoot profiles | The lens set now persists as one profile; add named, switchable profiles |
 | Per-camera colour matrices | Apply pairwise ColorChecker matrices so lenses match; input-profile plumbing is ready |
 | Seamless switch polish | Current switch has a short visual gap; pre-open/dual-session is a later refinement |
 

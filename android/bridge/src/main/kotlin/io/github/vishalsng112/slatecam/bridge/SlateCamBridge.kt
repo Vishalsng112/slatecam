@@ -20,6 +20,7 @@ import io.github.vishalsng112.slatecam.bridge.pigeon.CameraState
 import io.github.vishalsng112.slatecam.bridge.pigeon.LensOption
 import io.github.vishalsng112.slatecam.bridge.pigeon.RecordingMode
 import io.github.vishalsng112.slatecam.bridge.pigeon.ShootLens
+import io.github.vishalsng112.slatecam.bridge.pigeon.ShootProfile
 import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamFlutterApi
 import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamHostApi
 import io.github.vishalsng112.slatecam.core.camera.CameraCapabilitiesReader
@@ -923,6 +924,7 @@ class SlateCamBridge private constructor(
         val current = effectiveShootIds().toMutableSet()
         if (selected) current.add(id) else current.remove(id)
         shootPrefs.edit().putStringSet(KEY_SHOOT_LENSES, current).apply()
+        updateActiveProfile(current)
         modesCacheKey = null
 
         if (shootMode == SHOOT_MOVIE) {
@@ -988,10 +990,6 @@ class SlateCamBridge private constructor(
     }
 
     /**
-     * Lenses that participate in movie mode: probe-visible, openable, not macro.
-     * Logical variants that resolve to the same role/focal length collapse.
-     */
-    /**
      * Every lens that can join a shoot set: probe-visible or probe-openable,
      * non-macro, de-duplicated by facing/role/focal length.
      */
@@ -1005,10 +1003,133 @@ class SlateCamBridge private constructor(
                     .thenBy { it.intrinsicZoomRatio ?: 1.0 },
             )
             .filter { camera ->
-                val key = "${camera.facing}:${camera.role}:" +
-                    ((camera.focalLength35mmEquiv ?: 0.0).roundToInt())
-                seen.add(key)
+                seen.add(lensKey(camera))
             }
+    }
+
+    private fun lensKey(camera: CameraInfo): String =
+        shootLensKey(camera.facing, camera.role, camera.focalLength35mmEquiv)
+
+    private fun eligibleLensRefs(): List<ShootLensRef> =
+        eligibleShootCameras().map { ShootLensRef(it.id, lensKey(it)) }
+
+    private val profileStore by lazy {
+        ShootProfileStore(
+            storage = object : ShootProfileStorage {
+                override fun readProfiles(): String? =
+                    shootPrefs.getString(KEY_SHOOT_PROFILES, null)
+
+                override fun writeProfiles(raw: String) {
+                    shootPrefs.edit().putString(KEY_SHOOT_PROFILES, raw).apply()
+                }
+
+                override fun readActive(): String? =
+                    shootPrefs.getString(KEY_ACTIVE_PROFILE, null)
+
+                override fun writeActive(id: String) {
+                    shootPrefs.edit().putString(KEY_ACTIVE_PROFILE, id).apply()
+                }
+            },
+        )
+    }
+
+    private fun ensureProfiles(): MutableList<ShootProfileEntry> {
+        val eligible = eligibleLensRefs()
+        if (eligible.isEmpty()) return profileStore.profiles()
+        val selected = effectiveShootIds().toSet().ifEmpty { eligible.map { it.id }.toSet() }
+        return profileStore.ensure(profileStore.keysOf(selected, eligible))
+    }
+
+    private fun profileInfos(): List<ShootProfile> {
+        val eligible = eligibleLensRefs()
+        return ensureProfiles().map { profile ->
+            ShootProfile(
+                id = profile.id,
+                name = profile.name,
+                lensCount = profileStore.keyCount(profile, eligible).toLong(),
+            )
+        }
+    }
+
+    private fun activeProfileId(): String =
+        profileStore.activeId() ?: ensureProfiles().first().id
+
+    private fun updateActiveProfile(selectedIds: Set<String>) {
+        ensureProfiles()
+        profileStore.updateActive(profileStore.keysOf(selectedIds, eligibleLensRefs()))
+    }
+
+    override fun saveShootProfile(name: String) {
+        if (recorder.isRecording) {
+            recordingError = "stop recording to edit shoot profiles"
+            pushState()
+            return
+        }
+        ensureProfiles()
+        val keys = profileStore.keysOf(effectiveShootIds().toSet(), eligibleLensRefs())
+        if (profileStore.save(name, keys) == null) return
+        recordingError = null
+        pushState()
+    }
+
+    override fun applyShootProfile(id: String) {
+        if (recorder.isRecording) {
+            recordingError = "stop recording to switch shoot profiles"
+            pushState()
+            return
+        }
+        val profiles = ensureProfiles()
+        val profile = profiles.firstOrNull { it.id == id } ?: return
+        val selectedIds = profileStore.selectionOf(profile, eligibleLensRefs())
+        if (!profileStore.setActive(profile.id)) return
+        shootPrefs.edit().putStringSet(KEY_SHOOT_LENSES, selectedIds).apply()
+        modesCacheKey = null
+        if (shootMode == SHOOT_MOVIE) {
+            if (selectedIds.size < 2) {
+                shootMode = SHOOT_SINGLE
+                recordingError = "movie mode needs at least two selected lenses"
+            }
+            selectedModeId = null
+            applyMode(activeMode())
+        }
+        pushState()
+    }
+
+    override fun renameShootProfile(id: String, name: String) {
+        if (!profileStore.rename(id, name)) return
+        pushState()
+    }
+
+    override fun deleteShootProfile(id: String) {
+        if (recorder.isRecording) {
+            recordingError = "stop recording to edit shoot profiles"
+            pushState()
+            return
+        }
+        ensureProfiles()
+        when (val result = profileStore.delete(id)) {
+            DeleteResult.LastProfile -> {
+                recordingError = "keep at least one shoot profile"
+                pushState()
+            }
+            DeleteResult.NotFound -> Unit
+            is DeleteResult.Deleted -> {
+                val profile = profileStore.profiles()
+                    .firstOrNull { it.id == result.activeId } ?: return
+                val selectedIds = profileStore.selectionOf(profile, eligibleLensRefs())
+                shootPrefs.edit().putStringSet(KEY_SHOOT_LENSES, selectedIds).apply()
+                modesCacheKey = null
+                if (shootMode == SHOOT_MOVIE) {
+                    if (selectedIds.size < 2) {
+                        shootMode = SHOOT_SINGLE
+                        recordingError = "movie mode needs at least two selected lenses"
+                    }
+                    selectedModeId = null
+                    applyMode(activeMode())
+                }
+                pushState()
+            }
+        }
     }
 
     /** Effective set: persisted selection intersected with eligible lenses. */
@@ -1129,6 +1250,8 @@ class SlateCamBridge private constructor(
             recordingModes = recordingModes(),
             shootMode = shootMode,
             shootLenses = shootLenses(),
+            shootProfiles = profileInfos(),
+            activeShootProfile = activeProfileId(),
         )
         scope.launch {
             runCatching { api.onState(pigeon) }
@@ -1151,6 +1274,8 @@ class SlateCamBridge private constructor(
         recordingModes: List<RecordingMode>,
         shootMode: String,
         shootLenses: List<ShootLens>,
+        shootProfiles: List<ShootProfile>,
+        activeShootProfile: String,
     ) = CameraState(
         isOpen = isOpen,
         error = error,
@@ -1183,6 +1308,8 @@ class SlateCamBridge private constructor(
         recordingModes = recordingModes,
         shootMode = shootMode,
         shootLenses = shootLenses,
+        shootProfiles = shootProfiles,
+        activeShootProfile = activeShootProfile,
         tenBit = tenBit,
         hlgAvailable = hlgAvailable,
         hlgReason = hlgReason,
@@ -1228,6 +1355,8 @@ class SlateCamBridge private constructor(
         private const val SHOOT_MOVIE = "movie"
         private const val PREFS_SHOOT = "shoot-profile"
         private const val KEY_SHOOT_LENSES = "shoot_lenses"
+        private const val KEY_SHOOT_PROFILES = "shoot_profiles"
+        private const val KEY_ACTIVE_PROFILE = "active_profile"
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")

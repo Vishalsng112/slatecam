@@ -55,6 +55,19 @@ class RecordingMode {
   String reason;
 }
 
+/// A named lens set for Movie/Vlog mode.
+class ShootProfile {
+  ShootProfile({
+    required this.id,
+    required this.name,
+    required this.lensCount,
+  });
+
+  String id;
+  String name;
+  int lensCount;
+}
+
 /// A lens the user can include in the Movie/Vlog shoot set.
 class ShootLens {
   ShootLens({
@@ -106,6 +119,8 @@ class CameraState {
     required this.recordingModes,
     required this.shootMode,
     required this.shootLenses,
+    required this.shootProfiles,
+    required this.activeShootProfile,
     required this.tenBit,
     required this.hlgAvailable,
     required this.hlgReason,
@@ -183,6 +198,10 @@ class CameraState {
   String shootMode;
   /// Probe-visible, openable lenses with their shoot-set selection.
   List<ShootLens> shootLenses;
+  /// Named shoot profiles for this device.
+  List<ShootProfile> shootProfiles;
+  /// Currently active shoot profile id.
+  String activeShootProfile;
   /// True while the camera session or the clip in flight really carries HLG10.
   bool tenBit;
   /// Probe verdict for this camera, size and frame rate.
@@ -268,6 +287,18 @@ abstract class SlateCamHostApi {
 
   /// Includes/excludes a lens from the persisted Movie/Vlog shoot set.
   void setShootLens(String id, bool selected);
+
+  /// Saves the current lens set as a named profile (updates a same-name profile).
+  void saveShootProfile(String name);
+
+  /// Applies a named shoot profile.
+  void applyShootProfile(String id);
+
+  /// Renames a shoot profile.
+  void renameShootProfile(String id, String name);
+
+  /// Deletes a shoot profile.
+  void deleteShootProfile(String id);
 
   void setAutoFocus();
 

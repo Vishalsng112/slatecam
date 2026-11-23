@@ -29,7 +29,7 @@ lib/                         Flutter UI only
   src/pigeon/                generated Pigeon client
 pigeon/slatecam.dart         Pigeon contract source
 android/app/                 Flutter host, permissions, launch extras
-android/bridge/              Flutter <-> Kotlin API and state mapping
+android/bridge/              Flutter <-> Kotlin API, state mapping, shoot-profile store
 android/core/common/         pure helpers (HevcSps, ShutterAngle, GyroAligner)
 android/core/probe/          capability prober, verifiers, report model
 android/core/camera/         Camera2 controller, capabilities, modes
@@ -143,7 +143,8 @@ installs can drop adbd. Probe launch:
   RGBA8888, but the encoded stream is Main10/HLG and SPS-checked. Pad movie mode
   is 10-bit; POCO stays SDR because its encoder fails Main10.
 - Colour matching depends on measured per-camera matrices (not shipped).
-- Phase 5.5 remaining: measured colour matrices, named shoot profiles,
-  seamless-switch polish.
+- Shoot profiles live in `ShootProfileStore` (pure Kotlin, persisted through a
+  storage interface; JVM tests in `bridge/src/test`).
+- Phase 5.5 remaining: measured colour matrices, seamless-switch polish.
 
 - Feature modules `:feature:capture` and `:feature:playback` are empty.
