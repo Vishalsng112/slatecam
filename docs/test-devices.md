@@ -807,6 +807,14 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
+### Focal-length shoot-set circles (Pad 3 + POCO, build 2055)
+
+- Pad: `25mm` and `26mm` circles; tapping `26mm` removed it from the set
+  (`Default · 1`), and the remaining circle stayed selected.
+- POCO: `16mm`, `25mm`, `24mm` circles; tapping `25mm` added it back and all
+  three showed selected, matching the persisted profile.
+- Circles use a 50 lp hit target with a 42 lp visual badge.
+
 ### Three-row recording-mode selector (Pad 3 + POCO, build 2054)
 
 - Pad: from 1080p30 10-bit, selecting 4K → 24 fps → 8-bit produced

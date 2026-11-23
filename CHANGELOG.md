@@ -58,6 +58,9 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   (4K / 1080p / 4:3 / 720p) → frame rate (24/25/30) → bit depth (10-bit/8-bit).
   The closest enabled combination is chosen when a change is not available,
   and a size with no enabled mode reports the bridge's reason.
+- Shoot-set lenses are focal-length circles (`16mm`, `25mm`, `26mm`) instead of
+  verbose chips; the facing letter is added only when two lenses share a
+  focal length. Tapping a circle includes/excludes that lens.
 - `SwitchFramePump` repeats the last camera frame into the encoder while a
   movie-mode lens switch has no session, so the clip keeps a continuous
   timeline. Policy covered by 6 JVM tests.

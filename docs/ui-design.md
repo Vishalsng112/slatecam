@@ -206,6 +206,10 @@ Changing a row keeps the other two where possible and falls back to the closest
 enabled combination. A size with no enabled mode reports the bridge reason
 instead of silently changing something else.
 
+The shoot set lists lenses as focal-length circles (`16mm`, `25mm`, `26mm`).
+Tapping a circle includes or excludes that lens from the Movie/Vlog set; the
+facing letter is prefixed only when two lenses share a focal length.
+
 ### 5.4 Exposure card
 
 | Element | Native call | Status |

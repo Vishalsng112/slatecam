@@ -703,6 +703,94 @@ class _ControlDeckState extends State<ControlDeck> {
     };
   }
 
+  /// Lens badges use the 35 mm-equivalent focal length, e.g. `16mm`, because
+  /// that is how the operator picks a lens on set. Facing is added only when
+  /// two lenses share the same value.
+  Widget _shootLensRow(List<ShootLens> lenses, bool editable) {
+    final focalCounts = <String, int>{};
+    for (final lens in lenses) {
+      final focal = _focalLabel(lens);
+      focalCounts[focal] = (focalCounts[focal] ?? 0) + 1;
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final lens in lenses)
+          _shootLensCircle(lens, editable, focalCounts[_focalLabel(lens)]! > 1),
+      ],
+    );
+  }
+
+  Widget _shootLensCircle(ShootLens lens, bool editable, bool withFacing) {
+    final focal = _focalLabel(lens);
+    final facing = switch (lens.facing) {
+      'front' => 'F',
+      'back' => 'B',
+      _ => 'C',
+    };
+    final label = withFacing ? '$facing$focal' : focal;
+    return Semantics(
+      button: true,
+      selected: lens.selected,
+      label: 'shoot lens ${lens.label}',
+      child: Tooltip(
+        message: lens.label,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: editable
+                ? () => widget.host.setShootLens(lens.id, !lens.selected)
+                : null,
+            child: SizedBox(
+              width: 50,
+              height: 50,
+              child: Center(
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: lens.selected
+                        ? UiTokens.accent
+                        : UiTokens.surfaceRaised,
+                    border: Border.all(
+                      color: lens.selected
+                          ? UiTokens.accent
+                          : UiTokens.border,
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      height: 1.05,
+                      fontWeight: FontWeight.w800,
+                      color: lens.selected
+                          ? UiTokens.background
+                          : UiTokens.text,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _focalLabel(ShootLens lens) {
+    final match = RegExp(r'(\d+)mm').firstMatch(lens.label);
+    if (match != null) return '${match.group(1)}mm';
+    final digits = RegExp(r'\d+').firstMatch(lens.label)?.group(0);
+    return digits != null ? '${digits}mm' : lens.role;
+  }
+
   Widget _shootSetCard(BuildContext context) {
     final lenses = state.shootLenses;
     final profiles = state.shootProfiles;
@@ -722,25 +810,7 @@ class _ControlDeckState extends State<ControlDeck> {
               style: Theme.of(context).textTheme.bodySmall,
             )
           else
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final lens in lenses)
-                  FilterChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    label: Text(lens.label, style: const TextStyle(fontSize: 10)),
-                    selected: lens.selected,
-                    onSelected: editable
-                        ? (value) =>
-                              widget.host.setShootLens(lens.id, value)
-                        : null,
-                    selectedColor: UiTokens.accent.withValues(alpha: 0.25),
-                    checkmarkColor: UiTokens.accent,
-                  ),
-              ],
-            ),
+            _shootLensRow(lenses, editable),
           const SizedBox(height: 6),
           Text(
             state.isRecording

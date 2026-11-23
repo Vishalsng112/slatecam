@@ -32,10 +32,13 @@ opened at different positions and on a preview that continuously animates.
    bit depth are separate rows (4K/1080p/4:3/720p → 24/25/30 → 10-bit/8-bit).
    The UI selects the closest enabled combination instead of listing every
    Cartesian product as its own chip.
-5. **Stable semantics.** The fixed controls carry explicit labels
+5. **Lenses are identified by focal length.** The shoot set uses circular
+   `16mm` / `25mm` / `26mm` badges, matching how an operator picks a lens. The
+   facing letter is added only when two lenses share the same value.
+6. **Stable semantics.** The fixed controls carry explicit labels
    (`start recording`, `camera: …`, `recording mode: …`) so automation can find
    them without relying on visual text.
-6. **Console, not settings page.** Sliders keep their labels and values inline;
+7. **Console, not settings page.** Sliders keep their labels and values inline;
    status stays in the header and footer. The preview remains the largest
    element at every breakpoint.
 
