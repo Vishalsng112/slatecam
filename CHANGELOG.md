@@ -51,6 +51,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   exposure mode, angle, profile, white balance, processing and shoot profiles
   are direct chips/segments instead of dropdowns. The console starts open at
   760 lp on tablets and can still be collapsed.
+- Condensed console pass: circular RECORD/STOP, circular S/M shoot-mode and
+  per-lens badges (`B0`, `F1`) in a 44 lp hit target, compact mode chips
+  (UHD/FHD/4:3/720 + fps + bit depth), icon-chip monitoring and three-column
+  cards at >=720 lp. Colour, monitoring, exposure and device fit with far less
+  scrolling.
 - `SwitchFramePump` repeats the last camera frame into the encoder while a
   movie-mode lens switch has no session, so the clip keeps a continuous
   timeline. Policy covered by 6 JVM tests.

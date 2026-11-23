@@ -89,9 +89,10 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
 5. **Bottom dock** — record button, P/S/M selector, quick readout chips (ISO,
    shutter, white balance, focus), and Control Deck toggle.
 6. **Control Console** — a docked, collapsible right panel with no tabs. A fixed
-   header holds RECORD, a previous/next camera stepper, a previous/next mode
-   stepper and the Single/Movie toggle. Below it, two columns of always-visible
-   cards group the remaining controls. The header never scrolls away, so record,
+   header holds a circular RECORD/STOP button, circular S/M shoot-mode buttons
+   and one circular lens badge per camera (`B0`, `F1`, …), plus a compact mode
+   stepper. Below it, three columns at >=720 lp (two at >=520 lp) of dense cards
+   group the remaining controls. The header never scrolls away, so record,
    lens and mode are always one tap from any scroll position. On narrow
    landscape phones the console can be closed to give the preview the whole
    width.
@@ -102,7 +103,7 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
 
 | Width | Behaviour |
 |---|---|
-| `>= 1400 lp` | Console starts open at 760 lp, two columns; preview keeps the rest |
+| `>= 1400 lp` | Console starts open at 760 lp, three columns; preview keeps the rest |
 | `1000–1399 lp` | Console starts open at 600 lp, two columns |
 | `760–999 lp` | Console starts open at 460 lp, two columns |
 | `< 760 lp` | Console starts closed; opens over the preview at `min(360, width * 0.6)` |
@@ -116,10 +117,10 @@ The deck can always be closed with the chevron. The record button never moves.
 
 | Element | Behaviour | Why it is fixed |
 |---|---|---|
-| RECORD / STOP | `startRecording` / `stopRecording` | Never scroll away from the shutter |
-| Camera ‹ › | Cycles exposed cameras | One tap per lens; no dropdown menu |
-| Mode ‹ › | Cycles enabled recording modes | One tap per mode; disabled modes are skipped |
-| Single / Movie | `setShootMode` | Common-mode validation stays visible |
+| Record circle | `startRecording` / `stopRecording` | Never scroll away from the shutter |
+| Lens badges `B0` / `F1` | `setCameraId` | One tap per lens, all lenses visible |
+| Single `S` / Movie `M` circles | `setShootMode` | One tap, no menu |
+| Mode ‹ › | Cycles enabled recording modes | Disabled modes are skipped |
 | Status line | shoot mode, size, fps, bit depth | Read-only context for the current mode |
 
 Every fixed element has a stable semantics label (`start recording`,

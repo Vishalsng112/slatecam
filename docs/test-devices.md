@@ -795,7 +795,7 @@ one encoded clip alive.
 - POCO: back 16 mm (ultra-wide), back 25 mm, front 24 mm. Deselecting the
   ultra-wide left main + front, and the selection survived a force-stop/restart.
 
-## Phase 5.5 Control Console and seamless switch (2026-11-24, build 2048)
+## Phase 5.5 Control Console and seamless switch (2026-11-24, build 2051)
 
 ### Control Console
 
@@ -806,6 +806,15 @@ one encoded clip alive.
 - Movie-mode pass: tap Movie, tap RECORD, tap the camera stepper once, tap STOP.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
+
+### Condensed circular controls (Pad 3 + POCO, build 2051)
+
+- Fixed header: record circle at (1896,180), S at (2032,180), M at (2144,180),
+  B0 at (2280,180), F1 at (2418,180) on the Pad. Movie -> record -> F1 kept one
+  clip and the header switched to `F1`; stop produced
+  `SlateCam_20261124_022632.mp4`.
+- POCO shows the same header at its width, with the mode grid and colour /
+  monitoring icon chips visible with little scrolling.
 
 ### Seamless switch measurement (Pad 3)
 

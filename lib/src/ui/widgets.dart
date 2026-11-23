@@ -18,8 +18,8 @@ class DeckCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: UiTokens.surfaceRaised,
         borderRadius: BorderRadius.circular(UiTokens.radius),
@@ -39,7 +39,7 @@ class DeckCard extends StatelessWidget {
               ?trailing,
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           child,
         ],
       ),

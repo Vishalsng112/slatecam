@@ -102,35 +102,54 @@ class _ControlDeckState extends State<ControlDeck> {
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final left = <Widget>[
-                    _lensCard(context),
+                  final primary = <Widget>[
                     _modeCard(context),
-                    _shootSetCard(context),
                     _exposureCard(context),
                     _processingCard(context),
                   ];
-                  final right = <Widget>[
+                  final secondary = <Widget>[
+                    _shootSetCard(context),
                     _focusCard(context),
+                    _deviceCard(context),
+                  ];
+                  final tertiary = <Widget>[
                     _colourCard(context),
                     _monitorCard(context),
-                    _deviceCard(context),
                     _clipCard(context),
                   ];
                   if (constraints.maxWidth < 520) {
-                    return Column(children: [...left, ...right]);
+                    return Column(
+                      children: [...primary, ...secondary, ...tertiary],
+                    );
                   }
-                  final columnWidth = (constraints.maxWidth - 12) / 2;
+                  if (constraints.maxWidth >= 720) {
+                    final width = (constraints.maxWidth - 16) / 3;
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(width: width, child: Column(children: primary)),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: width,
+                          child: Column(children: secondary),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: width,
+                          child: Column(children: tertiary),
+                        ),
+                      ],
+                    );
+                  }
+                  final width = (constraints.maxWidth - 8) / 2;
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      SizedBox(width: width, child: Column(children: primary)),
+                      const SizedBox(width: 8),
                       SizedBox(
-                        width: columnWidth,
-                        child: Column(children: left),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: columnWidth,
-                        child: Column(children: right),
+                        width: width,
+                        child: Column(children: [...secondary, ...tertiary]),
                       ),
                     ],
                   );
@@ -146,209 +165,278 @@ class _ControlDeckState extends State<ControlDeck> {
 
   Widget _fixedHeader(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+      padding: const EdgeInsets.fromLTRB(10, 8, 4, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
+              _recordCircle(),
+              const SizedBox(width: 6),
+              _shootCircle('single', 'S'),
+              const SizedBox(width: 4),
+              _shootCircle('movie', 'M'),
+              const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'CONSOLE',
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${state.shootMode == 'movie' ? 'Movie' : 'Single'} · '
-                      '${state.previewWidth}×${state.previewHeight} · '
-                      '${state.frameRate} fps · '
-                      '${state.tenBit ? '10-bit HLG' : '8-bit SDR'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final id in state.cameraIds)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 2),
+                          child: _lensCircle(id),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               IconButton(
                 tooltip: 'Hide controls',
+                visualDensity: VisualDensity.compact,
                 onPressed: widget.onClose,
-                icon: const Icon(Icons.chevron_right),
+                icon: const Icon(Icons.chevron_right, size: 20),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Semantics(
-            button: true,
-            label: state.isRecording ? 'stop recording' : 'start recording',
-            child: SizedBox(
-              height: 50,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: state.isRecording
-                      ? UiTokens.danger
-                      : UiTokens.accent,
-                  foregroundColor: UiTokens.background,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: state.isRecording
-                    ? () => widget.host.stopRecording()
-                    : () => widget.host.startRecording(),
-                icon: Icon(
-                  state.isRecording
-                      ? Icons.stop_circle_outlined
-                      : Icons.fiber_manual_record,
-                  size: 20,
-                ),
-                label: Text(
-                  state.isRecording ? 'STOP RECORDING' : 'RECORD',
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${state.shootMode == 'movie' ? 'MOVIE' : 'SINGLE'} · '
+                  '${state.previewWidth}×${state.previewHeight} · '
+                  '${state.frameRate}p · '
+                  '${state.tenBit ? '10b HLG' : '8b SDR'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.6,
+                    fontSize: 10,
+                    letterSpacing: 0.3,
+                    color: UiTokens.muted,
                   ),
                 ),
               ),
-            ),
+              _modeStepper(),
+            ],
           ),
-          const SizedBox(height: 8),
-          _quickBar(context),
         ],
       ),
     );
   }
 
-  Widget _quickBar(BuildContext context) {
-    final modes = _enabledModes;
-    final modeIndex = modes.indexWhere((mode) => mode.id == state.recordingMode);
-    final mode = modeIndex >= 0 ? modes[modeIndex] : null;
-    final cameraIds = state.cameraIds;
-    final cameraIndex = cameraIds.indexOf(state.cameraId);
-
-    return Column(
-      children: [
-        _stepper(
-          label: 'Camera',
-          value: cameraIndex >= 0
-              ? _cameraLabel(state.cameraId)
-              : 'camera ${state.cameraId}',
-          semanticsPrefix: 'camera',
-          onPrevious: () => _cycleCamera(-1),
-          onNext: () => _cycleCamera(1),
-        ),
-        const SizedBox(height: 6),
-        _stepper(
-          label: 'Mode',
-          value: mode != null ? _modeShort(mode) : state.recordingMode,
-          semanticsPrefix: 'recording mode',
-          onPrevious: () => _cycleMode(-1),
-          onNext: () => _cycleMode(1),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(
-              child: SegmentedButton<String>(
-                showSelectedIcon: false,
-                style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact,
+  Widget _recordCircle() {
+    final recording = state.isRecording;
+    return Semantics(
+      button: true,
+      label: recording ? 'stop recording' : 'start recording',
+      child: Tooltip(
+        message: recording ? 'Stop recording' : 'Record',
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: recording
+                ? () => widget.host.stopRecording()
+                : () => widget.host.startRecording(),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: recording ? UiTokens.danger : UiTokens.surfaceRaised,
+                border: Border.all(
+                  color: recording ? UiTokens.danger : UiTokens.accent,
+                  width: 2,
                 ),
-                segments: const [
-                  ButtonSegment(value: 'single', label: Text('Single')),
-                  ButtonSegment(value: 'movie', label: Text('Movie / Vlog')),
-                ],
-                selected: {state.shootMode},
-                onSelectionChanged: (selection) {
-                  if (selection.isEmpty) return;
-                  widget.host.setShootMode(selection.first);
-                },
+              ),
+              child: Center(
+                child: recording
+                    ? Container(
+                        width: 13,
+                        height: 13,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      )
+                    : Container(
+                        width: 16,
+                        height: 16,
+                        decoration: const BoxDecoration(
+                          color: UiTokens.danger,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
               ),
             ),
-          ],
+          ),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _stepper({
-    required String label,
-    required String value,
-    required String semanticsPrefix,
-    required VoidCallback onPrevious,
-    required VoidCallback onNext,
-  }) {
+  Widget _shootCircle(String mode, String letter) {
+    final selected = state.shootMode == mode;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: mode == 'movie' ? 'shoot mode movie' : 'shoot mode single',
+      child: Tooltip(
+        message: mode == 'movie' ? 'Movie / Vlog' : 'Single camera',
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () => widget.host.setShootMode(mode),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? UiTokens.accent : UiTokens.surfaceRaised,
+                    border: Border.all(
+                      color: selected ? UiTokens.accent : UiTokens.border,
+                    ),
+                  ),
+                  child: Text(
+                    letter,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: selected ? UiTokens.background : UiTokens.text,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _lensCircle(String id) {
+    final selected = id == state.cameraId;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'camera $id',
+      child: Tooltip(
+        message: _cameraLabel(id),
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () => widget.host.setCameraId(id),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? UiTokens.accent : UiTokens.surfaceRaised,
+                    border: Border.all(
+                      color: selected ? UiTokens.accent : UiTokens.border,
+                    ),
+                  ),
+                  child: Text(
+                    _lensBadge(id),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: selected ? UiTokens.background : UiTokens.text,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _lensBadge(String id) {
+    var facing = '';
+    for (final lens in state.shootLenses) {
+      if (lens.id == id) {
+        facing = lens.facing;
+        break;
+      }
+    }
+    if (facing.isEmpty) {
+      final label = _cameraLabel(id).toLowerCase();
+      if (label.contains('front')) {
+        facing = 'front';
+      } else if (label.contains('back')) {
+        facing = 'back';
+      }
+    }
+    final letter = switch (facing) {
+      'front' => 'F',
+      'back' => 'B',
+      _ => 'C',
+    };
+    return '$letter$id';
+  }
+
+  Widget _modeStepper() {
+    final modes = _enabledModes;
+    final index = modes.indexWhere((mode) => mode.id == state.recordingMode);
+    final mode = index >= 0 ? modes[index] : null;
     return Container(
-      height: 40,
+      height: 28,
       decoration: BoxDecoration(
         color: UiTokens.surfaceRaised,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: UiTokens.border),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            tooltip: 'Previous $label',
-            visualDensity: VisualDensity.compact,
-            onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left, size: 20),
-          ),
-          Expanded(
+          _stepButton(Icons.chevron_left, 'Previous mode', () => _cycleMode(-1)),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 150),
             child: Semantics(
-              label: '$semanticsPrefix: $value',
+              label: 'recording mode: ${mode != null ? _modeShort(mode) : state.recordingMode}',
               child: Text(
-                '$label · $value',
+                mode != null ? _modeShort(mode) : state.recordingMode,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Next $label',
-            visualDensity: VisualDensity.compact,
-            onPressed: onNext,
-            icon: const Icon(Icons.chevron_right, size: 20),
-          ),
+          _stepButton(Icons.chevron_right, 'Next mode', () => _cycleMode(1)),
         ],
       ),
     );
   }
 
-  Widget _lensCard(BuildContext context) {
-    return DeckCard(
-      title: 'Lens',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final id in state.cameraIds)
-                ChoiceChip(
-                  label: Text(_cameraLabel(id)),
-                  selected: id == state.cameraId,
-                  onSelected: (_) => widget.host.setCameraId(id),
-                  selectedColor: UiTokens.accent.withValues(alpha: 0.25),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            state.isRecording && state.shootMode != 'movie'
-                ? 'Stop recording or switch to Movie to change lenses.'
-                : 'Tap a lens to switch. Movie mode requires a common mode '
-                      'across the shoot set.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
-          ),
-        ],
-      ),
+  Widget _stepButton(IconData icon, String tooltip, VoidCallback onTap) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+      icon: Icon(icon, size: 16),
     );
   }
 
@@ -364,9 +452,12 @@ class _ControlDeckState extends State<ControlDeck> {
             Tooltip(
               message: mode.enabled ? mode.label : '${mode.label} · ${mode.reason}',
               child: ChoiceChip(
+                labelPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 label: Text(
                   _modeLabel(mode),
-                  style: const TextStyle(fontSize: 11),
+                  style: const TextStyle(fontSize: 10),
                 ),
                 selected: mode.id == state.recordingMode,
                 onSelected: mode.enabled
@@ -405,7 +496,9 @@ class _ControlDeckState extends State<ControlDeck> {
               children: [
                 for (final lens in lenses)
                   FilterChip(
-                    label: Text(lens.label),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    label: Text(lens.label, style: const TextStyle(fontSize: 10)),
                     selected: lens.selected,
                     onSelected: editable
                         ? (value) =>
@@ -431,7 +524,12 @@ class _ControlDeckState extends State<ControlDeck> {
             children: [
               for (final profile in profiles)
                 ChoiceChip(
-                  label: Text('${profile.name} · ${profile.lensCount}'),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  label: Text(
+                    '${profile.name} · ${profile.lensCount}',
+                    style: const TextStyle(fontSize: 10),
+                  ),
                   selected: profile.id == state.activeShootProfile,
                   onSelected: editable
                       ? (_) => widget.host.applyShootProfile(profile.id)
@@ -532,7 +630,9 @@ class _ControlDeckState extends State<ControlDeck> {
             children: [
               for (final angle in _angleOptions)
                 ChoiceChip(
-                  label: Text('${angle.toInt()}°'),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  label: Text('${angle.toInt()}°', style: const TextStyle(fontSize: 10)),
                   selected:
                       state.shutterAngle.roundToDouble() == angle &&
                       manualShutter,
@@ -543,14 +643,19 @@ class _ControlDeckState extends State<ControlDeck> {
             ],
           ),
           const SizedBox(height: 6),
-          OutlinedButton.icon(
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+            ),
             onPressed: () => widget.host.setAutoExposure(),
             icon: Icon(
               state.autoExposure ? Icons.check_circle_outline : Icons.exposure,
-              size: 18,
+              size: 15,
             ),
             label: Text(
-              state.autoExposure ? 'AE active' : 'Return to auto exposure',
+              state.autoExposure ? 'AE active' : 'Return to AE',
+              style: const TextStyle(fontSize: 11),
             ),
           ),
         ],
@@ -566,12 +671,16 @@ class _ControlDeckState extends State<ControlDeck> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+            ),
             onPressed: state.autoFocusSupported
                 ? () => widget.host.setAutoFocus()
                 : null,
             icon: Icon(
               state.autoFocus ? Icons.center_focus_strong : Icons.lock_outline,
-              size: 18,
+              size: 15,
             ),
             label: Text(
               !state.autoFocusSupported
@@ -579,6 +688,7 @@ class _ControlDeckState extends State<ControlDeck> {
                   : state.autoFocus
                   ? 'AF active'
                   : 'Return to AF',
+              style: const TextStyle(fontSize: 11),
             ),
           ),
           const SizedBox(height: 4),
@@ -627,9 +737,11 @@ class _ControlDeckState extends State<ControlDeck> {
             children: [
               for (final profile in state.profileNames)
                 ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   label: Text(
                     humanizeWireValue(profile),
-                    style: const TextStyle(fontSize: 11),
+                    style: const TextStyle(fontSize: 10),
                   ),
                   selected: profile == state.profile,
                   onSelected: (_) => widget.host.setProfile(profile),
@@ -637,11 +749,15 @@ class _ControlDeckState extends State<ControlDeck> {
             ],
           ),
           TextButton.icon(
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+            ),
             onPressed: () => widget.host.reloadLuts(),
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Reload LUTs'),
+            icon: const Icon(Icons.refresh, size: 14),
+            label: const Text('Reload LUTs', style: TextStyle(fontSize: 10)),
           ),
-          const Divider(height: 12, color: UiTokens.border),
+          const Divider(height: 8, color: UiTokens.border),
           Text('WHITE BALANCE', style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 4),
           Wrap(
@@ -650,16 +766,18 @@ class _ControlDeckState extends State<ControlDeck> {
             children: [
               for (final mode in state.whiteBalanceModes)
                 ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   label: Text(
                     humanizeWireValue(mode),
-                    style: const TextStyle(fontSize: 11),
+                    style: const TextStyle(fontSize: 10),
                   ),
                   selected: mode == state.whiteBalanceMode,
                   onSelected: (_) => widget.host.setWhiteBalanceMode(mode),
                 ),
             ],
           ),
-          const Divider(height: 12, color: UiTokens.border),
+          const Divider(height: 8, color: UiTokens.border),
           Text(
             'Input calibration',
             style: Theme.of(context).textTheme.bodyMedium,
@@ -675,47 +793,54 @@ class _ControlDeckState extends State<ControlDeck> {
       title: 'Monitoring',
       child: Column(
         children: [
-          _switchRow(
-            'Framing guides',
-            'Thirds, centre mark and frame border',
-            widget.showGuides,
-            widget.onGuidesChanged,
-          ),
-          _switchRow(
-            'Zebra',
-            'Highlight warning at 70%',
-            state.zebra,
-            (value) => widget.host.setZebra(value),
-          ),
-          _switchRow(
-            'False colour',
-            'Exposure bands for shadows and highlights',
-            state.falseColor,
-            (value) => widget.host.setFalseColor(value),
-          ),
-          _switchRow(
-            'Focus peaking',
-            'Edge highlight on the preview only',
-            state.peaking,
-            (value) => widget.host.setPeaking(
-              value,
-              _peakingSensitivity,
-              _peakingStrength,
-            ),
-          ),
-          _switchRow(
-            'Histogram',
-            '64-bin luma histogram card',
-            widget.showHistogram,
-            widget.onHistogramChanged,
-          ),
-          _switchRow(
-            'Waveform',
-            '64 × 16 luma waveform card',
-            widget.showWaveform,
-            widget.onWaveformChanged,
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              _toggleChip(
+                'Guides',
+                Icons.grid_3x3,
+                widget.showGuides,
+                widget.onGuidesChanged,
+              ),
+              _toggleChip(
+                'Zebra',
+                Icons.warning_amber_rounded,
+                state.zebra,
+                widget.host.setZebra,
+              ),
+              _toggleChip(
+                'False',
+                Icons.palette_outlined,
+                state.falseColor,
+                widget.host.setFalseColor,
+              ),
+              _toggleChip(
+                'Peaking',
+                Icons.center_focus_strong,
+                state.peaking,
+                (value) => widget.host.setPeaking(
+                  value,
+                  _peakingSensitivity,
+                  _peakingStrength,
+                ),
+              ),
+              _toggleChip(
+                'Hist',
+                Icons.bar_chart,
+                widget.showHistogram,
+                widget.onHistogramChanged,
+              ),
+              _toggleChip(
+                'Wave',
+                Icons.show_chart,
+                widget.showWaveform,
+                widget.onWaveformChanged,
+              ),
+            ],
           ),
           if (state.peaking) ...[
+            const SizedBox(height: 4),
             LabeledSlider(
               label: 'Peaking sensitivity',
               valueLabel: '${(_peakingSensitivity * 100).round()}%',
@@ -741,6 +866,28 @@ class _ControlDeckState extends State<ControlDeck> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _toggleChip(
+    String label,
+    IconData icon,
+    bool selected,
+    ValueChanged<bool> onChanged,
+  ) {
+    return FilterChip(
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      avatar: Icon(
+        icon,
+        size: 13,
+        color: selected ? UiTokens.accent : UiTokens.muted,
+      ),
+      label: Text(label, style: const TextStyle(fontSize: 10)),
+      selected: selected,
+      onSelected: onChanged,
+      selectedColor: UiTokens.accent.withValues(alpha: 0.18),
+      checkmarkColor: UiTokens.accent,
     );
   }
 
@@ -787,14 +934,16 @@ class _ControlDeckState extends State<ControlDeck> {
         Text(label.toUpperCase(), style: Theme.of(context).textTheme.labelSmall),
         const SizedBox(height: 4),
         Wrap(
-          spacing: 6,
-          runSpacing: 6,
+          spacing: 4,
+          runSpacing: 4,
           children: [
             for (final value in values)
               ChoiceChip(
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 label: Text(
                   humanizeWireValue(value),
-                  style: const TextStyle(fontSize: 11),
+                  style: const TextStyle(fontSize: 10),
                 ),
                 selected: value == selected,
                 onSelected: (_) => onSelected(value),
@@ -975,14 +1124,6 @@ class _ControlDeckState extends State<ControlDeck> {
     return enabled.isEmpty ? state.recordingModes : enabled;
   }
 
-  void _cycleCamera(int delta) {
-    final ids = state.cameraIds;
-    if (ids.length < 2) return;
-    final index = ids.indexOf(state.cameraId);
-    final next = ids[(index < 0 ? 0 : index + delta) % ids.length];
-    widget.host.setCameraId(next);
-  }
-
   void _cycleMode(int delta) {
     final modes = _enabledModes;
     if (modes.length < 2) return;
@@ -999,44 +1140,22 @@ class _ControlDeckState extends State<ControlDeck> {
     return 'camera $id';
   }
 
-  String _modeLabel(RecordingMode mode) {
-    final size = _sizeLabel(mode);
-    final bit = mode.tenBit ? '10-bit' : '8-bit';
-    return '$size ${mode.fps}p · $bit';
-  }
+  String _modeLabel(RecordingMode mode) =>
+      '${_sizeLabel(mode)}${mode.fps} ${mode.tenBit ? '10b' : '8b'}';
 
   String _modeShort(RecordingMode mode) =>
-      '${_sizeLabel(mode)} ${mode.fps}p ${mode.tenBit ? '10b' : '8b'}';
+      '${_sizeLabel(mode)}${mode.fps}p ${mode.tenBit ? '10b' : '8b'}';
 
   String _sizeLabel(RecordingMode mode) {
     final width = mode.width.toInt();
     final height = mode.height.toInt();
     return switch ((width, height)) {
-      (3840, 2160) => '4K',
-      (1920, 1080) => '1080p',
+      (3840, 2160) => 'UHD',
+      (1920, 1080) => 'FHD',
       (1440, 1080) => '4:3',
-      (1280, 720) => '720p',
+      (1280, 720) => '720',
       _ => '$width×$height',
     };
-  }
-
-  Widget _switchRow(
-    String title,
-    String subtitle,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      title: Text(title, style: Theme.of(context).textTheme.bodyMedium),
-      subtitle: Text(
-        subtitle,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
-      ),
-      value: value,
-      onChanged: onChanged,
-    );
   }
 
   Widget _infoRow(String label, String value) {
