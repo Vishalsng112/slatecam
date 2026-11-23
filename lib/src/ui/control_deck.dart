@@ -441,34 +441,266 @@ class _ControlDeckState extends State<ControlDeck> {
   }
 
   Widget _modeCard(BuildContext context) {
-    final modes = state.recordingModes;
+    final current = _currentMode;
+    if (current == null) {
+      return DeckCard(
+        title: 'Recording mode',
+        child: Text(
+          'No recording modes reported.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      );
+    }
+
+    final sizes = <String, List<int>>{};
+    for (final mode in state.recordingModes) {
+      sizes['${mode.width}x${mode.height}'] = [
+        mode.width.toInt(),
+        mode.height.toInt(),
+      ];
+    }
+    final sizeList = sizes.values.toList()
+      ..sort((a, b) => (b[0] * b[1]).compareTo(a[0] * a[1]));
+
+    final rates = state.recordingModes
+        .where(
+          (mode) =>
+              mode.width == current.width && mode.height == current.height,
+        )
+        .map((mode) => mode.fps.toInt())
+        .toSet()
+        .toList()
+      ..sort();
+
+    final depths = state.recordingModes
+        .where(
+          (mode) =>
+              mode.width == current.width &&
+              mode.height == current.height &&
+              mode.fps == current.fps,
+        )
+        .map((mode) => mode.tenBit)
+        .toSet();
+
     return DeckCard(
       title: 'Recording mode',
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final mode in modes)
-            Tooltip(
-              message: mode.enabled ? mode.label : '${mode.label} · ${mode.reason}',
-              child: ChoiceChip(
-                labelPadding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                label: Text(
-                  _modeLabel(mode),
-                  style: const TextStyle(fontSize: 10),
+          _modeRow(
+            'Resolution',
+            [
+              for (final size in sizeList)
+                _modeChip(
+                  label: _sizeLabelFor(size[0], size[1]),
+                  tooltip: '${size[0]}×${size[1]}',
+                  selected:
+                      size[0] == current.width && size[1] == current.height,
+                  onTap: () => _selectSize(size[0], size[1]),
                 ),
-                selected: mode.id == state.recordingMode,
-                onSelected: mode.enabled
-                    ? (_) => widget.host.selectRecordingMode(mode.id)
-                    : null,
-                selectedColor: UiTokens.accent.withValues(alpha: 0.25),
-              ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _modeRow(
+            'Frame rate',
+            [
+              for (final fps in rates)
+                _modeChip(
+                  label: '$fps',
+                  tooltip: '$fps fps',
+                  selected: fps == current.fps,
+                  onTap: () => _selectFps(fps),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _modeRow(
+            'Bit depth',
+            [
+              for (final tenBit in [true, false])
+                if (depths.contains(tenBit))
+                  _modeChip(
+                    label: tenBit ? '10-bit' : '8-bit',
+                    tooltip: tenBit
+                        ? '10-bit HLG where probe-verified'
+                        : '8-bit SDR',
+                    selected: current.tenBit == tenBit,
+                    onTap: () => _selectBit(tenBit),
+                  ),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  Widget _profileIcon(IconData icon, String tooltip, VoidCallback? onPressed) {
+    return IconButton(
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+    );
+  }
+
+  Widget _modeRow(String label, List<Widget> chips) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 62,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 7),
+            child: Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontSize: 10),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Wrap(spacing: 4, runSpacing: 4, children: chips),
+        ),
+      ],
+    );
+  }
+
+  Widget _modeChip({
+    required String label,
+    required String tooltip,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: ChoiceChip(
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        labelPadding: EdgeInsets.zero,
+        label: Text(label, style: const TextStyle(fontSize: 10)),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        selectedColor: UiTokens.accent.withValues(alpha: 0.25),
+      ),
+    );
+  }
+
+  RecordingMode? get _currentMode {
+    for (final mode in state.recordingModes) {
+      if (mode.id == state.recordingMode) return mode;
+    }
+    return null;
+  }
+
+  void _selectSize(int width, int height) {
+    final current = _currentMode;
+    final fps = current?.fps.toInt() ?? 30;
+    final tenBit = current?.tenBit ?? true;
+    _chooseMode(width, height, fps, tenBit);
+  }
+
+  void _selectFps(int fps) {
+    final current = _currentMode;
+    if (current == null) return;
+    _chooseMode(current.width.toInt(), current.height.toInt(), fps, current.tenBit);
+  }
+
+  void _selectBit(bool tenBit) {
+    final current = _currentMode;
+    if (current == null) return;
+    _chooseMode(
+      current.width.toInt(),
+      current.height.toInt(),
+      current.fps.toInt(),
+      tenBit,
+    );
+  }
+
+  /// Picks the closest enabled mode, preferring the requested size, then the
+  /// requested rate, then the requested bit depth. Falls back to reporting the
+  /// reason from a disabled candidate.
+  void _chooseMode(int width, int height, int fps, bool tenBit) {
+    RecordingMode? enabled(
+      int desiredFps,
+      bool desiredBit,
+    ) {
+      for (final mode in state.recordingModes) {
+        if (mode.enabled &&
+            mode.width == width &&
+            mode.height == height &&
+            mode.fps == desiredFps &&
+            mode.tenBit == desiredBit) {
+          return mode;
+        }
+      }
+      return null;
+    }
+
+    final exact = enabled(fps, tenBit) ??
+        enabled(fps, !tenBit) ??
+        _nearestRate(width, height, fps, tenBit) ??
+        _nearestRate(width, height, fps, !tenBit) ??
+        _firstEnabledAt(width, height);
+
+    if (exact != null) {
+      widget.host.selectRecordingMode(exact.id);
+      return;
+    }
+
+    // No enabled combination at this size: surface the bridge's reason.
+    for (final mode in state.recordingModes) {
+      if (mode.width == width && mode.height == height) {
+        widget.host.selectRecordingMode(mode.id);
+        return;
+      }
+    }
+  }
+
+  RecordingMode? _nearestRate(
+    int width,
+    int height,
+    int fps,
+    bool tenBit,
+  ) {
+    RecordingMode? best;
+    var bestDelta = 1 << 30;
+    for (final mode in state.recordingModes) {
+      if (!mode.enabled ||
+          mode.width != width ||
+          mode.height != height ||
+          mode.tenBit != tenBit) {
+        continue;
+      }
+      final delta = (mode.fps.toInt() - fps).abs();
+      if (delta < bestDelta ||
+          (delta == bestDelta && (best == null || mode.fps > best.fps))) {
+        best = mode;
+        bestDelta = delta;
+      }
+    }
+    return best;
+  }
+
+  RecordingMode? _firstEnabledAt(int width, int height) {
+    for (final mode in state.recordingModes) {
+      if (mode.enabled && mode.width == width && mode.height == height) {
+        return mode;
+      }
+    }
+    return null;
+  }
+
+  String _sizeLabelFor(int width, int height) {
+    return switch ((width, height)) {
+      (3840, 2160) => '4K',
+      (1920, 1080) => '1080p',
+      (1440, 1080) => '4:3',
+      (1280, 720) => '720p',
+      _ => '$width×$height',
+    };
   }
 
   Widget _shootSetCard(BuildContext context) {
@@ -541,32 +773,30 @@ class _ControlDeckState extends State<ControlDeck> {
           const SizedBox(height: 4),
           Row(
             children: [
-              Text(
-                'Active profile: ${active.name}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: 'Save current set as profile',
-                onPressed: editable ? _saveShootProfile : null,
-                icon: const Icon(Icons.save_outlined, size: 18),
-              ),
-              IconButton(
-                tooltip: 'Rename active profile',
-                onPressed: editable && active.id.isNotEmpty
-                    ? _renameShootProfile
-                    : null,
-                icon: const Icon(
-                  Icons.drive_file_rename_outline,
-                  size: 18,
+              Expanded(
+                child: Text(
+                  'Active: ${active.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-              IconButton(
-                tooltip: 'Delete active profile',
-                onPressed: editable && profiles.length > 1 && active.id.isNotEmpty
+              _profileIcon(
+                Icons.save_outlined,
+                'Save current set as profile',
+                editable ? _saveShootProfile : null,
+              ),
+              _profileIcon(
+                Icons.drive_file_rename_outline,
+                'Rename active profile',
+                editable && active.id.isNotEmpty ? _renameShootProfile : null,
+              ),
+              _profileIcon(
+                Icons.delete_outline,
+                'Delete active profile',
+                editable && profiles.length > 1 && active.id.isNotEmpty
                     ? _deleteShootProfile
                     : null,
-                icon: const Icon(Icons.delete_outline, size: 18),
               ),
             ],
           ),
@@ -1140,23 +1370,11 @@ class _ControlDeckState extends State<ControlDeck> {
     return 'camera $id';
   }
 
-  String _modeLabel(RecordingMode mode) =>
-      '${_sizeLabel(mode)}${mode.fps} ${mode.tenBit ? '10b' : '8b'}';
-
   String _modeShort(RecordingMode mode) =>
       '${_sizeLabel(mode)}${mode.fps}p ${mode.tenBit ? '10b' : '8b'}';
 
-  String _sizeLabel(RecordingMode mode) {
-    final width = mode.width.toInt();
-    final height = mode.height.toInt();
-    return switch ((width, height)) {
-      (3840, 2160) => 'UHD',
-      (1920, 1080) => 'FHD',
-      (1440, 1080) => '4:3',
-      (1280, 720) => '720',
-      _ => '$width×$height',
-    };
-  }
+  String _sizeLabel(RecordingMode mode) =>
+      _sizeLabelFor(mode.width.toInt(), mode.height.toInt());
 
   Widget _infoRow(String label, String value) {
     return Padding(

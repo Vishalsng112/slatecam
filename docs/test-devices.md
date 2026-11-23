@@ -795,7 +795,7 @@ one encoded clip alive.
 - POCO: back 16 mm (ultra-wide), back 25 mm, front 24 mm. Deselecting the
   ultra-wide left main + front, and the selection survived a force-stop/restart.
 
-## Phase 5.5 Control Console and seamless switch (2026-11-24, build 2051)
+## Phase 5.5 Control Console and seamless switch (2026-11-24, build 2054)
 
 ### Control Console
 
@@ -807,7 +807,16 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
-### Condensed circular controls (Pad 3 + POCO, build 2051)
+### Three-row recording-mode selector (Pad 3 + POCO, build 2054)
+
+- Pad: from 1080p30 10-bit, selecting 4K → 24 fps → 8-bit produced
+  `3840×2160 · 24p · 8b SDR`; the mode stepper showed `4K24p 8b`.
+- Pad: switching back to Movie selected the common `1080p30 10-bit HLG`
+  automatically (4K is not available across both lenses).
+- POCO: console uses two columns at its width; the selector shows only
+  probe-verified combinations and 10-bit stays disabled by the encoder quirk.
+
+### Condensed circular controls (Pad 3 + POCO, build 2054)
 
 - Fixed header: record circle at (1896,180), S at (2032,180), M at (2144,180),
   B0 at (2280,180), F1 at (2418,180) on the Pad. Movie -> record -> F1 kept one

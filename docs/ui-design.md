@@ -105,7 +105,7 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
 |---|---|
 | `>= 1400 lp` | Console starts open at 760 lp, three columns; preview keeps the rest |
 | `1000–1399 lp` | Console starts open at 600 lp, two columns |
-| `760–999 lp` | Console starts open at 460 lp, two columns |
+| `760–999 lp` | Console starts open at 560 lp, two columns |
 | `< 760 lp` | Console starts closed; opens over the preview at `min(360, width * 0.6)` |
 
 On short landscape screens the six monitor toggles collapse into a compact
@@ -194,7 +194,19 @@ position without opening a menu.
 | Zoom / lens selector | lens chips + continuous zoom, from the probe report | **Current** (`ZoomPlugin`) |
 | Audio monitor mute | no audio monitor path | Future |
 
-### 5.3 Exposure card
+### 5.3 Recording mode card
+
+| Row | Values | Native call |
+|---|---|---|
+| Resolution | 4K, 1080p, 4:3, 720p | `selectRecordingMode` |
+| Frame rate | 24, 25, 30 (whatever the size exposes) | `selectRecordingMode` |
+| Bit depth | 10-bit, 8-bit (when the combination exists) | `selectRecordingMode` |
+
+Changing a row keeps the other two where possible and falls back to the closest
+enabled combination. A size with no enabled mode reports the bridge reason
+instead of silently changing something else.
+
+### 5.4 Exposure card
 
 | Element | Native call | Status |
 |---|---|---|
@@ -210,7 +222,7 @@ position without opening a menu.
 | Zebra threshold for exposure | `setZebra` only takes on/off | Future |
 | Metering mode (matrix/centre/spot) | probe reports regions, no UI yet | Future |
 
-### 5.4 Focus card
+### 5.5 Focus card
 
 | Element | Native call | Status |
 |---|---|---|
@@ -223,7 +235,7 @@ position without opening a menu.
 | Hybrid CDAF | hill-climb focus engine | Future |
 | Focus peaking controls | Monitoring card | Current |
 
-### 5.5 Colour card
+### 5.6 Colour card
 
 | Element | Native call | Status |
 |---|---|---|
@@ -238,7 +250,7 @@ position without opening a menu.
 | Transfer/gamma selection | needs 10-bit path | Future |
 | ColorChecker capture workflow | `ColorCalibration` solver; capture tooling | Solver current, workflow Future |
 
-### 5.6 Monitoring card and left rail
+### 5.7 Monitoring card and left rail
 
 | Element | Native call | Status |
 |---|---|---|

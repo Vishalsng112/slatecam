@@ -136,7 +136,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                 : constraints.maxWidth >= 1000
                 ? 600.0
                 : constraints.maxWidth >= 760
-                ? 460.0
+                ? 560.0
                 : math.min(360.0, math.max(300.0, constraints.maxWidth * 0.6));
             final deck = ControlDeck(
               state: state,

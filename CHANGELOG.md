@@ -52,10 +52,12 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   are direct chips/segments instead of dropdowns. The console starts open at
   760 lp on tablets and can still be collapsed.
 - Condensed console pass: circular RECORD/STOP, circular S/M shoot-mode and
-  per-lens badges (`B0`, `F1`) in a 44 lp hit target, compact mode chips
-  (UHD/FHD/4:3/720 + fps + bit depth), icon-chip monitoring and three-column
-  cards at >=720 lp. Colour, monitoring, exposure and device fit with far less
-  scrolling.
+  per-lens badges (`B0`, `F1`) in a 44 lp hit target, icon-chip monitoring and
+  three-column cards at >=720 lp (two at >=520 lp).
+- Recording mode is now the industry-standard three-row selector: resolution
+  (4K / 1080p / 4:3 / 720p) → frame rate (24/25/30) → bit depth (10-bit/8-bit).
+  The closest enabled combination is chosen when a change is not available,
+  and a size with no enabled mode reports the bridge's reason.
 - `SwitchFramePump` repeats the last camera frame into the encoder while a
   movie-mode lens switch has no session, so the clip keeps a continuous
   timeline. Policy covered by 6 JVM tests.
