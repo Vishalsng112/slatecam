@@ -77,7 +77,8 @@ left floating in conversation.
 |---|---|
 | RAW burst → DNG sequence | Camera2 has no RAW video; expect low fps and large files |
 | Gyro container embedding | Sidecar v2 is frame-aligned; embedding a metadata track in MP4 remains |
-| Dual preview / lens switching | Concurrency is proven; streaming two previews and per-physical streams remain |
+| Dual preview mode | **Blocked by open ordering.** Opening the second camera while the first holds a session returns `ERROR_MAX_CAMERAS_IN_USE (2)`. The verifier passes because it opens both devices before configuring either. A dual-preview controller must do the same: open both, then configure both sessions. The preview toggle was removed rather than shipped broken. |
+| Lens switching / per-physical streams | Needs a device that exposes physical IDs and `setPhysicalCameraId` |
 
 Framing guides moved to Phase 4 (done).
 

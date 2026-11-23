@@ -119,7 +119,13 @@ class CameraController(private val context: Context) {
 
     val isTenBitActive: Boolean get() = tenBitActive
 
-    fun open(previewTarget: Surface, width: Int, height: Int, tenBit: Boolean = false) {
+    fun open(
+        previewTarget: Surface,
+        width: Int,
+        height: Int,
+        tenBit: Boolean = false,
+        cameraIdOverride: String? = null,
+    ) {
         handler.post {
             try {
                 closeInternal()
@@ -131,7 +137,7 @@ class CameraController(private val context: Context) {
                 errorMessage = null
 
                 val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-                val cameraId = selectCamera(manager)
+                val cameraId = cameraIdOverride ?: selectCamera(manager)
                 val characteristics = manager.getCameraCharacteristics(cameraId)
                 readCapabilities(characteristics)
 
@@ -721,10 +727,10 @@ class CameraController(private val context: Context) {
          * Picks a 16:9 preview size up to 1080p from the back camera's stream map.
          * Falls back to the largest size under 1080p, then 720p.
          */
-        fun choosePreviewSize(context: Context): Size {
+        fun choosePreviewSize(context: Context, preferredCameraId: String? = null): Size {
             val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
             val ids = runCatching { manager.cameraIdList }.getOrDefault(emptyArray())
-            val cameraId = ids.firstOrNull { id ->
+            val cameraId = preferredCameraId ?: ids.firstOrNull { id ->
                 runCatching {
                     manager.getCameraCharacteristics(id)
                         .get(CameraCharacteristics.LENS_FACING) ==
