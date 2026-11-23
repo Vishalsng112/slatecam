@@ -82,6 +82,12 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   `on` (POCO back). EIS is enabled by default where advertised and can be
   switched off. Both preferences persist per camera ID; the Pad 3 back only
   advertises OIS `off`, so its OIS control is hidden rather than faked.
+- Exposure metering patterns: **Multi**, **Center**, **Spot**, **Average** and
+  **Highlight**, plus a **Meter speed** slider from slow (0) to fast (1). The
+  meter is a pure `:core:camera` engine fed by a 32×18 luma grid from the GPU
+  analysis pass. P applies the error as AE compensation on top of the HAL AE; S
+  applies it to ISO; M stays manual. Highlight is protect-only, so a flat scene
+  is not pushed up to 0.85. The mode and speed persist across restarts.
 - Exposure mode uses circular **P / S / M** buttons.
 - The Focus card and the bottom-dock focus chip are removed for now; the camera
   keeps continuous autofocus. Manual focus returns with the tap-to-focus/AF-lock

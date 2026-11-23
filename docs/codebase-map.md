@@ -55,6 +55,8 @@ root is `android/`, not the repository root.
 | Per-camera capabilities | `:core:camera` | `CameraCapabilities.kt` |
 | Recording modes / common mode | `:core:camera` | `RecordingModeCatalog.kt` |
 | Exposure P/S/M | `:core:camera` | `ExposureEngine.kt` |
+| Metering patterns and response speed | `:core:camera` | `Metering.kt`, `ExposureEngine.kt` |
+| Luma grid for metering | `:core:gpu` | `FrameAnalysis.kt`, `GlPreviewRenderer.runAnalysis` |
 | Lens-shading / vignette correction | `:core:camera` | `ShadingCorrection.kt`, `CameraController.applyControls` |
 | Focus mode policy | `:core:camera` | `FocusMode.kt` |
 | OIS / EIS requests | `:core:camera` | `CameraController.readCapabilities/applyControls` |
@@ -117,6 +119,7 @@ on camera change`
 - **Orientation/aspect:** ADR 0006.
 - **Lens-shading (vignette) correction:** ADR 0009.
 - **Stabilisation and focus modes:** ADR 0010.
+- **Exposure metering and response speed:** ADR 0011.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current

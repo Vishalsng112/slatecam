@@ -45,6 +45,7 @@ class _ControlDeckState extends State<ControlDeck> {
   final ScrollController _scrollController = ScrollController();
   double? _isoDraft;
   double? _shutterDraft;
+  double? _meterSpeedDraft;
   double? _peakingSensitivityDraft;
   double? _peakingStrengthDraft;
 
@@ -55,6 +56,9 @@ class _ControlDeckState extends State<ControlDeck> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.state.iso != state.iso) _isoDraft = null;
     if (oldWidget.state.shutterNs != state.shutterNs) _shutterDraft = null;
+    if (oldWidget.state.meteringSpeed != state.meteringSpeed) {
+      _meterSpeedDraft = null;
+    }
     if (oldWidget.state.peakingSensitivity != state.peakingSensitivity) {
       _peakingSensitivityDraft = null;
     }
@@ -65,6 +69,7 @@ class _ControlDeckState extends State<ControlDeck> {
 
   double get _iso => _isoDraft ?? state.iso.toDouble();
   double get _shutter => _shutterDraft ?? state.shutterNs.toDouble();
+  double get _meterSpeed => _meterSpeedDraft ?? state.meteringSpeed;
   double get _peakingSensitivity =>
       _peakingSensitivityDraft ?? state.peakingSensitivity;
   double get _peakingStrength => _peakingStrengthDraft ?? state.peakingStrength;
@@ -1047,7 +1052,29 @@ class _ControlDeckState extends State<ControlDeck> {
               ],
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
+          _modeRow(
+            'Metering',
+            [
+              for (final mode in state.meteringModes)
+                _modeChip(
+                  label: _meteringLabel(mode),
+                  tooltip: _meteringTooltip(mode),
+                  selected: state.meteringMode == mode,
+                  onTap: () => widget.host.setMeteringMode(mode),
+                ),
+            ],
+          ),
+          LabeledSlider(
+            label: 'Meter speed',
+            valueLabel: '${(_meterSpeed * 100).round()}%',
+            value: _meterSpeed,
+            min: 0,
+            max: 1,
+            enabled: state.exposureMode != 'M',
+            onChanged: (value) => setState(() => _meterSpeedDraft = value),
+            onChangeEnd: widget.host.setMeteringSpeed,
+          ),
           LabeledSlider(
             label: 'ISO',
             valueLabel: isoValueLabel,
@@ -1367,6 +1394,24 @@ class _ControlDeckState extends State<ControlDeck> {
       ],
     );
   }
+
+  String _meteringLabel(String mode) => switch (mode) {
+    'multi' => 'Multi',
+    'center' => 'Center',
+    'spot' => 'Spot',
+    'average' => 'Average',
+    'highlight' => 'Highlight',
+    _ => humanizeWireValue(mode),
+  };
+
+  String _meteringTooltip(String mode) => switch (mode) {
+    'multi' => 'Pattern metering: centre-weighted with outlier rejection',
+    'center' => 'Centre-weighted average',
+    'spot' => 'Small central spot',
+    'average' => 'Entire screen average',
+    'highlight' => 'Protect the brightest 10% from clipping',
+    _ => humanizeWireValue(mode),
+  };
 
   String _focusModeLabel(String mode) => switch (mode) {
     'off' => 'MF',

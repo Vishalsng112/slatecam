@@ -807,6 +807,27 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
+### Exposure metering patterns and speed (Pad 3 + POCO, build 2068)
+
+The meter uses the GPU luma grid, not Camera2 AE regions. Logcat tag
+`SlateCamMeter` prints the measured/target/EV and applied state once per second.
+
+| Check | Pad 3 | POCO X6 Pro |
+|---|---|---|
+| Default pattern | Multi | Multi |
+| Speed | 50% | 50% |
+| P compensation range | ±18 steps at 1/6 EV | range reported by HAL |
+| Multi convergence | 0.506 luma / EV −0.17 / comp 1 -> 0.449 / EV 0.00 / comp 2 -> 0.467 / EV −0.05 (dead band) | 0.434 luma / EV 0.05 / comp 6 (stable) |
+| Spot | 0.435 luma / EV 0.05 / comp −2 (stable) | — |
+| Highlight | protect-only; flat scene held at compensation 0 | — |
+| S loop | ISO 100 -> 1600 within 3 s when the scene needed more exposure | — |
+| M | speed slider disabled; exposure untouched | — |
+| Persistence | Spot selected, restart kept Spot; restored to Multi/50% | Multi/50% |
+
+The P log shows the loop converging in two steps with the dead band stopping at
+EV 0.05. The S log shows the same meter raising ISO when the manually set ISO
+was too low; the loop is clamped by the sensor's ISO range at the top end.
+
 ### Focus modes, OIS and EIS (Pad 3 + POCO, build 2064)
 
 | Check | Pad 3 back | POCO X6 Pro back |

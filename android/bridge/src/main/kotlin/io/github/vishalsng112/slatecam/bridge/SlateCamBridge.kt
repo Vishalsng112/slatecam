@@ -26,6 +26,7 @@ import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamHostApi
 import io.github.vishalsng112.slatecam.core.camera.CameraCapabilitiesReader
 import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
+import io.github.vishalsng112.slatecam.core.camera.MeteringMode
 import io.github.vishalsng112.slatecam.core.camera.RecordingModeCatalog
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.codec.GyroRecorder
@@ -134,6 +135,11 @@ class SlateCamBridge private constructor(
     }
 
     init {
+        controller.setMeteringMode(
+            shootPrefs.getString(KEY_METERING_MODE, MeteringMode.MULTI.wireValue)
+                ?: MeteringMode.MULTI.wireValue,
+        )
+        controller.setMeteringSpeed(shootPrefs.getFloat(KEY_METERING_SPEED, 0.5f))
         applyDeviceSnapshot(deviceSnapshot)
         controller.listener = CameraController.Listener { state ->
             lastState = state
@@ -158,15 +164,19 @@ class SlateCamBridge private constructor(
         applyProfile(PictureProfile.STANDARD)
 
         renderer.setAnalysisEnabled(true)
-        renderer.onAnalysis = { histogram, waveform ->
-            // Metering is camera state: every sample goes to the S-mode loop,
+        renderer.onAnalysis = { analysis ->
+            // Metering is camera state: every sample goes to the P/S loop,
             // while the UI copy is throttled below.
-            controller.submitMetering(histogram)
+            controller.submitMetering(
+                analysis.lumaGrid,
+                analysis.gridWidth,
+                analysis.gridHeight,
+            )
             val now = SystemClock.elapsedRealtime()
             if (now - lastAnalysisPublishMs >= 200L) {
                 lastAnalysisPublishMs = now
-                histogramBins = histogram.toList()
-                waveformBins = waveform.toList()
+                histogramBins = analysis.histogram.toList()
+                waveformBins = analysis.waveform.toList()
                 mainHandler.post { pushState() }
             }
         }
@@ -243,6 +253,18 @@ class SlateCamBridge private constructor(
 
     override fun setAutoExposure() {
         controller.setAutoExposure()
+    }
+
+    override fun setMeteringMode(mode: String) {
+        val selected = MeteringMode.fromWire(mode)
+        shootPrefs.edit().putString(KEY_METERING_MODE, selected.wireValue).apply()
+        controller.setMeteringMode(selected.wireValue)
+    }
+
+    override fun setMeteringSpeed(speed: Double) {
+        val clamped = speed.toFloat().coerceIn(0f, 1f)
+        shootPrefs.edit().putFloat(KEY_METERING_SPEED, clamped).apply()
+        controller.setMeteringSpeed(clamped)
     }
 
     override fun setExposureMode(mode: String) {
@@ -1458,6 +1480,9 @@ class SlateCamBridge private constructor(
         eisEnabled = eisEnabled,
         exposureMode = exposureMode,
         exposureModes = exposureModes,
+        meteringMode = meteringMode,
+        meteringModes = meteringModes,
+        meteringSpeed = meteringSpeed.toDouble(),
         deviceKey = deviceSnapshot.identity.deviceKey,
         deviceQuirks = deviceSnapshot.quirks.map { it.id },
         deviceCalibrationActive = deviceSnapshot.calibration != null,
@@ -1483,6 +1508,8 @@ class SlateCamBridge private constructor(
         private const val KEY_SHADING_OFF = "shading_off_cameras"
         private const val KEY_OIS_OFF = "ois_off_cameras"
         private const val KEY_EIS_OFF = "eis_off_cameras"
+        private const val KEY_METERING_MODE = "metering_mode"
+        private const val KEY_METERING_SPEED = "metering_speed"
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")

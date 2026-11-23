@@ -81,8 +81,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile
     private var analysisEnabled = false
 
-    /** Called on the GL thread with (64-bin luma histogram, 64x16 waveform). */
-    var onAnalysis: ((IntArray, IntArray) -> Unit)? = null
+    /** Called on the GL thread with histogram, waveform and metering grid. */
+    var onAnalysis: ((FrameAnalysis) -> Unit)? = null
     private var aPosition = 0
     private var aTexCoord = 0
     private val texMatrix = FloatArray(16)
@@ -763,6 +763,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
         val histogram = IntArray(HISTOGRAM_BINS)
         val waveform = IntArray(WAVEFORM_COLUMNS * WAVEFORM_BINS)
+        val grid = FloatArray(LUMA_GRID_WIDTH * LUMA_GRID_HEIGHT)
+        val gridCounts = IntArray(grid.size)
 
         for (pixel in 0 until ANALYSIS_WIDTH * ANALYSIS_HEIGHT) {
             val offset = pixel * 4
@@ -785,9 +787,29 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             }.coerceIn(0, WAVEFORM_COLUMNS - 1)
             val bin = (luma * (WAVEFORM_BINS - 1)).toInt().coerceIn(0, WAVEFORM_BINS - 1)
             waveform[bin * WAVEFORM_COLUMNS + column]++
+
+            val gx = (x * LUMA_GRID_WIDTH / ANALYSIS_WIDTH)
+                .coerceIn(0, LUMA_GRID_WIDTH - 1)
+            val gy = (y * LUMA_GRID_HEIGHT / ANALYSIS_HEIGHT)
+                .coerceIn(0, LUMA_GRID_HEIGHT - 1)
+            val cell = gy * LUMA_GRID_WIDTH + gx
+            grid[cell] += luma
+            gridCounts[cell]++
         }
 
-        callback(histogram, waveform)
+        for (cell in grid.indices) {
+            if (gridCounts[cell] > 0) grid[cell] /= gridCounts[cell]
+        }
+
+        callback(
+            FrameAnalysis(
+                histogram = histogram,
+                waveform = waveform,
+                lumaGrid = grid,
+                gridWidth = LUMA_GRID_WIDTH,
+                gridHeight = LUMA_GRID_HEIGHT,
+            ),
+        )
     }
 
     private fun ensureAnalysisTarget(): Boolean {
@@ -1091,6 +1113,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         const val HISTOGRAM_BINS = 64
         const val WAVEFORM_COLUMNS = 64
         const val WAVEFORM_BINS = 16
+        const val LUMA_GRID_WIDTH = 32
+        const val LUMA_GRID_HEIGHT = 18
         const val ANALYSIS_INTERVAL = 5
 
         // Android EGL extension: marks a config usable as a MediaCodec input.

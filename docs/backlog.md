@@ -35,7 +35,8 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 
 | Item | Notes |
 |---|---|
-| Pro AE + EV/sec control | Replace HAL AE in P with the histogram-driven controller; expose Slow/Normal/Fast |
+| Hybrid contrast AF | Metering/focus modes shipped; contrast-detect refinement remains |
+| Scene-referred metering | Metering shares the analysis frame with the histogram/waveform, so a strong LUT or log profile can bias the target; add a pre-look metering pass |
 | Hybrid contrast-detect AF | Laplacian variance from the analysis FBO + HAL coarse acquisition; fall back to HAL AF |
 | RAW burst → DNG sequence | Camera2 has no RAW video; expect low fps and large files |
 | Gyro container embedding | Sidecar v2 is frame-aligned; embedding an MP4 metadata track remains |

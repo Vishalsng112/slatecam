@@ -75,6 +75,10 @@ data class CameraUiState(
     val eisEnabled: Boolean = false,
     val exposureMode: String = ExposureMode.PROGRAM.wireValue,
     val exposureModes: List<String> = ExposureMode.wireValues,
+    val meteringMode: String = MeteringMode.MULTI.wireValue,
+    val meteringModes: List<String> = MeteringMode.wireValues,
+    /** 0 = slowest, 1 = fastest exposure response. */
+    val meteringSpeed: Float = 0.5f,
 )
 
 /**
@@ -127,8 +131,16 @@ class CameraController(private val context: Context) {
     private var wbMode = "auto"
     private var autoExposure = true
     private var exposureMode = ExposureMode.PROGRAM
-    private val autoIso = AutoIsoController()
+    private val exposureController = ExposureController()
+    private var meteringMode = MeteringMode.MULTI
+    private var meteringSpeed = 0.5f
     private var lastMeteringNs = 0L
+    private var lastMeterLogMs = 0L
+    private var aeCompensationSteps = 0
+    private var aeCompensationMin = 0
+    private var aeCompensationMax = 0
+    private var aeCompensationStepEv = 0f
+    private var aeCompensationAccumulator = 0f
     private var autoFocus = true
     private var autoFocusSupported = true
     private var focusModes: List<String> = emptyList()
@@ -289,6 +301,11 @@ class CameraController(private val context: Context) {
             exposureMode = selected
             autoExposure = selected == ExposureMode.PROGRAM
             lastMeteringNs = 0L
+            if (selected == ExposureMode.PROGRAM) {
+                // Start from a neutral bias; the meter takes over from there.
+                aeCompensationSteps = 0
+                aeCompensationAccumulator = 0f
+            }
             applyAndEmit()
         }
     }
@@ -371,15 +388,26 @@ class CameraController(private val context: Context) {
     }
 
     /**
-     * Feeds the GPU luma histogram into the shutter-priority auto-ISO loop.
-     * Safe to call in every mode; the loop only runs in S.
+     * Feeds the GPU luma grid into the metering loop.
+     *
+     * P applies the error as AE exposure compensation, S as ISO, and M leaves
+     * exposure untouched. Safe to call from the GL thread.
      */
-    fun submitMetering(histogram: IntArray) {
-        if (histogram.isEmpty()) return
-        val sample = histogram.copyOf()
+    fun submitMetering(lumaGrid: FloatArray, gridWidth: Int, gridHeight: Int) {
+        if (gridWidth <= 0 || gridHeight <= 0 ||
+            lumaGrid.size < gridWidth * gridHeight
+        ) {
+            return
+        }
         handler.post {
-            if (exposureMode != ExposureMode.SHUTTER_PRIORITY) return@post
             if (session == null || builder == null) return@post
+            if (exposureMode == ExposureMode.MANUAL) return@post
+            val sample = ExposureMeter.measure(
+                meteringMode,
+                lumaGrid,
+                gridWidth,
+                gridHeight,
+            ) ?: return@post
 
             val now = SystemClock.elapsedRealtimeNanos()
             val elapsed = if (lastMeteringNs == 0L) {
@@ -389,7 +417,54 @@ class CameraController(private val context: Context) {
             }
             lastMeteringNs = now
 
-            val next = autoIso.update(sample, iso, isoMin, isoMax, elapsed)
+            val nowMs = SystemClock.elapsedRealtime()
+            if (nowMs - lastMeterLogMs >= 1_000L) {
+                lastMeterLogMs = nowMs
+                android.util.Log.i(
+                    "SlateCamMeter",
+                    "mode=${meteringMode.wireValue} " +
+                        "measured=${sample.measuredLuma} target=${sample.targetLuma} " +
+                        "ev=${sample.errorEv} exposure=${exposureMode.wireValue} " +
+                        "iso=$iso comp=$aeCompensationSteps",
+                )
+            }
+
+            if (exposureMode == ExposureMode.PROGRAM) {
+                if (!autoExposure || aeCompensationMax <= aeCompensationMin ||
+                    aeCompensationStepEv <= 0f
+                ) {
+                    return@post
+                }
+                val correctionEv = exposureController.correctionEv(
+                    sample,
+                    elapsed,
+                    meteringSpeed,
+                )
+                if (correctionEv == 0f) return@post
+                aeCompensationAccumulator += correctionEv / aeCompensationStepEv
+                val deltaSteps = aeCompensationAccumulator.roundToInt()
+                if (deltaSteps == 0) return@post
+                val next = (aeCompensationSteps + deltaSteps)
+                    .coerceIn(aeCompensationMin, aeCompensationMax)
+                aeCompensationAccumulator -= deltaSteps
+                if (next != aeCompensationSteps) {
+                    aeCompensationSteps = next
+                    applyAndEmit()
+                } else {
+                    // At the compensation limit; do not accumulate further.
+                    aeCompensationAccumulator = 0f
+                }
+                return@post
+            }
+
+            val next = exposureController.nextIso(
+                sample,
+                iso,
+                isoMin,
+                isoMax,
+                elapsed,
+                meteringSpeed,
+            )
             if (next != iso) {
                 iso = next
                 applyAndEmit()
@@ -444,7 +519,29 @@ class CameraController(private val context: Context) {
             exposureMode = ExposureMode.PROGRAM
             autoExposure = true
             lastMeteringNs = 0L
+            aeCompensationSteps = 0
+            aeCompensationAccumulator = 0f
             applyAndEmit()
+        }
+    }
+
+    fun setMeteringMode(mode: String) {
+        val selected = MeteringMode.fromWire(mode)
+        handler.post {
+            if (meteringMode == selected) return@post
+            meteringMode = selected
+            lastMeteringNs = 0L
+            aeCompensationAccumulator = 0f
+            emit()
+        }
+    }
+
+    fun setMeteringSpeed(speed: Float) {
+        handler.post {
+            val clamped = speed.coerceIn(0f, 1f)
+            if (meteringSpeed == clamped) return@post
+            meteringSpeed = clamped
+            emit()
         }
     }
 
@@ -557,6 +654,24 @@ class CameraController(private val context: Context) {
         val exposure = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
         shutterMinNs = exposure?.lower ?: 1_000L
         shutterMaxNs = exposure?.upper ?: 1_000_000_000L
+
+        // P-mode metering is applied as an EV bias on top of the HAL AE. The
+        // range and step are per device.
+        val compensation = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+        aeCompensationStepEv = characteristics
+            .get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)
+            ?.toFloat()
+            ?.takeIf { it > 0f }
+            ?: 0f
+        if (compensation != null && aeCompensationStepEv > 0f) {
+            aeCompensationMin = compensation.lower
+            aeCompensationMax = compensation.upper
+        } else {
+            aeCompensationMin = 0
+            aeCompensationMax = 0
+        }
+        aeCompensationSteps = aeCompensationSteps.coerceIn(aeCompensationMin, aeCompensationMax)
+        aeCompensationAccumulator = 0f
 
         focusMax = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
         focusModes = characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
@@ -792,6 +907,12 @@ class CameraController(private val context: Context) {
 
         if (autoExposure) {
             request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+            if (aeCompensationMax > aeCompensationMin && aeCompensationStepEv > 0f) {
+                request.set(
+                    CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION,
+                    aeCompensationSteps,
+                )
+            }
         } else {
             request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
             request.set(CaptureRequest.SENSOR_SENSITIVITY, iso)
@@ -948,6 +1069,9 @@ class CameraController(private val context: Context) {
             eisEnabled = eisEnabled,
             exposureMode = exposureMode.wireValue,
             exposureModes = ExposureMode.wireValues,
+            meteringMode = meteringMode.wireValue,
+            meteringModes = MeteringMode.wireValues,
+            meteringSpeed = meteringSpeed,
         )
         mainHandler.post { listener?.onState(state) }
     }

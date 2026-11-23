@@ -32,72 +32,66 @@ enum class ExposureMode(val wireValue: String) {
 }
 
 /**
- * Brightness controller for shutter-priority mode.
+ * Conversion from a metered [MeterSample] to an exposure correction.
  *
- * The GPU already produces a 64-bin luma histogram at roughly 5 Hz. This loop
- * turns the requested percentile of that histogram into an EV error and moves
- * ISO toward the target. It is intentionally conservative: a dead band stops
- * chattering around the target, and the per-second EV limit prevents the
- * visible jumps that make a manual shutter look broken.
+ * The same loop drives P-mode AE compensation and S-mode ISO. The user-facing
+ * speed (0 = slow, 1 = fast) changes both the proportional gain and the
+ * per-second EV limit, so a slow setting glides and a fast setting snaps.
  *
- * This is not the user-facing "Pro AE" loop from the backlog; it only has to
- * hold brightness while the shutter is fixed. It is pure Kotlin so the
- * behaviour can be tested without a camera.
+ * Pure Kotlin so the response curve is testable without a camera.
  */
-class AutoIsoController(
-    private val targetLuma: Float = 0.45f,
-    private val measurementPercentile: Float = 0.5f,
-    private val deadBandEv: Float = 0.08f,
-    private val maxEvPerSecond: Float = 2f,
-    private val gain: Float = 0.6f,
+class ExposureController(
+    private val deadBandEv: Float = 0.06f,
 ) {
     /**
-     * Returns the ISO for the next metering update.
+     * Returns the EV correction for one metering update, or 0 inside the dead
+     * band. Callers apply it to ISO (S) or AE compensation (P).
      *
-     * @param histogram GPU luma histogram, one bin per equal luma step.
-     * @param currentIso ISO currently applied to the sensor.
-     * @param elapsedSeconds time since the previous update.
+     * @param elapsedSeconds time since the previous metering update.
+     * @param speed 0 = slowest, 1 = fastest.
      */
-    fun update(
-        histogram: IntArray,
+    fun correctionEv(
+        sample: MeterSample,
+        elapsedSeconds: Float,
+        speed: Float,
+    ): Float {
+        val measured = sample.measuredLuma.coerceAtLeast(MIN_LUMA)
+        val target = sample.targetLuma.coerceIn(MIN_LUMA, 1f)
+        val errorEv = log2(target / measured)
+        if (abs(errorEv) < deadBandEv) return 0f
+
+        val normalized = speed.coerceIn(0f, 1f)
+        val gain = GAIN_SLOW + (GAIN_FAST - GAIN_SLOW) * normalized
+        val maxEvPerSecond = EV_PER_SECOND_SLOW +
+            (EV_PER_SECOND_FAST - EV_PER_SECOND_SLOW) * normalized
+        val maxStep = maxEvPerSecond *
+            elapsedSeconds.coerceIn(MIN_STEP_SECONDS, MAX_STEP_SECONDS)
+        return (errorEv * gain).coerceIn(-maxStep, maxStep)
+    }
+
+    /** ISO for the next metering update in shutter-priority mode. */
+    fun nextIso(
+        sample: MeterSample,
         currentIso: Int,
         isoMin: Int,
         isoMax: Int,
         elapsedSeconds: Float,
+        speed: Float,
     ): Int {
-        if (histogram.isEmpty() || isoMin <= 0 || isoMax <= isoMin) return currentIso
-
-        val total = histogram.sumOf { it.coerceAtLeast(0) }
-        if (total <= 0) return currentIso
-
-        val measured = percentileLuma(histogram, total)
-        if (measured <= 0f) return currentIso
-
-        val errorEv = log2(targetLuma / measured)
-        if (abs(errorEv) < deadBandEv) return currentIso
-
-        val maxStepEv = maxEvPerSecond * elapsedSeconds.coerceIn(MIN_STEP_SECONDS, MAX_STEP_SECONDS)
-        val correctionEv = (errorEv * gain).coerceIn(-maxStepEv, maxStepEv)
+        if (isoMin <= 0 || isoMax <= isoMin) return currentIso
+        val correctionEv = correctionEv(sample, elapsedSeconds, speed)
+        if (correctionEv == 0f) return currentIso
         val next = currentIso * 2f.pow(correctionEv)
         return next.roundToInt().coerceIn(isoMin, isoMax)
-    }
-
-    private fun percentileLuma(histogram: IntArray, total: Int): Float {
-        val requested = (total * measurementPercentile.coerceIn(0f, 1f))
-            .toInt()
-            .coerceIn(1, total)
-        var cumulative = 0
-        for (bin in histogram.indices) {
-            cumulative += histogram[bin].coerceAtLeast(0)
-            if (cumulative >= requested) {
-                return (bin + 0.5f) / histogram.size
-            }
-        }
-        return (histogram.size - 0.5f) / histogram.size
     }
 
     private companion object {
         const val MIN_STEP_SECONDS = 0.05f
         const val MAX_STEP_SECONDS = 0.5f
+        const val MIN_LUMA = 1e-4f
+        const val GAIN_SLOW = 0.2f
+        const val GAIN_FAST = 1.0f
+        const val EV_PER_SECOND_SLOW = 0.4f
+        const val EV_PER_SECOND_FAST = 4.0f
     }
 }

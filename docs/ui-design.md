@@ -220,17 +220,21 @@ facing letter is prefixed only when two lenses share a focal length.
 
 | Element | Native call | Status |
 |---|---|---|
-| P/S/M segmented control | `setExposureMode` | Current |
-| ISO slider | `setIso` (manual M only) | Current |
+| P / S / M circles | `setExposureMode` | Current |
+| Metering pattern | `setMeteringMode` | Current |
+| Meter speed (0–100%) | `setMeteringSpeed` | Current |
+| ISO slider | `setIso` (manual M/S; auto in P/S) | Current |
 | Shutter time slider | `setShutterNs` (S/M) | Current |
 | Shutter angle presets | `setShutterAngle` | Current |
-| AE auto | `setAutoExposure` | Current |
-| Auto-ISO status | `AutoIsoController` state via ISO + S mode | Current |
+| AE auto / return to AE | `setAutoExposure` | Current |
 | Exposure compensation / EV wheel | not in the Pigeon contract | Future |
-| Pro AE | own exposure loop | Future |
-| AE response speed (Slow/Normal/Fast) | EV/sec controller | Future |
 | Zebra threshold for exposure | `setZebra` only takes on/off | Future |
-| Metering mode (matrix/centre/spot) | probe reports regions, no UI yet | Future |
+
+Metering is software over the GPU luma grid: P biases the HAL AE with exposure
+compensation, S drives ISO, and M leaves exposure manual. The speed slider is
+disabled in M because there is no automatic exposure to follow. Highlight is
+protect-only: it lowers exposure when the brightest 10% exceed 0.85 and never
+brightens a flat scene.
 
 ### 5.5 Focus and stabilisation card
 

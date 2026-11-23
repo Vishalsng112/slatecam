@@ -154,6 +154,9 @@ class CameraState {
     required this.eisEnabled,
     required this.exposureMode,
     required this.exposureModes,
+    required this.meteringMode,
+    required this.meteringModes,
+    required this.meteringSpeed,
     required this.deviceKey,
     required this.deviceQuirks,
     required this.deviceCalibrationActive,
@@ -253,6 +256,11 @@ class CameraState {
   bool eisEnabled;
   String exposureMode;
   List<String> exposureModes;
+  /// multi | center | spot | average | highlight
+  String meteringMode;
+  List<String> meteringModes;
+  /// 0 = slowest exposure response, 1 = fastest.
+  double meteringSpeed;
   String deviceKey;
   List<String> deviceQuirks;
   bool deviceCalibrationActive;
@@ -289,6 +297,10 @@ abstract class SlateCamHostApi {
   void setWhiteBalanceMode(String mode);
 
   void setAutoExposure();
+
+  void setMeteringMode(String mode);
+
+  void setMeteringSpeed(double speed);
 
   /// Selects the exposure mode: P (HAL AE), S (fixed shutter, auto ISO), or M.
   void setExposureMode(String mode);
