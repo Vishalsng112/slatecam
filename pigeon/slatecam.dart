@@ -124,6 +124,9 @@ abstract class SlateCamHostApi {
   void setAntibanding(String mode);
 
   void reloadLuts();
+
+  /// True when the app was launched to run a probe: preview must stay closed.
+  bool isProbeMode();
 }
 
 @FlutterApi()

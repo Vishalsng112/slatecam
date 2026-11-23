@@ -395,3 +395,23 @@ destructive and belong in post-processing.
   encoder timestamp and alignment, and `GyroRecorder` warns when the first
   sample and first frame differ by more than a second.
 - With the phone stationary, rotations are zero, which is the correct result.
+
+## Phase 5 — dual camera spike (2026-11-23)
+
+| Item | Result |
+|---|---|
+| Concurrent pair | cameras **0 + 1** (back + front), from `getConcurrentCameraIds` |
+| Sessions | both configured at 640×480 simultaneously |
+| Check | `concurrent_camera_session: pass` (prober 1.5.0) |
+| Probe mode | preview is disabled during a probe run, so the test cannot be fooled by our own camera |
+
+Not done yet: streaming two previews, lens switching, and per-physical streams
+via `OutputConfiguration.setPhysicalCameraId`.
+
+### Crash found and fixed
+
+The verifier shut down its callback executor immediately after `device.close()`.
+This platform dispatches `onClosed` on that executor, so the task was rejected
+and the process died with `RejectedExecutionException`. Both camera verifiers now
+defer the executor shutdown by 500 ms. A probe-only launch mode also prevents the
+preview from holding a camera while verification runs.

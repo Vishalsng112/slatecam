@@ -84,6 +84,7 @@ class SlateCamBridge private constructor(
     private var zebraEnabled = false
     private var falseColorEnabled = false
     private var lutEntries: List<LutLibrary.Entry> = emptyList()
+    private var probeMode = false
 
     private var histogramBins: List<Int> = emptyList()
     private var waveformBins: List<Int> = emptyList()
@@ -216,6 +217,12 @@ class SlateCamBridge private constructor(
     override fun reloadLuts() {
         refreshLuts()
         pushState()
+    }
+
+    override fun isProbeMode(): Boolean = probeMode
+
+    fun setProbeMode(enabled: Boolean) {
+        probeMode = enabled
     }
 
     private fun refreshLuts() {

@@ -32,6 +32,7 @@ class MainActivity : FlutterActivity() {
             zebraThreshold = intent?.getFloatExtra(EXTRA_ZEBRA_THRESHOLD, 0.7f) ?: 0.7f,
             falseColor = intent?.getBooleanExtra(EXTRA_FALSE_COLOR, false) == true,
         )
+        installed.setProbeMode(intent?.getBooleanExtra(EXTRA_RUN_PROBE, false) == true)
         bridge = installed
     }
 

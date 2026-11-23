@@ -43,6 +43,7 @@ left floating in conversation.
 | Shutter angle (math + control) | 5 | 180°@30 = 1/60 s, unit-tested; live angle shown in UI |
 | Gyro sample capture + sidecar | 5 | 206 samples in 5 s, realtime timestamps |
 | Gyro frame alignment | 5 | 145 frame rotations in 4.8 s; sidecar v2; shared `elapsedRealtimeNanos` clock |
+| Concurrent camera session | 5 | cameras 0+1 configured together; `concurrent_camera_session: pass` |
 
 ## Phase 2 completion — remaining
 
@@ -76,7 +77,7 @@ left floating in conversation.
 |---|---|
 | RAW burst → DNG sequence | Camera2 has no RAW video; expect low fps and large files |
 | Gyro container embedding | Sidecar v2 is frame-aligned; embedding a metadata track in MP4 remains |
-| Dual camera / concurrent sessions | Gated by `getConcurrentCameraIds` and `isConcurrentSessionConfigurationSupported` |
+| Dual preview / lens switching | Concurrency is proven; streaming two previews and per-physical streams remain |
 
 Framing guides moved to Phase 4 (done).
 

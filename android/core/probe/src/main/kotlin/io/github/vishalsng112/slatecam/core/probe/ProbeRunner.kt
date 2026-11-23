@@ -15,6 +15,7 @@ import io.github.vishalsng112.slatecam.core.probe.source.DisplaySource
 import io.github.vishalsng112.slatecam.core.probe.source.EncoderSource
 import io.github.vishalsng112.slatecam.core.probe.source.SystemSource
 import io.github.vishalsng112.slatecam.core.probe.verify.CameraSessionVerifier
+import io.github.vishalsng112.slatecam.core.probe.verify.ConcurrentSessionVerifier
 import io.github.vishalsng112.slatecam.core.probe.verify.EncoderVerifier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -43,6 +44,7 @@ class ProbeRunner(private val context: Context) {
         val encodeOutcome = if (verify) EncoderVerifier().verifyHevcMain10() else null
         val encodeCheck = encodeOutcome?.check
         val sessionCheck = if (verify) CameraSessionVerifier(context).verifyHlg10Session() else null
+        val concurrentCheck = if (verify) ConcurrentSessionVerifier(context).verify() else null
 
         val main10Verified = encodeCheck?.status ?: "not_run"
         val sessionVerified = sessionCheck?.status ?: "not_run"
@@ -147,8 +149,8 @@ class ProbeRunner(private val context: Context) {
             audio = audio,
             tier = tier,
             verification = Verification(
-                ran = encodeCheck != null || sessionCheck != null,
-                checks = listOfNotNull(encodeCheck, sessionCheck),
+                ran = encodeCheck != null || sessionCheck != null || concurrentCheck != null,
+                checks = listOfNotNull(encodeCheck, sessionCheck, concurrentCheck),
             ),
             warnings = warnings,
         )
@@ -158,7 +160,7 @@ class ProbeRunner(private val context: Context) {
         json.encodeToString(run(kind, verify))
 
     companion object {
-        const val PROBER_VERSION = "1.4.0"
+        const val PROBER_VERSION = "1.5.0"
 
         val json: Json = Json {
             prettyPrint = true

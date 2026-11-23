@@ -55,8 +55,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
     super.initState();
     SlateCamFlutterApi.setUp(_StateListener(_onState));
     // A camera app should be ready to shoot, not wait for a tap.
-    Future<void>.delayed(const Duration(milliseconds: 600), () {
-      if (mounted && _textureId == null && !_busy) _openCamera();
+    Future<void>.delayed(const Duration(milliseconds: 600), () async {
+      if (!mounted || _textureId != null || _busy) return;
+      final probeMode = await _host.isProbeMode();
+      if (!mounted) return;
+      if (probeMode) {
+        setState(() => _bridgeError = 'Probe running — preview disabled');
+        return;
+      }
+      await _openCamera();
     });
   }
 

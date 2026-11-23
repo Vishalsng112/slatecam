@@ -54,7 +54,9 @@ class CameraSessionVerifier(private val context: Context) {
                 started,
             )
 
-        val executor = Executors.newSingleThreadExecutor()
+        val thread = android.os.HandlerThread("probe-session").apply { start() }
+        val handler = android.os.Handler(thread.looper)
+        val executor = java.util.concurrent.Executor { handler.post(it) }
         var device: CameraDevice? = null
         var session: CameraCaptureSession? = null
         var texture: SurfaceTexture? = null
@@ -104,7 +106,9 @@ class CameraSessionVerifier(private val context: Context) {
             runCatching { device?.close() }
             runCatching { surface?.release() }
             runCatching { texture?.release() }
-            runCatching { executor.shutdownNow() }
+            // Never shut the executor down immediately: device.close() dispatches
+            // its onClosed callback here.
+            handler.postDelayed({ thread.quitSafely() }, 500)
         }
 
         return if (error == null) {

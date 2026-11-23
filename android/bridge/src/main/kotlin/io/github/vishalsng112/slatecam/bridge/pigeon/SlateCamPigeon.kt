@@ -439,6 +439,8 @@ interface SlateCamHostApi {
   fun setNoiseReduction(mode: String)
   fun setAntibanding(mode: String)
   fun reloadLuts()
+  /** True when the app was launched to run a probe: preview must stay closed. */
+  fun isProbeMode(): Boolean
 
   companion object {
     /** The codec used by SlateCamHostApi. */
@@ -749,6 +751,21 @@ interface SlateCamHostApi {
             val wrapped: List<Any?> = try {
               api.reloadLuts()
               listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.isProbeMode$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.isProbeMode())
             } catch (exception: Throwable) {
               SlateCamPigeonPigeonUtils.wrapError(exception)
             }
