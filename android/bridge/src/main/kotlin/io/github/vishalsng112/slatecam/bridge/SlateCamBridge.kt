@@ -74,6 +74,8 @@ class SlateCamBridge private constructor(
     private val deviceDatabase = DeviceDatabaseRepository(context)
     private var deviceSnapshot: DeviceDatabaseSnapshot = deviceDatabase.snapshot()
     private var lastCameraId: String? = null
+    private var switchPump: SwitchFramePump? = null
+    private var switchPumpTarget: String? = null
     private var lastAppliedProfile: InputProfile = InputProfile.IDENTITY
     private var appliedQuirkIds: Set<String> = emptySet()
     private var deviceReportRunning = false
@@ -207,6 +209,7 @@ class SlateCamBridge private constructor(
 
     override fun closeCamera() {
         if (recorder.isRecording) stopRecording()
+        stopSwitchPump()
         controller.close()
         opened = false
     }
@@ -294,6 +297,7 @@ class SlateCamBridge private constructor(
                 return
             }
             recordingError = null
+            beginSwitchPump(id)
             controller.setCameraId(id, allowUnlisted = true)
             pushState()
             return
@@ -627,6 +631,7 @@ class SlateCamBridge private constructor(
 
     override fun stopRecording() {
         if (!recorder.isRecording) return
+        stopSwitchPump()
         renderer.detachEncoderSurface()
 
         Thread({
@@ -660,6 +665,7 @@ class SlateCamBridge private constructor(
     }
 
     fun dispose() {
+        stopSwitchPump()
         if (recorder.isRecording) {
             renderer.detachEncoderSurface()
             val destination = activeDestination
@@ -936,6 +942,51 @@ class SlateCamBridge private constructor(
             applyMode(activeMode())
         }
         pushState()
+    }
+
+    /**
+     * Movie-mode switches recreate the camera session. Keep the encoder alive
+     * with the last frame until the new session streams.
+     */
+    private val switchPumpTick = object : Runnable {
+        override fun run() {
+            val pump = switchPump ?: return
+            if (!recorder.isRecording) {
+                stopSwitchPump()
+                return
+            }
+            val decision = pump.tick(
+                nowMs = SystemClock.elapsedRealtime(),
+                targetReady = lastState?.cameraId == switchPumpTarget,
+                frameCount = renderer.cameraFramesRendered(),
+            )
+            when (decision) {
+                SwitchFramePump.Decision.REPEAT -> {
+                    renderer.repeatLastFrame()
+                    mainHandler.postDelayed(this, pump.frameIntervalMs)
+                }
+                SwitchFramePump.Decision.HOLD ->
+                    mainHandler.postDelayed(this, pump.frameIntervalMs)
+                SwitchFramePump.Decision.DONE -> stopSwitchPump()
+            }
+        }
+    }
+
+    private fun beginSwitchPump(targetId: String) {
+        val fps = activeMode().fps.toInt().coerceAtLeast(1)
+        val pump = SwitchFramePump(frameIntervalMs = (1000L / fps).coerceAtLeast(1L))
+        pump.start(SystemClock.elapsedRealtime(), renderer.cameraFramesRendered())
+        switchPump = pump
+        switchPumpTarget = targetId
+        mainHandler.removeCallbacks(switchPumpTick)
+        mainHandler.postDelayed(switchPumpTick, pump.frameIntervalMs)
+    }
+
+    private fun stopSwitchPump() {
+        mainHandler.removeCallbacks(switchPumpTick)
+        switchPump?.cancel()
+        switchPump = null
+        switchPumpTarget = null
     }
 
     private fun applyMode(mode: RecordingMode) {

@@ -13,6 +13,7 @@ import android.opengl.GLES20
 import android.opengl.GLUtils
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import java.nio.ByteBuffer
@@ -92,6 +93,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile
     private var tenBitSource = false
     private var encoderFrames = 0
+
+    @Volatile
+    private var cameraFrames = 0L
+    private var lastFrameTimestampNs = 0L
 
     private val encoderTimestamps = ArrayList<Long>(512)
 
@@ -611,18 +616,44 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
         val texture = SurfaceTexture(oesTextureId)
         texture.setDefaultBufferSize(width, height)
-        texture.setOnFrameAvailableListener { handler.post(::drawFrame) }
+        texture.setOnFrameAvailableListener { handler.post { drawFrame() } }
         surfaceTexture = texture
         cameraSurface = Surface(texture)
     }
 
-    private fun drawFrame() {
+    /**
+     * Frame count from the camera only. A switch pump compares this between
+     * ticks to tell a real frame from a repeated one.
+     */
+    fun cameraFramesRendered(): Long = cameraFrames
+
+    /**
+     * Re-renders the last camera frame without waiting for a new one. Used while
+     * a lens switch has no camera session, so the encoder keeps a continuous
+     * timeline (a frozen frame) instead of dropping samples.
+     */
+    fun repeatLastFrame() {
+        handler.post { drawFrame(updateTexture = false) }
+    }
+
+    private fun drawFrame(updateTexture: Boolean = true) {
         val texture = surfaceTexture ?: return
 
-        runCatching {
-            texture.updateTexImage()
-            texture.getTransformMatrix(texMatrix)
-        }.onFailure { return }
+        val timestampNs: Long
+        if (updateTexture) {
+            runCatching {
+                texture.updateTexImage()
+                texture.getTransformMatrix(texMatrix)
+            }.onFailure { return }
+            timestampNs = texture.timestamp.takeIf { it > 0L }
+                ?: SystemClock.elapsedRealtimeNanos()
+            cameraFrames++
+        } else {
+            if (!started || cameraFrames == 0L) return
+            timestampNs = SystemClock.elapsedRealtimeNanos()
+                .coerceAtLeast(lastFrameTimestampNs + 1_000_000L)
+        }
+        lastFrameTimestampNs = timestampNs
 
         if (!firstFrameLogged) {
             firstFrameLogged = true
@@ -633,9 +664,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             )
         }
 
-        val frameTimestampNs = texture.timestamp
-            .takeIf { it > 0L }
-            ?: android.os.SystemClock.elapsedRealtimeNanos()
+        val frameTimestampNs = timestampNs
         renderTo(
             outputEglSurface,
             frameTimestampNs,

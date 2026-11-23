@@ -44,6 +44,23 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Profile name prompt is a compact dialog that survives the POCO landscape IME;
   controller disposal no longer runs while the route is animating out.
 
+### Added — Control Console and seamless switching
+- Replaced the six-tab Control Deck with a single Control Console: fixed
+  RECORD/STOP, previous/next camera and recording-mode steppers, and a
+  Single/Movie toggle above two columns of cards. Camera, mode, shoot mode,
+  exposure mode, angle, profile, white balance, processing and shoot profiles
+  are direct chips/segments instead of dropdowns. The console starts open at
+  760 lp on tablets and can still be collapsed.
+- `SwitchFramePump` repeats the last camera frame into the encoder while a
+  movie-mode lens switch has no session, so the clip keeps a continuous
+  timeline. Policy covered by 6 JVM tests.
+- Pad movie switch measured at 5,969 frames / 199.3 s Main10 HLG with one
+  122 ms pause; median frame interval 33.4 ms.
+- `ColorCalibration` least-squares solver turns 24 observed/reference patches
+  into an `InputProfile` (3×3 matrix + exposure trim) with plausible-fit
+  rejection; covered by 9 JVM tests. No matrices are shipped without a measured
+  target.
+
 ### Changed — Phase 3 recording completion (Pad 3)
 - 10-bit HLG recording enabled by probe verification and SPS checks.
 - Recorder builds `hvcC` from VPS/SPS/PPS in the first access unit when

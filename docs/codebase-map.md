@@ -29,7 +29,7 @@ lib/                         Flutter UI only
   src/pigeon/                generated Pigeon client
 pigeon/slatecam.dart         Pigeon contract source
 android/app/                 Flutter host, permissions, launch extras
-android/bridge/              Flutter <-> Kotlin API, state mapping, shoot-profile store
+android/bridge/              Flutter <-> Kotlin API, state mapping, profiles, switch pump
 android/core/common/         pure helpers (HevcSps, ShutterAngle, GyroAligner)
 android/core/probe/          capability prober, verifiers, report model
 android/core/camera/         Camera2 controller, capabilities, modes
@@ -62,6 +62,9 @@ root is `android/`, not the repository root.
 | Device quirks/calibration | `:core:device` | `DeviceDatabase.kt`, `DeviceDatabaseRepository.kt`, `CapabilityGates.kt` |
 | Probe | `:core:probe` | `ProbeRunner.kt`, `source/`, `verify/`, `eval/` |
 | Flutter state/commands | `:bridge` | `SlateCamBridge.kt`, generated Pigeon |
+| Control surface | `lib/src/ui` | `capture_screen.dart` preview/dock, `control_deck.dart` console |
+| Lens-switch encoder continuity | `:bridge` | `SwitchFramePump.kt`, `GlPreviewRenderer.repeatLastFrame` |
+| Colour calibration math | `:core:profile` | `ColorCalibration.kt` |
 | UI | `lib/src/ui` | `capture_screen.dart`, `control_deck.dart`, `zoom_plugin.dart` |
 
 ## Flows
@@ -145,6 +148,8 @@ installs can drop adbd. Probe launch:
 - Colour matching depends on measured per-camera matrices (not shipped).
 - Shoot profiles live in `ShootProfileStore` (pure Kotlin, persisted through a
   storage interface; JVM tests in `bridge/src/test`).
-- Phase 5.5 remaining: measured colour matrices, seamless-switch polish.
+- The Control Console is one surface with a fixed record/lens/mode bar; avoid
+  reintroducing tabs or dropdowns for primary actions.
+- Phase 5.5 remaining: captured colour-target data; the solver already exists.
 
 - Feature modules `:feature:capture` and `:feature:playback` are empty.

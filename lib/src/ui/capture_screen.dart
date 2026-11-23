@@ -28,7 +28,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   bool _layoutInitialised = false;
   bool _deckOpen = true;
-  DeckTab _deckTab = DeckTab.exposure;
   bool _showGuides = false;
   bool _showHistogram = false;
   bool _showWaveform = false;
@@ -111,11 +110,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(() => _textureId = null);
   }
 
-  void _openTab(DeckTab tab) {
-    setState(() {
-      _deckTab = tab;
-      _deckOpen = true;
-    });
+  void _openDeck() {
+    setState(() => _deckOpen = true);
   }
 
   @override
@@ -124,7 +120,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            if (!_layoutInitialised) {
+            if (!_layoutInitialised && constraints.maxWidth > 0) {
               _layoutInitialised = true;
               _deckOpen = constraints.maxWidth >= 760;
             }
@@ -135,16 +131,16 @@ class _CaptureScreenState extends State<CaptureScreen> {
             if (!live) return _launchView();
 
             final preview = _previewView(state);
-            final deckWidth = constraints.maxWidth >= 1000
-                ? 420.0
+            final deckWidth = constraints.maxWidth >= 1400
+                ? 760.0
+                : constraints.maxWidth >= 1000
+                ? 600.0
                 : constraints.maxWidth >= 760
-                ? 360.0
-                : math.min(340.0, math.max(280.0, constraints.maxWidth * 0.55));
+                ? 460.0
+                : math.min(360.0, math.max(300.0, constraints.maxWidth * 0.6));
             final deck = ControlDeck(
               state: state,
               host: _host,
-              tab: _deckTab,
-              onTabChanged: (tab) => setState(() => _deckTab = tab),
               onClose: () => setState(() => _deckOpen = false),
               onCloseCamera: _closeCamera,
               showGuides: _showGuides,
@@ -662,7 +658,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                           ? 'auto ${state.iso}'
                           : '${state.iso}',
                       icon: Icons.iso,
-                      onTap: () => _openTab(DeckTab.exposure),
+                      onTap: () => _openDeck(),
                     ),
                     const SizedBox(width: 6),
                     ReadoutChip(
@@ -671,14 +667,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
                           ? 'auto'
                           : formatShutterFraction(state.shutterNs),
                       icon: Icons.shutter_speed,
-                      onTap: () => _openTab(DeckTab.exposure),
+                      onTap: () => _openDeck(),
                     ),
                     const SizedBox(width: 6),
                     ReadoutChip(
                       label: 'WB',
                       value: humanizeWireValue(state.whiteBalanceMode),
                       icon: Icons.thermostat,
-                      onTap: () => _openTab(DeckTab.colour),
+                      onTap: () => _openDeck(),
                     ),
                     const SizedBox(width: 6),
                     ReadoutChip(
@@ -687,7 +683,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                           ? 'AF'
                           : formatDiopters(state.focusDiopters),
                       icon: Icons.center_focus_strong,
-                      onTap: () => _openTab(DeckTab.focus),
+                      onTap: () => _openDeck(),
                     ),
                   ],
                 ),

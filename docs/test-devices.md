@@ -794,3 +794,31 @@ one encoded clip alive.
   re-selecting restored 10-bit HLG movie mode.
 - POCO: back 16 mm (ultra-wide), back 25 mm, front 24 mm. Deselecting the
   ultra-wide left main + front, and the selection survived a force-stop/restart.
+
+## Phase 5.5 Control Console and seamless switch (2026-11-24, build 2048)
+
+### Control Console
+
+- The six-tab deck is replaced by one console. RECORD/STOP, the camera stepper,
+  the mode stepper and Single/Movie stay fixed while the cards scroll.
+- Pad 3: console at 760 lp in two columns; camera stepper switched back→front
+  and back again without opening a menu or scrolling.
+- Movie-mode pass: tap Movie, tap RECORD, tap the camera stepper once, tap STOP.
+  The same sequence is repeatable from a fixed screen position, which was not
+  possible with the tab + dropdown layout.
+
+### Seamless switch measurement (Pad 3)
+
+- One Main10 HLG clip: `SlateCam_20261124_014006.mp4`, 199.27 s, 5,969 frames.
+- `ffprobe` frame PTS: median Δ 33.4 ms, 5,957 of 5,968 intervals in the 30 fps
+  bucket, and a single 122 ms pause at the back→front switch. The recorder and
+  audio/gyro never restarted.
+- POCO X6 Pro: Movie → RECORD → camera stepper → STOP produced one 8-bit SDR
+  clip; 10-bit remains withheld by `poco-duchamp-force-8bit`.
+
+### Colour calibration
+
+- `ColorCalibration` is unit-tested (9 cases) but no matrix is shipped: a
+  display-referred capture on the test bench was not reliable enough to claim a
+  ColorChecker measurement. The next step is a physical 24-patch target per
+  lens; the solver accepts the patch means directly.

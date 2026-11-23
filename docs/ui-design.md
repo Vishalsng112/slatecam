@@ -12,8 +12,10 @@ final layout before the Flutter implementation changes.
 
 1. **Preview first.** The image is the product. Controls float over or beside it,
    never push it below a permanent stack of form-like widgets.
-2. **Two levels of control.** Quick controls stay on the main screen. Deep
-   controls live in a tabbed Control Deck.
+2. **One surface, no tabs.** Every control lives on a single Control Console.
+   The record button, lens stepper, mode stepper and Single/Movie toggle are
+   fixed at the top; the rest are cards in two columns. Nothing requires a tab
+   switch or a dropdown to reach a primary action.
 3. **No false controls.** A feature that the probe did not prove is either
    absent or shown read-only with the reason. Future options are documented here
    and only appear in the app when their native path exists.
@@ -33,12 +35,13 @@ module owns the data.
 | Group | Purpose | Primary location |
 |---|---|---|
 | Status | What the camera is doing right now | Top HUD |
-| Exposure | P/S/M, ISO, shutter time/angle, auto exposure | Bottom dock + Exposure tab |
-| Focus | AF, manual focus, focus speed | Bottom dock + Focus tab |
-| Colour | Profile, LUT, white balance, calibration | Bottom dock chip + Colour tab |
-| Monitoring | Guides, zebra, false colour, peaking, histogram, waveform | Left rail + Monitor tab |
-| Capture | Edge, noise reduction, antibanding, output format | Capture tab |
-| Device | Device database, quirks, calibration state, reports | Device tab |
+| Record & lens | Record, lens, mode, shoot mode, shoot set | Fixed console header |
+| Exposure | P/S/M, ISO, shutter time/angle, auto exposure | Console card |
+| Focus | AF, manual focus, focus speed | Console card |
+| Colour | Profile, LUT, white balance, calibration | Console card |
+| Monitoring | Guides, zebra, false colour, peaking, histogram, waveform | Left rail + console card |
+| Capture | Edge, noise reduction, antibanding, output format | Console card |
+| Device | Device database, quirks, calibration state, reports | Console card |
 | Future AI | Subject tracking, focus assist, local assistant | Reserved AI tab |
 | Future media | Playback/library, export, clip management | Reserved deck tab / separate screen |
 | Settings | Theme, help, diagnostics, privacy | Reserved deck tab |
@@ -85,9 +88,13 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
    dock, bottom-left.
 5. **Bottom dock** — record button, P/S/M selector, quick readout chips (ISO,
    shutter, white balance, focus), and Control Deck toggle.
-6. **Control Deck** — a docked, collapsible right panel. Tabs group deep
-   controls. On narrow landscape phones it can be closed to give the preview the
-   whole width. On tablets (≥1000 logical px) it starts open.
+6. **Control Console** — a docked, collapsible right panel with no tabs. A fixed
+   header holds RECORD, a previous/next camera stepper, a previous/next mode
+   stepper and the Single/Movie toggle. Below it, two columns of always-visible
+   cards group the remaining controls. The header never scrolls away, so record,
+   lens and mode are always one tap from any scroll position. On narrow
+   landscape phones the console can be closed to give the preview the whole
+   width.
 7. **Overlay banners** — camera errors, recording errors, probe mode and saved
    clip messages. These sit above the dock and never block the record button.
 
@@ -95,14 +102,29 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
 
 | Width | Behaviour |
 |---|---|
-| `>= 1000 lp` | Control Deck starts open at 420 lp; preview keeps the rest |
-| `760–999 lp` | Deck starts open at 360 lp; tabs stay horizontally scrollable |
-| `< 760 lp` | Deck starts closed; bottom dock chips stay horizontally scrollable; deck opens over/next to the preview at `min(360, width * 0.55)` |
+| `>= 1400 lp` | Console starts open at 760 lp, two columns; preview keeps the rest |
+| `1000–1399 lp` | Console starts open at 600 lp, two columns |
+| `760–999 lp` | Console starts open at 460 lp, two columns |
+| `< 760 lp` | Console starts closed; opens over the preview at `min(360, width * 0.6)` |
 
 On short landscape screens the six monitor toggles collapse into a compact
 two-column rail so they never exceed the available height.
 
 The deck can always be closed with the chevron. The record button never moves.
+
+### Console header (fixed)
+
+| Element | Behaviour | Why it is fixed |
+|---|---|---|
+| RECORD / STOP | `startRecording` / `stopRecording` | Never scroll away from the shutter |
+| Camera ‹ › | Cycles exposed cameras | One tap per lens; no dropdown menu |
+| Mode ‹ › | Cycles enabled recording modes | One tap per mode; disabled modes are skipped |
+| Single / Movie | `setShootMode` | Common-mode validation stays visible |
+| Status line | shoot mode, size, fps, bit depth | Read-only context for the current mode |
+
+Every fixed element has a stable semantics label (`start recording`,
+`camera: …`, `recording mode: …`) so UI automation can target it by role or
+position without opening a menu.
 
 ## 4. Screen states
 
@@ -162,16 +184,16 @@ The deck can always be closed with the chevron. The record button never moves.
 |---|---|---|
 | Record / stop | `startRecording` / `stopRecording` | Current |
 | P / S / M | `setExposureMode` | Current |
-| ISO chip | opens Exposure tab | Current |
-| Shutter chip | opens Exposure tab | Current |
-| WB chip | opens Colour tab | Current |
-| Focus chip | opens Focus tab | Current |
+| ISO chip | opens the console | Current |
+| Shutter chip | opens the console | Current |
+| WB chip | opens the console | Current |
+| Focus chip | opens the console | Current |
 | Control Deck toggle | opens/closes the deck | Current |
 | Photo shutter | not in native API | Future |
 | Zoom / lens selector | lens chips + continuous zoom, from the probe report | **Current** (`ZoomPlugin`) |
 | Audio monitor mute | no audio monitor path | Future |
 
-### 5.3 Exposure tab
+### 5.3 Exposure card
 
 | Element | Native call | Status |
 |---|---|---|
@@ -187,7 +209,7 @@ The deck can always be closed with the chevron. The record button never moves.
 | Zebra threshold for exposure | `setZebra` only takes on/off | Future |
 | Metering mode (matrix/centre/spot) | probe reports regions, no UI yet | Future |
 
-### 5.4 Focus tab
+### 5.4 Focus card
 
 | Element | Native call | Status |
 |---|---|---|
@@ -198,9 +220,9 @@ The deck can always be closed with the chevron. The record button never moves.
 | Tap to focus | needs metering region API | Future |
 | AF lock / AE lock buttons | probe has lock flags, not wired | Future |
 | Hybrid CDAF | hill-climb focus engine | Future |
-| Focus peaking controls | Monitor tab today | Current/future split |
+| Focus peaking controls | Monitoring card | Current |
 
-### 5.5 Colour tab
+### 5.5 Colour card
 
 | Element | Native call | Status |
 |---|---|---|
@@ -213,9 +235,9 @@ The deck can always be closed with the chevron. The record button never moves.
 | Creative vignette | shader effect | Future |
 | Colour-space menu (SDR/HLG) | gated by probe | Future |
 | Transfer/gamma selection | needs 10-bit path | Future |
-| ColorChecker capture workflow | calibration tooling | Future |
+| ColorChecker capture workflow | `ColorCalibration` solver; capture tooling | Solver current, workflow Future |
 
-### 5.6 Monitor tab and left rail
+### 5.6 Monitoring card and left rail
 
 | Element | Native call | Status |
 |---|---|---|

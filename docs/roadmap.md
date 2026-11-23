@@ -16,7 +16,7 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | 3 | Recording | Done on Pad 3 and POCO X6 Pro |
 | 4 | GPU + profiles | Done |
 | 5 | Advanced capture | Mostly done: shutter angle, gyro, focus shift, concurrent verification. Pro AE and hybrid AF remain |
-| **5.5** | **Shoot profiles / Movie-Vlog** | **Per-lens verification, shoot-set editor and named profiles complete; remaining colour matrices, seamless switch** |
+| **5.5** | **Shoot profiles / Movie-Vlog** | **Complete except measured colour data: verification, shoot set, profiles, console and seamless switch done** |
 | 6 | AI (optional) | Contract only |
 | 7 | Device database | Done |
 | 8 | Quality | Not started |
@@ -76,7 +76,12 @@ Phase 5.5 ──────► Phase 8 quality (cross-device stress)
 - Shoot-set editor: include/exclude lenses; selection persists.
 - Named shoot profiles: save/apply/rename/delete, per-device persistence,
   case-insensitive name updates, last-profile guard; unit-tested.
-- Remaining: measured colour matrices, seamless-switch polish.
+- Control Console: single surface, fixed record/camera/mode/shoot-mode bar,
+  direct chips for all primary choices; no tab or menu needed to switch a lens.
+- Seamless switch: the encoder keeps receiving repeated frames while the new
+  session starts; Pad back→front measured 5,969 frames with one 122 ms pause.
+- Colour: `ColorCalibration` solver and tests are in place; shipping matrices
+  needs captured 24-patch data for each lens.
 
 ## Next phase
 

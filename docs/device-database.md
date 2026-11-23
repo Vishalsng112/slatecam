@@ -2,7 +2,7 @@
 
 **Owner:** `:core:device`
 **Bundled schema:** `slatecam.device-db`, version 1
-**Status:** Phase 7 complete; measured ColorChecker matrices are still data to add
+**Status:** Phase 7 complete; the calibration solver ships, measured target data is still to add
 
 The device database is the Phase 7 data layer between probe reports and the
 camera pipeline. It answers three questions without device-specific code:
@@ -117,6 +117,12 @@ The bundled database currently ships **no measured calibration entries**. Until
 a ColorChecker matrix is added, `InputProfile` stays identity and the UI reports
 `identity · no measured data`. This is deliberate: inventing a matrix would make
 the preview change without evidence.
+
+`ColorCalibration.solve` (`:core:profile`) converts 24 observed/reference RGB
+patches into the matrix and exposure trim used above. It rejects degenerate fits
+and returns identity rather than a guessed result. Feed it the patch means from
+a target captured under one exposure/white-balance state, then copy the printed
+matrix into a `calibrations` entry.
 
 ## Adding a device or calibration
 

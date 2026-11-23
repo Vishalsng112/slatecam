@@ -1,0 +1,44 @@
+# ADR 0008 — Single-surface Control Console
+
+- **Status:** Accepted
+- **Date:** 2026-11-24
+- **Phase:** 5.5
+- **Depends on:** ADR 0007 (shoot profiles)
+
+## Context
+
+The previous Control Deck grouped controls behind six tabs and used dropdowns
+for the camera, recording mode, shoot mode and profiles. Reaching a lens or mode
+took a tab switch plus a menu. That was slow with a camera in hand and made
+scripted device verification fragile: a tap sequence depended on menus that
+opened at different positions and on a preview that continuously animates.
+
+## Decision
+
+1. **No tabs.** The deck becomes one scrollable console. Cards are grouped by
+   task and laid out in two columns when the rail is at least 520 logical pixels
+   wide.
+2. **Fixed quick bar.** RECORD/STOP, a previous/next camera stepper, a
+   previous/next recording-mode stepper and the Single/Movie toggle sit in a
+   non-scrolling header. Record, lens and mode never require a menu or a scroll.
+3. **Direct-choice controls.** Camera, recording mode, shoot mode, exposure
+   mode, shutter angle, profile, white balance, processing modes and shoot
+   profiles are chips or segmented buttons. Dropdowns remain only for long
+   free-form lists that do not fit as chips.
+4. **Stable semantics.** The fixed controls carry explicit labels
+   (`start recording`, `camera: …`, `recording mode: …`) so automation can find
+   them without relying on visual text.
+5. **Console, not settings page.** Sliders keep their labels and values inline;
+   status stays in the header and footer. The preview remains the largest
+   element at every breakpoint.
+
+## Consequences
+
+- Lens and mode changes are two fixed taps from any scroll position; recording
+  and switching can be scripted without opening a menu.
+- Mode chips make the disabled reasons visible instead of hiding them in a
+  closed dropdown.
+- Two columns reduce scrolling on tablets and wide phones.
+- The console is wider (up to 760 lp) than the old deck, trading preview width
+  for always-visible controls; it can still be collapsed.
+- Dropdowns are still used where a chip row would be unbounded or unreadable.

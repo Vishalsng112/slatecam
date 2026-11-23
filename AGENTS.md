@@ -36,7 +36,7 @@ flutter analyze
 flutter build apk --debug
 cd android && ./gradlew checkModuleGraph :core:common:testDebugUnitTest \
   :core:probe:testDebugUnitTest :core:device:testDebugUnitTest \
-  :core:camera:testDebugUnitTest
+  :core:camera:testDebugUnitTest :core:profile:test :bridge:testDebugUnitTest
 ```
 
 Real-device tests and evidence go in `docs/test-devices.md` with the build
