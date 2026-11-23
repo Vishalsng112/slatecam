@@ -87,6 +87,11 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var tenBitSource = false
     private var encoderFrames = 0
 
+    private val encoderTimestamps = ArrayList<Long>(512)
+
+    @Volatile
+    private var captureEncoderTimestamps = false
+
     @Volatile private var exposure = 1f
     @Volatile private var contrast = 1f
     @Volatile private var saturation = 1f
@@ -140,6 +145,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
     fun setDisplayRotation(degrees: Int) {
         displayRotation = ((degrees % 360) + 360) % 360
+    }
+
+    /** Records the timestamp submitted with each encoded frame. */
+    fun startEncoderTimestampCapture() {
+        synchronized(encoderTimestamps) {
+            encoderTimestamps.clear()
+            captureEncoderTimestamps = true
+        }
+    }
+
+    fun stopEncoderTimestampCapture(): LongArray {
+        captureEncoderTimestamps = false
+        synchronized(encoderTimestamps) {
+            return encoderTimestamps.toLongArray()
+        }
     }
 
     fun setLut(size: Int, data: FloatArray?) {
@@ -503,7 +523,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             texture.getTransformMatrix(texMatrix)
         }.onFailure { return }
 
-        val timestampNs = System.nanoTime()
+        val timestampNs = android.os.SystemClock.elapsedRealtimeNanos()
         renderTo(outputEglSurface, timestampNs, tonemap = tenBitSource, overlay = true)
         renderTo(encoderEglSurface, timestampNs, tonemap = false, overlay = false)
 
@@ -668,6 +688,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         drawQuad(tonemap, overlay)
 
         if (surface == encoderEglSurface) {
+            if (captureEncoderTimestamps) {
+                synchronized(encoderTimestamps) { encoderTimestamps += timestampNs }
+            }
             EGLExt.eglPresentationTimeANDROID(display, surface, timestampNs)
         }
         if (!EGL14.eglSwapBuffers(display, surface)) {

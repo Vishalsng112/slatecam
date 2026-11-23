@@ -290,6 +290,7 @@ class SlateCamBridge private constructor(
             val started = startRecorder(name, size.width, size.height)
             activeDestination = started.destination
             renderer.attachEncoderSurface(started.surface, started.tenBitHlg)
+            renderer.startEncoderTimestampCapture()
             clipPath = null
             recordingError = null
             recordingStartMs = SystemClock.elapsedRealtime()
@@ -316,6 +317,7 @@ class SlateCamBridge private constructor(
 
         Thread({
             val finalized = recorder.stop()
+            val frameTimestamps = renderer.stopEncoderTimestampCapture()
             val samples = gyro.stop()
             if (samples > 0) {
                 val base = activeDestination?.label
@@ -323,10 +325,14 @@ class SlateCamBridge private constructor(
                     ?.removeSuffix(".mp4")
                     ?: "clip-${System.currentTimeMillis()}"
                 val file = File(File(context.filesDir, "gyro"), "$base.gyro.json")
-                val written = gyro.writeSidecar(file)
+                val frames = gyro.writeAlignedSidecar(
+                    file = file,
+                    fps = lastState?.frameRate ?: 30,
+                    frameTimestampsNs = frameTimestamps,
+                )
                 android.util.Log.i(
                     "SlateCam",
-                    "gyro samples=$samples written=$written path=${file.absolutePath}",
+                    "gyro sidecar: raw=$samples frames=$frames path=${file.absolutePath}",
                 )
             }
             gyroSampleCount = samples

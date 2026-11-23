@@ -383,3 +383,15 @@ destructive and belong in post-processing.
 | Gyro capture | 206 samples in a 5 s clip (~41 Hz), `SENSOR_INFO_TIMESTAMP_SOURCE = realtime` |
 | Sidecar | `files/gyro/<clip>.gyro.json`, samples as `{t,x,y,z}` |
 | Not done | Frame alignment and container embedding; the sidecar is keyed by clip filename |
+
+### Gyro alignment (2026-11-23)
+
+- Sidecar v2 now stores **per-frame rotations**: 206 raw samples integrated to
+  145 frame intervals over 4.8 s, matching 30 fps.
+- **Clock bug found:** frame timestamps used `System.nanoTime()` while sensor
+  events use the `realtime` base (`SystemClock.elapsedRealtimeNanos()`). The two
+  bases differed by roughly 2.5 days, so integration would have produced
+  meaningless values. The renderer now uses `elapsedRealtimeNanos` for both the
+  encoder timestamp and alignment, and `GyroRecorder` warns when the first
+  sample and first frame differ by more than a second.
+- With the phone stationary, rotations are zero, which is the correct result.

@@ -41,7 +41,8 @@ left floating in conversation.
 | Colour input-profile model (matrix + trims, versioned) | 4 | `InputProfile`, unit-tested; calibration pending |
 | Audio source selection (UNPROCESSED → CAMCORDER → MIC) | 3 | POCO reports no UNPROCESSED, so CAMCORDER; AAC stereo verified |
 | Shutter angle (math + control) | 5 | 180°@30 = 1/60 s, unit-tested; live angle shown in UI |
-| Gyro sample capture + sidecar | 5 | 206 samples in 5 s, realtime timestamps, `files/gyro/*.json` |
+| Gyro sample capture + sidecar | 5 | 206 samples in 5 s, realtime timestamps |
+| Gyro frame alignment | 5 | 145 frame rotations in 4.8 s; sidecar v2; shared `elapsedRealtimeNanos` clock |
 
 ## Phase 2 completion — remaining
 
@@ -74,7 +75,7 @@ left floating in conversation.
 | Item | Notes |
 |---|---|
 | RAW burst → DNG sequence | Camera2 has no RAW video; expect low fps and large files |
-| Gyro alignment / embedding | Samples and sidecar exist; frame alignment and container embedding remain |
+| Gyro container embedding | Sidecar v2 is frame-aligned; embedding a metadata track in MP4 remains |
 | Dual camera / concurrent sessions | Gated by `getConcurrentCameraIds` and `isConcurrentSessionConfigurationSupported` |
 
 Framing guides moved to Phase 4 (done).

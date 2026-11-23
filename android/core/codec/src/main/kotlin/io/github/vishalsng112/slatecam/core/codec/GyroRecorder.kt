@@ -5,27 +5,22 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import io.github.vishalsng112.slatecam.core.common.GyroAligner
+import io.github.vishalsng112.slatecam.core.common.GyroSample
 import java.io.File
 
 /**
- * Records gyroscope samples alongside a clip and writes a sidecar file.
+ * Captures gyroscope samples during a recording and writes frame-aligned
+ * rotations to a sidecar.
  *
- * This is the Phase 5 starting point: raw samples with sensor timestamps. Frame
- * alignment is only meaningful when `SENSOR_INFO_TIMESTAMP_SOURCE` is `realtime`,
+ * Alignment is only meaningful when `SENSOR_INFO_TIMESTAMP_SOURCE` is `realtime`,
  * which the caller checks. Embedding the data in the container is a later step.
  */
 class GyroRecorder(private val context: Context) {
 
-    data class Sample(
-        val timestampNs: Long,
-        val x: Float,
-        val y: Float,
-        val z: Float,
-    )
-
     private var manager: SensorManager? = null
     private var listener: SensorEventListener? = null
-    private val samples = ArrayList<Sample>(8192)
+    private val samples = ArrayList<GyroSample>(8192)
 
     @Volatile
     private var running = false
@@ -44,7 +39,7 @@ class GyroRecorder(private val context: Context) {
         val callback = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 if (!running) return
-                samples += Sample(
+                samples += GyroSample(
                     timestampNs = event.timestamp,
                     x = event.values[0],
                     y = event.values[1],
@@ -73,20 +68,47 @@ class GyroRecorder(private val context: Context) {
 
     fun sampleCount(): Int = samples.size
 
-    /** Writes `{version, samples:[{t,x,y,z}]}` as a sidecar next to the clip name. */
-    fun writeSidecar(file: File): Boolean = runCatching {
-        file.parentFile?.mkdirs()
-        file.bufferedWriter().use { writer ->
-            writer.write("{\"version\":1,\"samples\":[")
-            samples.forEachIndexed { index, sample ->
-                if (index > 0) writer.write(",")
-                writer.write(
-                    "{\"t\":${sample.timestampNs},\"x\":${sample.x}," +
-                        "\"y\":${sample.y},\"z\":${sample.z}}",
+    /**
+     * Integrates samples into per-frame rotations and writes a versioned sidecar.
+     * Returns the number of frames written, or -1 on failure.
+     */
+    fun writeAlignedSidecar(
+        file: File,
+        fps: Int,
+        frameTimestampsNs: LongArray,
+    ): Int {
+        if (samples.isNotEmpty() && frameTimestampsNs.isNotEmpty()) {
+            val delta = kotlin.math.abs(
+                samples.first().timestampNs - frameTimestampsNs.first(),
+            )
+            if (delta > 1_000_000_000L) {
+                android.util.Log.w(
+                    "SlateCam",
+                    "gyro clock mismatch: sensor vs frame differs by ${delta / 1_000_000} ms",
                 )
             }
-            writer.write("]}")
         }
-        true
-    }.getOrDefault(false)
+        val rotations = GyroAligner.align(frameTimestampsNs, samples.toList())
+        val written = runCatching {
+            file.parentFile?.mkdirs()
+            file.bufferedWriter().use { writer ->
+                writer.write(
+                    "{\"version\":2,\"fps\":$fps,\"raw_samples\":${samples.size},\"frames\":[",
+                )
+                rotations.forEachIndexed { index, rotation ->
+                    if (index > 0) writer.write(",")
+                    writer.write(
+                        "{\"t\":${rotation.timestampNs}," +
+                            "\"rx\":${rotation.rx}," +
+                            "\"ry\":${rotation.ry}," +
+                            "\"rz\":${rotation.rz}}",
+                    )
+                }
+                writer.write("]}")
+            }
+            true
+        }.getOrDefault(false)
+
+        return if (written) rotations.size else -1
+    }
 }
