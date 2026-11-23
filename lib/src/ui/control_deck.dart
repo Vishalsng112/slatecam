@@ -45,8 +45,6 @@ class _ControlDeckState extends State<ControlDeck> {
   final ScrollController _scrollController = ScrollController();
   double? _isoDraft;
   double? _shutterDraft;
-  double? _focusDraft;
-  double? _shiftDraft;
   double? _peakingSensitivityDraft;
   double? _peakingStrengthDraft;
 
@@ -57,12 +55,6 @@ class _ControlDeckState extends State<ControlDeck> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.state.iso != state.iso) _isoDraft = null;
     if (oldWidget.state.shutterNs != state.shutterNs) _shutterDraft = null;
-    if (oldWidget.state.focusDiopters != state.focusDiopters) {
-      _focusDraft = null;
-    }
-    if (oldWidget.state.focusShiftSpeed != state.focusShiftSpeed) {
-      _shiftDraft = null;
-    }
     if (oldWidget.state.peakingSensitivity != state.peakingSensitivity) {
       _peakingSensitivityDraft = null;
     }
@@ -73,8 +65,6 @@ class _ControlDeckState extends State<ControlDeck> {
 
   double get _iso => _isoDraft ?? state.iso.toDouble();
   double get _shutter => _shutterDraft ?? state.shutterNs.toDouble();
-  double get _focusValue => _focusDraft ?? state.focusDiopters;
-  double get _shift => _shiftDraft ?? state.focusShiftSpeed;
   double get _peakingSensitivity =>
       _peakingSensitivityDraft ?? state.peakingSensitivity;
   double get _peakingStrength => _peakingStrengthDraft ?? state.peakingStrength;
@@ -105,26 +95,28 @@ class _ControlDeckState extends State<ControlDeck> {
                   final primary = <Widget>[
                     _modeCard(context),
                     _exposureCard(context),
-                    _processingCard(context),
                   ];
                   final secondary = <Widget>[
                     _shootSetCard(context),
-                    _focusCard(context),
-                    _deviceCard(context),
+                    _colourCard(context),
                   ];
                   final tertiary = <Widget>[
-                    _colourCard(context),
                     _monitorCard(context),
+                    _processingCard(context),
                     _clipCard(context),
                   ];
+                  Widget columns;
                   if (constraints.maxWidth < 520) {
-                    return Column(
-                      children: [...primary, ...secondary, ...tertiary],
+                    columns = Column(
+                      children: [
+                        ...primary,
+                        ...secondary,
+                        ...tertiary,
+                      ],
                     );
-                  }
-                  if (constraints.maxWidth >= 720) {
+                  } else if (constraints.maxWidth >= 720) {
                     final width = (constraints.maxWidth - 16) / 3;
-                    return Row(
+                    columns = Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(width: width, child: Column(children: primary)),
@@ -140,18 +132,32 @@ class _ControlDeckState extends State<ControlDeck> {
                         ),
                       ],
                     );
+                  } else {
+                    final width = (constraints.maxWidth - 8) / 2;
+                    columns = Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: width,
+                          child: Column(children: [...primary, _processingCard(context)]),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: width,
+                          child: Column(
+                            children: [
+                              ...secondary,
+                              _monitorCard(context),
+                              _clipCard(context),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
                   }
-                  final width = (constraints.maxWidth - 8) / 2;
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(width: width, child: Column(children: primary)),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: width,
-                        child: Column(children: [...secondary, ...tertiary]),
-                      ),
-                    ],
+                  // Device is diagnostics, not a shooting control: always last.
+                  return Column(
+                    children: [columns, _deviceCard(context)],
                   );
                 },
               ),
@@ -452,21 +458,14 @@ class _ControlDeckState extends State<ControlDeck> {
       );
     }
 
-    final sizes = <String, List<int>>{};
-    for (final mode in state.recordingModes) {
-      sizes['${mode.width}x${mode.height}'] = [
-        mode.width.toInt(),
-        mode.height.toInt(),
-      ];
-    }
-    final sizeList = sizes.values.toList()
-      ..sort((a, b) => (b[0] * b[1]).compareTo(a[0] * a[1]));
+    final height = current.height.toInt();
+    final is4k = height == 2160;
+    final is1080 = height == 1080;
+    final wide = _isWideMode(current);
+    final familyHeight = is4k ? 2160 : 1080;
 
     final rates = state.recordingModes
-        .where(
-          (mode) =>
-              mode.width == current.width && mode.height == current.height,
-        )
+        .where((mode) => mode.height == familyHeight && mode.height != 720)
         .map((mode) => mode.fps.toInt())
         .toSet()
         .toList()
@@ -490,17 +489,37 @@ class _ControlDeckState extends State<ControlDeck> {
           _modeRow(
             'Resolution',
             [
-              for (final size in sizeList)
-                _modeChip(
-                  label: _sizeLabelFor(size[0], size[1]),
-                  tooltip: '${size[0]}×${size[1]}',
-                  selected:
-                      size[0] == current.width && size[1] == current.height,
-                  onTap: () => _selectSize(size[0], size[1]),
-                ),
+              _modeChip(
+                label: '4K',
+                tooltip: '3840×2160',
+                selected: is4k,
+                onTap: () => _selectResolution('4K'),
+              ),
+              _modeChip(
+                label: '1080',
+                tooltip: '1920×1080 or 1440×1080',
+                selected: is1080,
+                onTap: () => _selectResolution('1080'),
+              ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
+          _modeRow(
+            'Aspect',
+            [
+              _aspectCircle(
+                '16:9',
+                selected: wide,
+                onTap: () => _selectAspect(true),
+              ),
+              _aspectCircle(
+                '4:3',
+                selected: !wide,
+                onTap: () => _selectAspect(false),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
           _modeRow(
             'Frame rate',
             [
@@ -513,7 +532,7 @@ class _ControlDeckState extends State<ControlDeck> {
                 ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           _modeRow(
             'Bit depth',
             [
@@ -530,6 +549,51 @@ class _ControlDeckState extends State<ControlDeck> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _aspectCircle(String label, {
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'aspect ratio $label',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? UiTokens.accent : UiTokens.surfaceRaised,
+                  border: Border.all(
+                    color: selected ? UiTokens.accent : UiTokens.border,
+                  ),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    color: selected ? UiTokens.background : UiTokens.text,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -595,33 +659,56 @@ class _ControlDeckState extends State<ControlDeck> {
     return null;
   }
 
-  void _selectSize(int width, int height) {
+  bool _isWideMode(RecordingMode mode) =>
+      mode.width * 9 == mode.height * 16;
+
+  (int, int) get _editableSize {
+    final current = _currentMode;
+    if (current == null) return (1920, 1080);
+    if (current.height == 2160) return (3840, 2160);
+    if (current.width == 1440) return (1440, 1080);
+    return (1920, 1080);
+  }
+
+  void _selectResolution(String label) {
     final current = _currentMode;
     final fps = current?.fps.toInt() ?? 30;
     final tenBit = current?.tenBit ?? true;
-    _chooseMode(width, height, fps, tenBit);
+    if (label == '4K') {
+      _chooseMode(3840, 2160, fps, tenBit);
+      return;
+    }
+    final wide = current == null ? true : _isWideMode(current);
+    _chooseMode(wide ? 1920 : 1440, 1080, fps, tenBit);
+  }
+
+  void _selectAspect(bool wide) {
+    final current = _currentMode;
+    final fps = current?.fps.toInt() ?? 30;
+    final tenBit = current?.tenBit ?? true;
+    final is4k = current?.height == 2160;
+    if (wide) {
+      _chooseMode(is4k ? 3840 : 1920, is4k ? 2160 : 1080, fps, tenBit);
+    } else {
+      // 4:3 exists at 1440x1080; selecting it from 4K drops to 1080.
+      _chooseMode(1440, 1080, fps, tenBit);
+    }
   }
 
   void _selectFps(int fps) {
     final current = _currentMode;
     if (current == null) return;
-    _chooseMode(current.width.toInt(), current.height.toInt(), fps, current.tenBit);
+    final (width, height) = _editableSize;
+    _chooseMode(width, height, fps, current.tenBit);
   }
 
   void _selectBit(bool tenBit) {
     final current = _currentMode;
     if (current == null) return;
-    _chooseMode(
-      current.width.toInt(),
-      current.height.toInt(),
-      current.fps.toInt(),
-      tenBit,
-    );
+    final (width, height) = _editableSize;
+    _chooseMode(width, height, current.fps.toInt(), tenBit);
   }
 
-  /// Picks the closest enabled mode, preferring the requested size, then the
-  /// requested rate, then the requested bit depth. Falls back to reporting the
-  /// reason from a disabled candidate.
   void _chooseMode(int width, int height, int fps, bool tenBit) {
     RecordingMode? enabled(
       int desiredFps,
@@ -875,6 +962,49 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
+  Widget _exposureCircle(String mode) {
+    final selected = state.exposureMode == mode;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'exposure mode $mode',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => widget.host.setExposureMode(mode),
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Center(
+              child: Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? UiTokens.accent : UiTokens.surfaceRaised,
+                  border: Border.all(
+                    color: selected ? UiTokens.accent : UiTokens.border,
+                  ),
+                ),
+                child: Text(
+                  mode,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: selected ? UiTokens.background : UiTokens.text,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _exposureCard(BuildContext context) {
     final manualIso = state.exposureMode == 'M';
     final manualShutter = state.exposureMode != 'P';
@@ -890,18 +1020,13 @@ class _ControlDeckState extends State<ControlDeck> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SegmentedButton<String>(
-            showSelectedIcon: false,
-            style: const ButtonStyle(visualDensity: VisualDensity.compact),
-            segments: [
-              for (final mode in state.exposureModes)
-                ButtonSegment(value: mode, label: Text(mode)),
+          Row(
+            children: [
+              for (final mode in state.exposureModes) ...[
+                _exposureCircle(mode),
+                const SizedBox(width: 6),
+              ],
             ],
-            selected: {state.exposureMode},
-            onSelectionChanged: (selection) {
-              if (selection.isEmpty) return;
-              widget.host.setExposureMode(selection.first);
-            },
           ),
           const SizedBox(height: 4),
           LabeledSlider(
@@ -957,63 +1082,6 @@ class _ControlDeckState extends State<ControlDeck> {
               state.autoExposure ? 'AE active' : 'Return to AE',
               style: const TextStyle(fontSize: 11),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _focusCard(BuildContext context) {
-    final focusEnabled = state.focusMax > 0;
-    return DeckCard(
-      title: 'Focus',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-            ),
-            onPressed: state.autoFocusSupported
-                ? () => widget.host.setAutoFocus()
-                : null,
-            icon: Icon(
-              state.autoFocus ? Icons.center_focus_strong : Icons.lock_outline,
-              size: 15,
-            ),
-            label: Text(
-              !state.autoFocusSupported
-                  ? 'AF not supported'
-                  : state.autoFocus
-                  ? 'AF active'
-                  : 'Return to AF',
-              style: const TextStyle(fontSize: 11),
-            ),
-          ),
-          const SizedBox(height: 4),
-          LabeledSlider(
-            label: 'Focus',
-            valueLabel: focusEnabled
-                ? formatDiopters(_focusValue)
-                : 'fixed focus',
-            value: focusEnabled ? _focusValue : 0,
-            min: 0,
-            max: focusEnabled ? state.focusMax : 1,
-            enabled: focusEnabled,
-            onChanged: (value) => setState(() => _focusDraft = value),
-            onChangeEnd: focusEnabled
-                ? (value) => widget.host.setFocusDiopters(value)
-                : null,
-          ),
-          LabeledSlider(
-            label: 'Rack speed',
-            valueLabel: '${_shift.toStringAsFixed(1)} D/s',
-            value: _shift,
-            min: 0.1,
-            max: 20,
-            onChanged: (value) => setState(() => _shiftDraft = value),
-            onChangeEnd: (value) => widget.host.setFocusShiftSpeed(value),
           ),
         ],
       ),
@@ -1420,6 +1488,10 @@ class _ControlDeckState extends State<ControlDeck> {
   }
 
   List<RecordingMode> get _enabledModes {
+    final offered = state.recordingModes
+        .where((mode) => mode.enabled && mode.height != 720)
+        .toList();
+    if (offered.isNotEmpty) return offered;
     final enabled = state.recordingModes.where((mode) => mode.enabled).toList();
     return enabled.isEmpty ? state.recordingModes : enabled;
   }

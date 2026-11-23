@@ -807,6 +807,17 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
+### 4K/1080 + aspect + circular exposure (Pad 3 + POCO, build 2056)
+
+- Pad: resolution offers only `4K` and `1080`; choosing 4:3 produced
+  `1440×1080 · 30p · 10b`, and choosing 4K returned to
+  `3840×2160 · 30p · 10b` with the 16:9 circle.
+- Pad: P/S/M are circles; selecting M left ISO/shutter manual and the header
+  stayed on 4K.
+- Focus card and the bottom-dock FOCUS chip are gone; continuous AF continues
+  without UI.
+- Device card is the last full-width item on both devices.
+
 ### Focal-length shoot-set circles (Pad 3 + POCO, build 2055)
 
 - Pad: `25mm` and `26mm` circles; tapping `26mm` removed it from the set

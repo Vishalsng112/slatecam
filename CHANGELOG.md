@@ -61,6 +61,14 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Shoot-set lenses are focal-length circles (`16mm`, `25mm`, `26mm`) instead of
   verbose chips; the facing letter is added only when two lenses share a
   focal length. Tapping a circle includes/excludes that lens.
+- Recording mode now offers only **4K** and **1080** resolutions, with circular
+  **16:9 / 4:3** aspect buttons. Choosing 4:3 at 4K drops to 1440×1080 rather
+  than offering a nonexistent mode.
+- Exposure mode uses circular **P / S / M** buttons.
+- The Focus card and the bottom-dock focus chip are removed for now; the camera
+  keeps continuous autofocus. Manual focus returns with the tap-to-focus/AF-lock
+  work.
+- Device diagnostics always render last, after the shooting cards.
 - `SwitchFramePump` repeats the last camera frame into the encoder while a
   movie-mode lens switch has no session, so the clip keeps a continuous
   timeline. Policy covered by 6 JVM tests.

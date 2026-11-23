@@ -676,15 +676,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
                       icon: Icons.thermostat,
                       onTap: () => _openDeck(),
                     ),
-                    const SizedBox(width: 6),
-                    ReadoutChip(
-                      label: 'FOCUS',
-                      value: state.autoFocus
-                          ? 'AF'
-                          : formatDiopters(state.focusDiopters),
-                      icon: Icons.center_focus_strong,
-                      onTap: () => _openDeck(),
-                    ),
                   ],
                 ),
               ),

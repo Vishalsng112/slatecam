@@ -50,6 +50,7 @@ AF handling). Remaining:
 
 | Item | Notes |
 |---|---|
+| Manual focus UI | Focus card and dock chip removed while continuous AF is the default; restore with tap-to-focus, AF/AE lock and focus speed |
 | Measured colour matrices | `ColorCalibration` solves a 3×3 matrix + trim; capture 24 patches per lens and add the result to the device database |
 | Dual-session seamless switch | The frame pump hides the session gap; a true no-freeze switch needs concurrent sessions and a probe verdict |
 

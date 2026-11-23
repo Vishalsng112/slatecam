@@ -37,7 +37,7 @@ module owns the data.
 | Status | What the camera is doing right now | Top HUD |
 | Record & lens | Record, lens, mode, shoot mode, shoot set | Fixed console header |
 | Exposure | P/S/M, ISO, shutter time/angle, auto exposure | Console card |
-| Focus | AF, manual focus, focus speed | Console card |
+| Focus | Continuous AF by default; manual controls deferred | Kotlin default |
 | Colour | Profile, LUT, white balance, calibration | Console card |
 | Monitoring | Guides, zebra, false colour, peaking, histogram, waveform | Left rail + console card |
 | Capture | Edge, noise reduction, antibanding, output format | Console card |
@@ -198,9 +198,13 @@ position without opening a menu.
 
 | Row | Values | Native call |
 |---|---|---|
-| Resolution | 4K, 1080p, 4:3, 720p | `selectRecordingMode` |
+| Resolution | 4K, 1080 | `selectRecordingMode` |
+| Aspect | 16:9, 4:3 circles | `selectRecordingMode` |
 | Frame rate | 24, 25, 30 (whatever the size exposes) | `selectRecordingMode` |
 | Bit depth | 10-bit, 8-bit (when the combination exists) | `selectRecordingMode` |
+
+4:3 is 1440×1080 today, so selecting it from 4K switches to 1080 rather than
+offering a nonexistent 4K 4:3 mode.
 
 Changing a row keeps the other two where possible and falls back to the closest
 enabled combination. A size with no enabled mode reports the bridge reason
@@ -226,14 +230,18 @@ facing letter is prefixed only when two lenses share a focal length.
 | Zebra threshold for exposure | `setZebra` only takes on/off | Future |
 | Metering mode (matrix/centre/spot) | probe reports regions, no UI yet | Future |
 
-### 5.5 Focus card
+### 5.5 Focus (deferred)
+
+Manual focus, focus speed and AF buttons are removed from the console for now.
+The native controller keeps continuous autofocus, so the preview stays focused
+without UI. The API remains available for the tap-to-focus/AF-lock follow-up.
 
 | Element | Native call | Status |
 |---|---|---|
-| AF auto | `setAutoFocus` | Current |
-| Manual focus slider | `setFocusDiopters` | Current |
-| Focus shift speed | `setFocusShiftSpeed` | Current |
-| Focus distance readout | `focusDiopters` / `focusMax` | Current |
+| Continuous autofocus | `CONTROL_AF_MODE_CONTINUOUS_VIDEO` | Default |
+| Manual focus slider | `setFocusDiopters` | Deferred |
+| Focus shift speed | `setFocusShiftSpeed` | Deferred |
+| Focus distance readout | `focusDiopters` / `focusMax` | Deferred |
 | Tap to focus | needs metering region API | Future |
 | AF lock / AE lock buttons | probe has lock flags, not wired | Future |
 | Hybrid CDAF | hill-climb focus engine | Future |

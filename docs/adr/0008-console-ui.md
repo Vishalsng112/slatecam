@@ -28,17 +28,25 @@ opened at different positions and on a preview that continuously animates.
    profiles are compact chips or segmented buttons. Monitoring is a wrap of
    icon chips instead of switch rows. Dropdowns remain only for long free-form
    lists that do not fit as chips.
-4. **Recording mode follows the camera convention.** Resolution, frame rate and
-   bit depth are separate rows (4K/1080p/4:3/720p → 24/25/30 → 10-bit/8-bit).
-   The UI selects the closest enabled combination instead of listing every
-   Cartesian product as its own chip.
+4. **Recording mode follows the camera convention.** Resolution, aspect, frame
+   rate and bit depth are separate rows (4K/1080 → 16:9/4:3 → 24/25/30 →
+   10-bit/8-bit). The UI selects the closest enabled combination instead of
+   listing every Cartesian product as its own chip. Only 4K and 1080 are
+   offered today; 4:3 exists at 1440×1080, so choosing it from 4K drops to 1080.
 5. **Lenses are identified by focal length.** The shoot set uses circular
    `16mm` / `25mm` / `26mm` badges, matching how an operator picks a lens. The
    facing letter is added only when two lenses share the same value.
-6. **Stable semantics.** The fixed controls carry explicit labels
+6. **Exposure mode is circular.** P/S/M are round buttons next to the fixed
+   shoot-mode circles, so the exposure family reads like the camera dial.
+7. **Diagnostics are last.** The Device card is rendered after every shooting
+   card; important controls always start at the top.
+8. **Focus is default CAF for now.** The manual-focus card and dock chip are
+   removed until tap-to-focus and AF/AE lock are wired; the controller keeps
+   `CONTROL_AF_MODE_CONTINUOUS_VIDEO`.
+9. **Stable semantics.** The fixed controls carry explicit labels
    (`start recording`, `camera: …`, `recording mode: …`) so automation can find
    them without relying on visual text.
-7. **Console, not settings page.** Sliders keep their labels and values inline;
+10. **Console, not settings page.** Sliders keep their labels and values inline;
    status stays in the header and footer. The preview remains the largest
    element at every breakpoint.
 
