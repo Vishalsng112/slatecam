@@ -585,6 +585,7 @@ class _ControlDeckState extends State<ControlDeck> {
 
   Widget _capture(BuildContext context) {
     final lastClip = state.clipPath;
+    final shootLenses = state.shootLenses;
     return Column(
       children: [
         DeckCard(
@@ -620,9 +621,10 @@ class _ControlDeckState extends State<ControlDeck> {
               ),
               _dropdown<String>(
                 label: 'Recording mode',
-                value: state.recordingModes.any(
-                  (mode) => mode.id == state.recordingMode,
-                )
+                value:
+                    state.recordingModes.any(
+                      (mode) => mode.id == state.recordingMode,
+                    )
                     ? state.recordingMode
                     : null,
                 items: state.recordingModes.map((mode) => mode.id).toList(),
@@ -657,6 +659,44 @@ class _ControlDeckState extends State<ControlDeck> {
               _infoRow('Gyro sidecar', '${state.gyroSampleCount} samples'),
             ],
           ),
+        ),
+        DeckCard(
+          title: 'Shoot set',
+          child: shootLenses.isEmpty
+              ? const SizedBox.shrink()
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        for (final lens in shootLenses)
+                          FilterChip(
+                            label: Text(lens.label),
+                            selected: lens.selected,
+                            onSelected: state.isRecording
+                                ? null
+                                : (value) =>
+                                      widget.host.setShootLens(lens.id, value),
+                            selectedColor: UiTokens.accent.withValues(
+                              alpha: 0.25,
+                            ),
+                            checkmarkColor: UiTokens.accent,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      state.isRecording
+                          ? 'Stop recording to change the shoot set.'
+                          : 'The common recording mode is the intersection of the '
+                                'selected lenses. Macro lenses are never part of the '
+                                'shoot set.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
         ),
         DeckCard(
           title: 'Processing',

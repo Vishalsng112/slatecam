@@ -55,6 +55,23 @@ class RecordingMode {
   String reason;
 }
 
+/// A lens the user can include in the Movie/Vlog shoot set.
+class ShootLens {
+  ShootLens({
+    required this.id,
+    required this.label,
+    required this.facing,
+    required this.role,
+    required this.selected,
+  });
+
+  String id;
+  String label;
+  String facing;
+  String role;
+  bool selected;
+}
+
 /// Immutable camera snapshot. Kotlin owns this state; Dart only renders it.
 class CameraState {
   CameraState({
@@ -88,6 +105,7 @@ class CameraState {
     required this.recordingMode,
     required this.recordingModes,
     required this.shootMode,
+    required this.shootLenses,
     required this.tenBit,
     required this.hlgAvailable,
     required this.hlgReason,
@@ -163,6 +181,8 @@ class CameraState {
   List<RecordingMode> recordingModes;
   /// single | movie — movie uses the common mode of all selected lenses.
   String shootMode;
+  /// Probe-visible, openable lenses with their shoot-set selection.
+  List<ShootLens> shootLenses;
   /// True while the camera session or the clip in flight really carries HLG10.
   bool tenBit;
   /// Probe verdict for this camera, size and frame rate.
@@ -245,6 +265,9 @@ abstract class SlateCamHostApi {
 
   /// Selects single-camera or movie/vlog multi-camera mode.
   void setShootMode(String mode);
+
+  /// Includes/excludes a lens from the persisted Movie/Vlog shoot set.
+  void setShootLens(String id, bool selected);
 
   void setAutoFocus();
 

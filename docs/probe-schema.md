@@ -686,4 +686,3 @@ HLG10 session per lens. The extra checks use
 `camera_hlg10_session_c<id>_<size>`, so movie-mode alignment can require every
 camera in the shoot set to pass at the same size. A preset is verified only on
 the camera and size it exercised; one lens never inherits another lens's pass.
-

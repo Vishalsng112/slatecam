@@ -143,7 +143,7 @@ installs can drop adbd. Probe launch:
   RGBA8888, but the encoded stream is Main10/HLG and SPS-checked. Pad movie mode
   is 10-bit; POCO stays SDR because its encoder fails Main10.
 - Colour matching depends on measured per-camera matrices (not shipped).
-- Phase 5.5 remaining: shoot-set editor, measured colour matrices,
+- Phase 5.5 remaining: measured colour matrices, named shoot profiles,
   seamless-switch polish.
 
 - Feature modules `:feature:capture` and `:feature:playback` are empty.

@@ -780,3 +780,17 @@ exposed/openable lens at every supported 10-bit size.
 The Pad demonstrates the target behaviour: a 10-bit movie profile is offered
 only after *every* lens in the set is verified at that size, and a switch keeps
 one encoded clip alive.
+
+## Phase 5.5 shoot-set editor (2026-11-24, build 2040)
+
+- Shoot set is every probe-visible, openable, non-macro lens, de-duplicated by
+  facing/role/focal length.
+- Each lens is a selectable chip in Capture → Shoot set. Selection persists in
+  the `shoot-profile` preferences across app restart.
+- Movie mode requires at least two selected lenses; dropping to one returns to
+  Single mode with “movie mode needs at least two selected lenses”. The editor
+  remains visible so the set can be repaired.
+- Pad: back 25 mm + front 26 mm; deselecting front triggered the min-two guard,
+  re-selecting restored 10-bit HLG movie mode.
+- POCO: back 16 mm (ultra-wide), back 25 mm, front 24 mm. Deselecting the
+  ultra-wide left main + front, and the selection survived a force-stop/restart.

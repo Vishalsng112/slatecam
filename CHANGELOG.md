@@ -26,6 +26,9 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   disables the AF action.
 - Per-camera input profile is applied on every lens switch; measured ColorChecker
   matrices are still data to add.
+- Shoot-set editor: include/exclude any eligible lens; selection is persisted in
+  `shoot-profile` and survives restart. Fewer than two selected lenses disables
+  Movie mode with a reason; the editor stays visible so it can be fixed.
 - POCO multi-lens pass: movie mode main → ultra-wide → front in one continuous
   125.3 s clip (3733 frames). Selecting the macro is rejected with
   “lens 3 is not part of the movie lens set”; recording continues.

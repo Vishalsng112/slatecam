@@ -19,6 +19,7 @@ import io.flutter.view.TextureRegistry
 import io.github.vishalsng112.slatecam.bridge.pigeon.CameraState
 import io.github.vishalsng112.slatecam.bridge.pigeon.LensOption
 import io.github.vishalsng112.slatecam.bridge.pigeon.RecordingMode
+import io.github.vishalsng112.slatecam.bridge.pigeon.ShootLens
 import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamFlutterApi
 import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamHostApi
 import io.github.vishalsng112.slatecam.core.camera.CameraCapabilitiesReader
@@ -83,6 +84,7 @@ class SlateCamBridge private constructor(
 
     /** single | movie. Movie uses the common mode across a set of lenses. */
     private var shootMode: String = SHOOT_SINGLE
+    private val shootPrefs = context.getSharedPreferences(PREFS_SHOOT, Context.MODE_PRIVATE)
     private var modesCacheKey: String? = null
     private var modesCache: List<RecordingMode> = emptyList()
 
@@ -899,7 +901,7 @@ class SlateCamBridge private constructor(
         val normalized = if (mode == SHOOT_MOVIE) SHOOT_MOVIE else SHOOT_SINGLE
         if (normalized == shootMode) return
         if (normalized == SHOOT_MOVIE && shootCameraIds().size < 2) {
-            recordingError = "movie mode needs at least two probe-visible lenses"
+            recordingError = "movie mode needs at least two selected lenses"
             pushState()
             return
         }
@@ -907,6 +909,30 @@ class SlateCamBridge private constructor(
         shootMode = normalized
         selectedModeId = null
         applyMode(activeMode())
+        pushState()
+    }
+
+    override fun setShootLens(id: String, selected: Boolean) {
+        if (recorder.isRecording) {
+            recordingError = "stop recording to edit the shoot set"
+            pushState()
+            return
+        }
+        if (id !in eligibleShootCameras().map { it.id }) return
+
+        val current = effectiveShootIds().toMutableSet()
+        if (selected) current.add(id) else current.remove(id)
+        shootPrefs.edit().putStringSet(KEY_SHOOT_LENSES, current).apply()
+        modesCacheKey = null
+
+        if (shootMode == SHOOT_MOVIE) {
+            if (current.size < 2) {
+                shootMode = SHOOT_SINGLE
+                recordingError = "movie mode needs at least two selected lenses"
+            }
+            selectedModeId = null
+            applyMode(activeMode())
+        }
         pushState()
     }
 
@@ -921,7 +947,9 @@ class SlateCamBridge private constructor(
     }
 
     private fun recordingModes(): List<RecordingMode> {
-        val cacheKey = "$shootMode|${lastCameraId}|${deviceSnapshot.probeReport?.report?.id}"
+        val cacheKey = "$shootMode|${lastCameraId}|" +
+            "${deviceSnapshot.probeReport?.report?.id}|" +
+            effectiveShootIds().joinToString(",")
         if (cacheKey == modesCacheKey) return modesCache
         val pairs = if (shootMode == SHOOT_MOVIE) {
             shootCameraIds().mapNotNull { id ->
@@ -963,7 +991,11 @@ class SlateCamBridge private constructor(
      * Lenses that participate in movie mode: probe-visible, openable, not macro.
      * Logical variants that resolve to the same role/focal length collapse.
      */
-    private fun shootCameraIds(): List<String> {
+    /**
+     * Every lens that can join a shoot set: probe-visible or probe-openable,
+     * non-macro, de-duplicated by facing/role/focal length.
+     */
+    private fun eligibleShootCameras(): List<CameraInfo> {
         val report = deviceSnapshot.probeReport ?: return emptyList()
         val seen = mutableSetOf<String>()
         return report.cameras
@@ -977,7 +1009,35 @@ class SlateCamBridge private constructor(
                     ((camera.focalLength35mmEquiv ?: 0.0).roundToInt())
                 seen.add(key)
             }
-            .map { it.id }
+    }
+
+    /** Effective set: persisted selection intersected with eligible lenses. */
+    private fun effectiveShootIds(): List<String> {
+        val eligible = eligibleShootCameras()
+        if (!shootPrefs.contains(KEY_SHOOT_LENSES)) return eligible.map { it.id }
+        val saved = shootPrefs.getStringSet(KEY_SHOOT_LENSES, emptySet()).orEmpty()
+        return eligible.filter { it.id in saved }.map { it.id }
+    }
+
+    private fun shootCameraIds(): List<String> = effectiveShootIds()
+
+    private fun shootLenses(): List<ShootLens> {
+        val selected = effectiveShootIds().toSet()
+        return eligibleShootCameras().map { camera ->
+            val mm = camera.focalLength35mmEquiv?.roundToInt() ?: 0
+            val label = if (mm > 0) {
+                "${camera.facing} · ${mm}mm"
+            } else {
+                "${camera.facing} · ${camera.role}"
+            }
+            ShootLens(
+                id = camera.id,
+                label = label,
+                facing = camera.facing,
+                role = camera.role,
+                selected = camera.id in selected,
+            )
+        }
     }
 
     private fun tenBitVerifier(cameraId: String): RecordingModeCatalog.TenBitVerifier =
@@ -1068,6 +1128,7 @@ class SlateCamBridge private constructor(
             recordingMode = mode.id,
             recordingModes = recordingModes(),
             shootMode = shootMode,
+            shootLenses = shootLenses(),
         )
         scope.launch {
             runCatching { api.onState(pigeon) }
@@ -1089,6 +1150,7 @@ class SlateCamBridge private constructor(
         recordingMode: String,
         recordingModes: List<RecordingMode>,
         shootMode: String,
+        shootLenses: List<ShootLens>,
     ) = CameraState(
         isOpen = isOpen,
         error = error,
@@ -1120,6 +1182,7 @@ class SlateCamBridge private constructor(
         recordingMode = recordingMode,
         recordingModes = recordingModes,
         shootMode = shootMode,
+        shootLenses = shootLenses,
         tenBit = tenBit,
         hlgAvailable = hlgAvailable,
         hlgReason = hlgReason,
@@ -1163,6 +1226,8 @@ class SlateCamBridge private constructor(
     companion object {
         private const val SHOOT_SINGLE = "single"
         private const val SHOOT_MOVIE = "movie"
+        private const val PREFS_SHOOT = "shoot-profile"
+        private const val KEY_SHOOT_LENSES = "shoot_lenses"
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")
