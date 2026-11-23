@@ -106,3 +106,41 @@ Stress tests, profiling, signed releases, F-Droid, API tracking. Unchanged.
 | RAW video via Camera2 | No such stream exists; only still RAW frames |
 | A colour-space menu that offers HLG on unverified devices | We already shipped one false HDR claim; the prober must gate the menu |
 | Dual preview mode | Removed by decision. It needs a synchronous camera-release path plus a second controller, preview and bridge surface, for a feature a single-camera cinema app does not need. Concurrency itself remains verified in the probe. |
+
+## Capture engine — next major slice
+
+Four requested features share one engine in `:core:camera`. All are feasible;
+none is a one-session change.
+
+### 1. Mode engine (P / S / M)
+- **P**: stock HAL AE/AF (current default).
+- **S (Tv)**: fix `SENSOR_EXPOSURE_TIME`, run our **auto-ISO** loop from the GPU
+  histogram to hold brightness. Metering source already exists (64 bins @ ~5 Hz).
+- **M**: manual ISO/shutter (done).
+- Av is impossible: phone apertures are fixed and Camera2 has no selection key.
+
+### 2. Own exposure loop + change speed
+- Replace HAL AE when a "Pro AE" mode is active.
+- Controller: target from a percentile of the histogram, PI controller on
+  `SENSOR_SENSITIVITY` (and shutter in P-pro), clamped to reported ranges.
+- **Speed control**: rate-limit the EV change (`EV/sec`) or define a convergence
+  time; expose Slow / Normal / Fast.
+- Risks: oscillation, flicker under 50/60 Hz light (antibanding stays on), and
+  vendor gain-step quantisation.
+
+### 3. Hybrid contrast-detect AF
+- Metric: Laplacian variance over the AF region, computed in the existing
+  analysis FBO and read back at ~10 Hz.
+- Coarse acquisition: HAL AF (one-shot), then refine `LENS_FOCUS_DISTANCE` by
+  hill-climb (step, settle, measure, reverse at the peak).
+- Fallback to HAL continuous AF if the metric is unreliable (low light/low
+  texture).
+- Risks: lens/HAL rate limits, visible hunting; keep HAL AF as the default.
+
+### 4. Focus shift (rack) speed — most cinematic, least risky
+- `setFocusDiopters(target)` currently jumps. Add a **focus transition speed**
+  (`diopters/sec`) and ramp toward the target each frame.
+- Slow = long, deliberate rack; fast = snap focus. Preview-only effect on the
+  lens, so it applies to recording too.
+- Implement first: small, self-contained, immediately visible, and it becomes the
+  actuator layer the CDAF hill-climb needs anyway.
