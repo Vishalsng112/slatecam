@@ -218,6 +218,7 @@ data class CameraState (
   val focusDiopters: Double,
   val focusMin: Double,
   val focusMax: Double,
+  val focusShiftSpeed: Double,
   val whiteBalanceMode: String,
   val whiteBalanceModes: List<String>,
   val autoExposure: Boolean,
@@ -264,38 +265,39 @@ data class CameraState (
       val focusDiopters = pigeonVar_list[8] as Double
       val focusMin = pigeonVar_list[9] as Double
       val focusMax = pigeonVar_list[10] as Double
-      val whiteBalanceMode = pigeonVar_list[11] as String
-      val whiteBalanceModes = pigeonVar_list[12] as List<String>
-      val autoExposure = pigeonVar_list[13] as Boolean
-      val autoFocus = pigeonVar_list[14] as Boolean
-      val previewWidth = pigeonVar_list[15] as Long
-      val previewHeight = pigeonVar_list[16] as Long
-      val previewRotationDegrees = pigeonVar_list[17] as Long
-      val isRecording = pigeonVar_list[18] as Boolean
-      val recordingSeconds = pigeonVar_list[19] as Long
-      val clipPath = pigeonVar_list[20] as String?
-      val recordingError = pigeonVar_list[21] as String?
-      val shutterAngle = pigeonVar_list[22] as Double
-      val frameRate = pigeonVar_list[23] as Long
-      val gyroSampleCount = pigeonVar_list[24] as Long
-      val profile = pigeonVar_list[25] as String
-      val profileNames = pigeonVar_list[26] as List<String>
-      val zebra = pigeonVar_list[27] as Boolean
-      val falseColor = pigeonVar_list[28] as Boolean
-      val peaking = pigeonVar_list[29] as Boolean
-      val peakingSensitivity = pigeonVar_list[30] as Double
-      val peakingStrength = pigeonVar_list[31] as Double
-      val edgeMode = pigeonVar_list[32] as String
-      val edgeModes = pigeonVar_list[33] as List<String>
-      val noiseReduction = pigeonVar_list[34] as String
-      val noiseReductionModes = pigeonVar_list[35] as List<String>
-      val antibanding = pigeonVar_list[36] as String
-      val antibandingModes = pigeonVar_list[37] as List<String>
-      val histogram = pigeonVar_list[38] as List<Long>
-      val waveform = pigeonVar_list[39] as List<Long>
-      val waveformColumns = pigeonVar_list[40] as Long
-      val waveformBins = pigeonVar_list[41] as Long
-      return CameraState(isOpen, error, iso, isoMin, isoMax, shutterNs, shutterMinNs, shutterMaxNs, focusDiopters, focusMin, focusMax, whiteBalanceMode, whiteBalanceModes, autoExposure, autoFocus, previewWidth, previewHeight, previewRotationDegrees, isRecording, recordingSeconds, clipPath, recordingError, shutterAngle, frameRate, gyroSampleCount, profile, profileNames, zebra, falseColor, peaking, peakingSensitivity, peakingStrength, edgeMode, edgeModes, noiseReduction, noiseReductionModes, antibanding, antibandingModes, histogram, waveform, waveformColumns, waveformBins)
+      val focusShiftSpeed = pigeonVar_list[11] as Double
+      val whiteBalanceMode = pigeonVar_list[12] as String
+      val whiteBalanceModes = pigeonVar_list[13] as List<String>
+      val autoExposure = pigeonVar_list[14] as Boolean
+      val autoFocus = pigeonVar_list[15] as Boolean
+      val previewWidth = pigeonVar_list[16] as Long
+      val previewHeight = pigeonVar_list[17] as Long
+      val previewRotationDegrees = pigeonVar_list[18] as Long
+      val isRecording = pigeonVar_list[19] as Boolean
+      val recordingSeconds = pigeonVar_list[20] as Long
+      val clipPath = pigeonVar_list[21] as String?
+      val recordingError = pigeonVar_list[22] as String?
+      val shutterAngle = pigeonVar_list[23] as Double
+      val frameRate = pigeonVar_list[24] as Long
+      val gyroSampleCount = pigeonVar_list[25] as Long
+      val profile = pigeonVar_list[26] as String
+      val profileNames = pigeonVar_list[27] as List<String>
+      val zebra = pigeonVar_list[28] as Boolean
+      val falseColor = pigeonVar_list[29] as Boolean
+      val peaking = pigeonVar_list[30] as Boolean
+      val peakingSensitivity = pigeonVar_list[31] as Double
+      val peakingStrength = pigeonVar_list[32] as Double
+      val edgeMode = pigeonVar_list[33] as String
+      val edgeModes = pigeonVar_list[34] as List<String>
+      val noiseReduction = pigeonVar_list[35] as String
+      val noiseReductionModes = pigeonVar_list[36] as List<String>
+      val antibanding = pigeonVar_list[37] as String
+      val antibandingModes = pigeonVar_list[38] as List<String>
+      val histogram = pigeonVar_list[39] as List<Long>
+      val waveform = pigeonVar_list[40] as List<Long>
+      val waveformColumns = pigeonVar_list[41] as Long
+      val waveformBins = pigeonVar_list[42] as Long
+      return CameraState(isOpen, error, iso, isoMin, isoMax, shutterNs, shutterMinNs, shutterMaxNs, focusDiopters, focusMin, focusMax, focusShiftSpeed, whiteBalanceMode, whiteBalanceModes, autoExposure, autoFocus, previewWidth, previewHeight, previewRotationDegrees, isRecording, recordingSeconds, clipPath, recordingError, shutterAngle, frameRate, gyroSampleCount, profile, profileNames, zebra, falseColor, peaking, peakingSensitivity, peakingStrength, edgeMode, edgeModes, noiseReduction, noiseReductionModes, antibanding, antibandingModes, histogram, waveform, waveformColumns, waveformBins)
     }
   }
   fun toList(): List<Any?> {
@@ -311,6 +313,7 @@ data class CameraState (
       focusDiopters,
       focusMin,
       focusMax,
+      focusShiftSpeed,
       whiteBalanceMode,
       whiteBalanceModes,
       autoExposure,
@@ -352,7 +355,7 @@ data class CameraState (
       return true
     }
     val other = other as CameraState
-    return SlateCamPigeonPigeonUtils.deepEquals(this.isOpen, other.isOpen) && SlateCamPigeonPigeonUtils.deepEquals(this.error, other.error) && SlateCamPigeonPigeonUtils.deepEquals(this.iso, other.iso) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMin, other.isoMin) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMax, other.isoMax) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterNs, other.shutterNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMinNs, other.shutterMinNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMaxNs, other.shutterMaxNs) && SlateCamPigeonPigeonUtils.deepEquals(this.focusDiopters, other.focusDiopters) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMin, other.focusMin) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMax, other.focusMax) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceMode, other.whiteBalanceMode) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceModes, other.whiteBalanceModes) && SlateCamPigeonPigeonUtils.deepEquals(this.autoExposure, other.autoExposure) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocus, other.autoFocus) && SlateCamPigeonPigeonUtils.deepEquals(this.previewWidth, other.previewWidth) && SlateCamPigeonPigeonUtils.deepEquals(this.previewHeight, other.previewHeight) && SlateCamPigeonPigeonUtils.deepEquals(this.previewRotationDegrees, other.previewRotationDegrees) && SlateCamPigeonPigeonUtils.deepEquals(this.isRecording, other.isRecording) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingSeconds, other.recordingSeconds) && SlateCamPigeonPigeonUtils.deepEquals(this.clipPath, other.clipPath) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingError, other.recordingError) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterAngle, other.shutterAngle) && SlateCamPigeonPigeonUtils.deepEquals(this.frameRate, other.frameRate) && SlateCamPigeonPigeonUtils.deepEquals(this.gyroSampleCount, other.gyroSampleCount) && SlateCamPigeonPigeonUtils.deepEquals(this.profile, other.profile) && SlateCamPigeonPigeonUtils.deepEquals(this.profileNames, other.profileNames) && SlateCamPigeonPigeonUtils.deepEquals(this.zebra, other.zebra) && SlateCamPigeonPigeonUtils.deepEquals(this.falseColor, other.falseColor) && SlateCamPigeonPigeonUtils.deepEquals(this.peaking, other.peaking) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingSensitivity, other.peakingSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingStrength, other.peakingStrength) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeMode, other.edgeMode) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeModes, other.edgeModes) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReduction, other.noiseReduction) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReductionModes, other.noiseReductionModes) && SlateCamPigeonPigeonUtils.deepEquals(this.antibanding, other.antibanding) && SlateCamPigeonPigeonUtils.deepEquals(this.antibandingModes, other.antibandingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.histogram, other.histogram) && SlateCamPigeonPigeonUtils.deepEquals(this.waveform, other.waveform) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformColumns, other.waveformColumns) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformBins, other.waveformBins)
+    return SlateCamPigeonPigeonUtils.deepEquals(this.isOpen, other.isOpen) && SlateCamPigeonPigeonUtils.deepEquals(this.error, other.error) && SlateCamPigeonPigeonUtils.deepEquals(this.iso, other.iso) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMin, other.isoMin) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMax, other.isoMax) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterNs, other.shutterNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMinNs, other.shutterMinNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMaxNs, other.shutterMaxNs) && SlateCamPigeonPigeonUtils.deepEquals(this.focusDiopters, other.focusDiopters) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMin, other.focusMin) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMax, other.focusMax) && SlateCamPigeonPigeonUtils.deepEquals(this.focusShiftSpeed, other.focusShiftSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceMode, other.whiteBalanceMode) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceModes, other.whiteBalanceModes) && SlateCamPigeonPigeonUtils.deepEquals(this.autoExposure, other.autoExposure) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocus, other.autoFocus) && SlateCamPigeonPigeonUtils.deepEquals(this.previewWidth, other.previewWidth) && SlateCamPigeonPigeonUtils.deepEquals(this.previewHeight, other.previewHeight) && SlateCamPigeonPigeonUtils.deepEquals(this.previewRotationDegrees, other.previewRotationDegrees) && SlateCamPigeonPigeonUtils.deepEquals(this.isRecording, other.isRecording) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingSeconds, other.recordingSeconds) && SlateCamPigeonPigeonUtils.deepEquals(this.clipPath, other.clipPath) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingError, other.recordingError) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterAngle, other.shutterAngle) && SlateCamPigeonPigeonUtils.deepEquals(this.frameRate, other.frameRate) && SlateCamPigeonPigeonUtils.deepEquals(this.gyroSampleCount, other.gyroSampleCount) && SlateCamPigeonPigeonUtils.deepEquals(this.profile, other.profile) && SlateCamPigeonPigeonUtils.deepEquals(this.profileNames, other.profileNames) && SlateCamPigeonPigeonUtils.deepEquals(this.zebra, other.zebra) && SlateCamPigeonPigeonUtils.deepEquals(this.falseColor, other.falseColor) && SlateCamPigeonPigeonUtils.deepEquals(this.peaking, other.peaking) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingSensitivity, other.peakingSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingStrength, other.peakingStrength) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeMode, other.edgeMode) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeModes, other.edgeModes) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReduction, other.noiseReduction) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReductionModes, other.noiseReductionModes) && SlateCamPigeonPigeonUtils.deepEquals(this.antibanding, other.antibanding) && SlateCamPigeonPigeonUtils.deepEquals(this.antibandingModes, other.antibandingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.histogram, other.histogram) && SlateCamPigeonPigeonUtils.deepEquals(this.waveform, other.waveform) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformColumns, other.waveformColumns) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformBins, other.waveformBins)
   }
 
   override fun hashCode(): Int {
@@ -368,6 +371,7 @@ data class CameraState (
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.focusDiopters)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.focusMin)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.focusMax)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.focusShiftSpeed)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.whiteBalanceMode)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.whiteBalanceModes)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.autoExposure)
@@ -402,7 +406,7 @@ data class CameraState (
     return result
   }
   override fun toString(): String {
-    return "CameraState(isOpen=$isOpen, error=$error, iso=$iso, isoMin=$isoMin, isoMax=$isoMax, shutterNs=$shutterNs, shutterMinNs=$shutterMinNs, shutterMaxNs=$shutterMaxNs, focusDiopters=$focusDiopters, focusMin=$focusMin, focusMax=$focusMax, whiteBalanceMode=$whiteBalanceMode, whiteBalanceModes=$whiteBalanceModes, autoExposure=$autoExposure, autoFocus=$autoFocus, previewWidth=$previewWidth, previewHeight=$previewHeight, previewRotationDegrees=$previewRotationDegrees, isRecording=$isRecording, recordingSeconds=$recordingSeconds, clipPath=$clipPath, recordingError=$recordingError, shutterAngle=$shutterAngle, frameRate=$frameRate, gyroSampleCount=$gyroSampleCount, profile=$profile, profileNames=$profileNames, zebra=$zebra, falseColor=$falseColor, peaking=$peaking, peakingSensitivity=$peakingSensitivity, peakingStrength=$peakingStrength, edgeMode=$edgeMode, edgeModes=$edgeModes, noiseReduction=$noiseReduction, noiseReductionModes=$noiseReductionModes, antibanding=$antibanding, antibandingModes=$antibandingModes, histogram=$histogram, waveform=$waveform, waveformColumns=$waveformColumns, waveformBins=$waveformBins)"
+    return "CameraState(isOpen=$isOpen, error=$error, iso=$iso, isoMin=$isoMin, isoMax=$isoMax, shutterNs=$shutterNs, shutterMinNs=$shutterMinNs, shutterMaxNs=$shutterMaxNs, focusDiopters=$focusDiopters, focusMin=$focusMin, focusMax=$focusMax, focusShiftSpeed=$focusShiftSpeed, whiteBalanceMode=$whiteBalanceMode, whiteBalanceModes=$whiteBalanceModes, autoExposure=$autoExposure, autoFocus=$autoFocus, previewWidth=$previewWidth, previewHeight=$previewHeight, previewRotationDegrees=$previewRotationDegrees, isRecording=$isRecording, recordingSeconds=$recordingSeconds, clipPath=$clipPath, recordingError=$recordingError, shutterAngle=$shutterAngle, frameRate=$frameRate, gyroSampleCount=$gyroSampleCount, profile=$profile, profileNames=$profileNames, zebra=$zebra, falseColor=$falseColor, peaking=$peaking, peakingSensitivity=$peakingSensitivity, peakingStrength=$peakingStrength, edgeMode=$edgeMode, edgeModes=$edgeModes, noiseReduction=$noiseReduction, noiseReductionModes=$noiseReductionModes, antibanding=$antibanding, antibandingModes=$antibandingModes, histogram=$histogram, waveform=$waveform, waveformColumns=$waveformColumns, waveformBins=$waveformBins)"
   }
 }
 private open class SlateCamPigeonPigeonCodec : StandardMessageCodec() {
@@ -439,6 +443,7 @@ interface SlateCamHostApi {
   fun setShutterNs(nanoseconds: Long)
   fun setShutterAngle(degrees: Double)
   fun setFocusDiopters(diopters: Double)
+  fun setFocusShiftSpeed(dioptersPerSecond: Double)
   fun setWhiteBalanceMode(mode: String)
   fun setAutoExposure()
   fun setAutoFocus()
@@ -557,6 +562,24 @@ interface SlateCamHostApi {
             val dioptersArg = args[0] as Double
             val wrapped: List<Any?> = try {
               api.setFocusDiopters(dioptersArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.setFocusShiftSpeed$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val dioptersPerSecondArg = args[0] as Double
+            val wrapped: List<Any?> = try {
+              api.setFocusShiftSpeed(dioptersPerSecondArg)
               listOf(null)
             } catch (exception: Throwable) {
               SlateCamPigeonPigeonUtils.wrapError(exception)

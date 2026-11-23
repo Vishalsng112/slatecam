@@ -179,6 +179,10 @@ class SlateCamBridge private constructor(
         controller.setFocusDiopters(diopters.toFloat())
     }
 
+    override fun setFocusShiftSpeed(dioptersPerSecond: Double) {
+        controller.setFocusShiftSpeed(dioptersPerSecond.toFloat())
+    }
+
     override fun setWhiteBalanceMode(mode: String) {
         controller.setWhiteBalanceMode(mode)
     }
@@ -563,6 +567,7 @@ class SlateCamBridge private constructor(
         focusDiopters = focusDiopters.toDouble(),
         focusMin = focusMin.toDouble(),
         focusMax = focusMax.toDouble(),
+        focusShiftSpeed = focusShiftSpeed.toDouble(),
         whiteBalanceMode = whiteBalanceMode,
         whiteBalanceModes = whiteBalanceModes,
         autoExposure = autoExposure,

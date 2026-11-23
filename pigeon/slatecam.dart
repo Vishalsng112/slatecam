@@ -14,6 +14,7 @@ class CameraState {
     required this.focusDiopters,
     required this.focusMin,
     required this.focusMax,
+    required this.focusShiftSpeed,
     required this.whiteBalanceMode,
     required this.whiteBalanceModes,
     required this.autoExposure,
@@ -58,6 +59,7 @@ class CameraState {
   double focusDiopters;
   double focusMin;
   double focusMax;
+  double focusShiftSpeed;
   String whiteBalanceMode;
   List<String> whiteBalanceModes;
   bool autoExposure;
@@ -106,6 +108,8 @@ abstract class SlateCamHostApi {
   void setShutterAngle(double degrees);
 
   void setFocusDiopters(double diopters);
+
+  void setFocusShiftSpeed(double dioptersPerSecond);
 
   void setWhiteBalanceMode(String mode);
 

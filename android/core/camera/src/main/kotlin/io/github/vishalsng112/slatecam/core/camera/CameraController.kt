@@ -34,6 +34,7 @@ data class CameraUiState(
     val focusDiopters: Float,
     val focusMin: Float,
     val focusMax: Float,
+    val focusShiftSpeed: Float = 2f,
     val whiteBalanceMode: String,
     val whiteBalanceModes: List<String>,
     val autoExposure: Boolean,
@@ -91,6 +92,9 @@ class CameraController(private val context: Context) {
     private var iso = 400
     private var shutterNs = 1_000_000_000L / 50
     private var focusDiopters = 0f
+    private var focusTarget = 0f
+    private var focusShiftSpeed = 2f
+    private var focusRampActive = false
     private var wbMode = "auto"
     private var autoExposure = true
     private var autoFocus = true
@@ -205,10 +209,35 @@ class CameraController(private val context: Context) {
 
     fun setFocusDiopters(value: Float) {
         handler.post {
-            focusDiopters = value.coerceIn(0f, focusMax)
+            focusTarget = value.coerceIn(0f, focusMax)
             autoFocus = false
-            applyAndEmit()
+            startFocusRamp()
         }
+    }
+
+    fun setFocusShiftSpeed(dioptersPerSecond: Float) {
+        focusShiftSpeed = dioptersPerSecond.coerceIn(0.1f, 20f)
+    }
+
+    private fun startFocusRamp() {
+        if (focusRampActive) return
+        focusRampActive = true
+        val step = object : Runnable {
+            override fun run() {
+                val delta = focusTarget - focusDiopters
+                val maxStep = focusShiftSpeed * 0.033f
+                if (kotlin.math.abs(delta) <= maxStep) {
+                    focusDiopters = focusTarget
+                    focusRampActive = false
+                    applyAndEmit()
+                } else {
+                    focusDiopters += if (delta > 0f) maxStep else -maxStep
+                    applyAndEmit()
+                    handler.postDelayed(this, 33)
+                }
+            }
+        }
+        handler.post(step)
     }
 
     fun setWhiteBalanceMode(mode: String) {
@@ -538,6 +567,7 @@ class CameraController(private val context: Context) {
             focusDiopters = focusDiopters,
             focusMin = 0f,
             focusMax = focusMax,
+            focusShiftSpeed = focusShiftSpeed,
             whiteBalanceMode = wbMode,
             whiteBalanceModes = wbModes,
             autoExposure = autoExposure,
