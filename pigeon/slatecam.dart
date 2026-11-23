@@ -32,9 +32,6 @@ class CameraState {
     required this.profileNames,
     required this.zebra,
     required this.falseColor,
-    required this.dualOpen,
-    required this.dualRotationPrimary,
-    required this.dualRotationSecondary,
     required this.edgeMode,
     required this.edgeModes,
     required this.noiseReduction,
@@ -76,9 +73,6 @@ class CameraState {
   List<String> profileNames;
   bool zebra;
   bool falseColor;
-  bool dualOpen;
-  int dualRotationPrimary;
-  int dualRotationSecondary;
   String edgeMode;
   List<String> edgeModes;
   String noiseReduction;
@@ -122,11 +116,6 @@ abstract class SlateCamHostApi {
   void setZebra(bool enabled);
 
   void setFalseColor(bool enabled);
-
-  /// Opens both cameras in the required order and returns their texture ids.
-  List<int> openDualPreview();
-
-  void closeDualPreview();
 
   void setEdgeMode(String mode);
 

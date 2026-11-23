@@ -21,7 +21,6 @@ import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamFlutterApi
 import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamHostApi
 import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
-import io.github.vishalsng112.slatecam.core.camera.DualPreviewController
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.codec.GyroRecorder
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
@@ -89,14 +88,6 @@ class SlateCamBridge private constructor(
     private var lutEntries: List<LutLibrary.Entry> = emptyList()
     private var probeMode = false
 
-    private var dualController: DualPreviewController? = null
-    private var dualRendererPrimary: GlPreviewRenderer? = null
-    private var dualRendererSecondary: GlPreviewRenderer? = null
-    private var dualProducerPrimary: TextureRegistry.SurfaceProducer? = null
-    private var dualProducerSecondary: TextureRegistry.SurfaceProducer? = null
-    private var dualOpen = false
-    private var dualRotationPrimary = 0
-    private var dualRotationSecondary = 0
 
     private var histogramBins: List<Int> = emptyList()
     private var waveformBins: List<Int> = emptyList()
@@ -211,138 +202,6 @@ class SlateCamBridge private constructor(
     override fun setFalseColor(enabled: Boolean) {
         falseColorEnabled = enabled
         renderer.setFalseColor(enabled)
-        pushState()
-    }
-
-    override fun openDualPreview(): List<Long> {
-        val existingPrimary = dualProducerPrimary?.id()
-        val existingSecondary = dualProducerSecondary?.id()
-        if (dualOpen && existingPrimary != null && existingSecondary != null) {
-            return listOf(existingPrimary, existingSecondary)
-        }
-
-        val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val ids = manager.cameraIdList
-        fun facing(id: String): Int? = runCatching {
-            manager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING)
-        }.getOrNull()
-
-        val back = ids.firstOrNull { facing(it) == CameraCharacteristics.LENS_FACING_BACK }
-            ?: throw IllegalStateException("no back camera")
-        val front = ids.firstOrNull { facing(it) == CameraCharacteristics.LENS_FACING_FRONT }
-            ?: throw IllegalStateException("no front camera")
-        val size = CameraController.chooseCommonPreviewSize(context, listOf(back, front))
-
-        // Release the single-camera session before opening two devices.
-        controller.close()
-
-        val producerPrimary = engine.renderer.createSurfaceProducer()
-        val producerSecondary = engine.renderer.createSurfaceProducer()
-        val rendererPrimary = GlPreviewRenderer {
-            mainHandler.post { producerPrimary.scheduleFrame() }
-        }
-        val rendererSecondary = GlPreviewRenderer {
-            mainHandler.post { producerSecondary.scheduleFrame() }
-        }
-
-        try {
-            producerPrimary.setSize(size.width, size.height)
-            producerSecondary.setSize(size.width, size.height)
-
-            producerPrimary.setCallback(object : TextureRegistry.SurfaceProducer.Callback {
-                override fun onSurfaceAvailable() {
-                    producerPrimary.surface?.let(rendererPrimary::updateTarget)
-                }
-            })
-            producerSecondary.setCallback(object : TextureRegistry.SurfaceProducer.Callback {
-                override fun onSurfaceAvailable() {
-                    producerSecondary.surface?.let(rendererSecondary::updateTarget)
-                }
-            })
-
-            rendererPrimary.start(
-                producerPrimary.surface ?: producerPrimary.forcedNewSurface,
-                size.width,
-                size.height,
-            )
-            rendererSecondary.start(
-                producerSecondary.surface ?: producerSecondary.forcedNewSurface,
-                size.width,
-                size.height,
-            )
-
-            val surfacePrimary = rendererPrimary.cameraSurface
-                ?: throw IllegalStateException("primary GL surface missing")
-            val surfaceSecondary = rendererSecondary.cameraSurface
-                ?: throw IllegalStateException("secondary GL surface missing")
-
-            val dual = DualPreviewController(context)
-            dual.listener = DualPreviewController.Listener { open, error, rotationPrimary, rotationSecondary ->
-                dualOpen = open
-                dualRotationPrimary = rotationPrimary
-                dualRotationSecondary = rotationSecondary
-                if (error != null) {
-                    android.util.Log.w("SlateCam", "dual preview: $error")
-                    // Recover the single-camera preview if dual mode failed.
-                    val surface = renderer.cameraSurface
-                    if (surface != null) {
-                        val size = CameraController.choosePreviewSize(context)
-                        controller.open(surface, size.width, size.height, tenBit = hlgEnabled)
-                        opened = true
-                    }
-                }
-                pushState()
-            }
-            mainHandler.postDelayed(
-                {
-                    dual.open(
-                        back,
-                        front,
-                        surfacePrimary,
-                        surfaceSecondary,
-                        size.width,
-                        size.height,
-                    )
-                },
-                700L,
-            )
-
-            dualController = dual
-            dualRendererPrimary = rendererPrimary
-            dualRendererSecondary = rendererSecondary
-            dualProducerPrimary = producerPrimary
-            dualProducerSecondary = producerSecondary
-        } catch (t: Throwable) {
-            runCatching { rendererPrimary.close() }
-            runCatching { rendererSecondary.close() }
-            runCatching { producerPrimary.release() }
-            runCatching { producerSecondary.release() }
-            throw t
-        }
-
-        return listOf(producerPrimary.id(), producerSecondary.id())
-    }
-
-    override fun closeDualPreview() {
-        dualController?.release()
-        dualController = null
-        dualRendererPrimary?.close()
-        dualRendererPrimary = null
-        dualRendererSecondary?.close()
-        dualRendererSecondary = null
-        dualProducerPrimary?.release()
-        dualProducerPrimary = null
-        dualProducerSecondary?.release()
-        dualProducerSecondary = null
-        dualOpen = false
-        dualRotationPrimary = 0
-        dualRotationSecondary = 0
-
-        val surface = renderer.cameraSurface
-        if (surface != null) {
-            val size = CameraController.choosePreviewSize(context)
-            controller.open(surface, size.width, size.height, tenBit = hlgEnabled)
-        }
         pushState()
     }
 
@@ -496,8 +355,6 @@ class SlateCamBridge private constructor(
     }
 
     fun dispose() {
-        dualController?.release()
-        dualController = null
         if (recorder.isRecording) {
             renderer.detachEncoderSurface()
             val destination = activeDestination
@@ -633,12 +490,7 @@ class SlateCamBridge private constructor(
 
     /** Releases the camera when the app leaves the foreground. */
     fun pause() {
-        if (dualOpen) {
-            closeDualPreview()
-            resumeOnReturn = true
-        } else {
-            resumeOnReturn = opened
-        }
+        resumeOnReturn = opened
         if (recorder.isRecording) stopRecording()
         controller.close()
         opened = false
@@ -711,9 +563,6 @@ class SlateCamBridge private constructor(
         profileNames = PictureProfile.all.map { it.id } + lutEntries.map { it.id },
         zebra = zebraEnabled,
         falseColor = falseColorEnabled,
-        dualOpen = dualOpen,
-        dualRotationPrimary = dualRotationPrimary.toLong(),
-        dualRotationSecondary = dualRotationSecondary.toLong(),
         edgeMode = edgeMode,
         edgeModes = edgeModes,
         noiseReduction = noiseReduction,

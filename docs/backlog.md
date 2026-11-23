@@ -77,8 +77,7 @@ left floating in conversation.
 |---|---|
 | RAW burst → DNG sequence | Camera2 has no RAW video; expect low fps and large files |
 | Gyro container embedding | Sidecar v2 is frame-aligned; embedding a metadata track in MP4 remains |
-| Dual preview mode | **Blocked by teardown timing.** `DualPreviewController` opens both devices before configuring either session, but after a live single preview the pair still times out (~12 s) even with a 700 ms settle delay; the verifier succeeds from a clean state. Needs a synchronous camera-release acknowledgement before opening the pair. Failure now recovers the single preview instead of leaving the app closed. |
-| Lens switching / per-physical streams | Needs a device that exposes physical IDs and `setPhysicalCameraId` |
+| Lens switching / per-physical streams | Only worth pursuing on a device that exposes physical IDs |
 
 Framing guides moved to Phase 4 (done).
 
@@ -104,3 +103,4 @@ Stress tests, profiling, signed releases, F-Droid, API tracking. Unchanged.
 | Baked-in live audio noise suppression | Destroys ambience and spatial cues; incompatible with cinema audio. Post-processing instead |
 | RAW video via Camera2 | No such stream exists; only still RAW frames |
 | A colour-space menu that offers HLG on unverified devices | We already shipped one false HDR claim; the prober must gate the menu |
+| Dual preview mode | Removed by decision. It needs a synchronous camera-release path plus a second controller, preview and bridge surface, for a feature a single-camera cinema app does not need. Concurrency itself remains verified in the probe. |

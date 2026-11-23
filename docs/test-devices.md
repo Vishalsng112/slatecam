@@ -415,27 +415,3 @@ This platform dispatches `onClosed` on that executor, so the task was rejected
 and the process died with `RejectedExecutionException`. Both camera verifiers now
 defer the executor shutdown by 500 ms. A probe-only launch mode also prevents the
 preview from holding a camera while verification runs.
-
-### Dual preview attempt — blocked by open ordering (2026-11-23)
-
-Enabling a second preview while the primary camera was live failed with
-`CameraDevice.ERROR_MAX_CAMERAS_IN_USE` (error 2). The concurrency verifier
-passes because it **opens both devices before configuring either session**;
-the app opens and configures the primary first, so the second open is refused.
-
-The preview toggle was removed rather than shipped black. A working dual
-preview needs a dedicated controller that opens both cameras, waits for both,
-then configures both sessions with compatible stream sizes (checked via
-`isConcurrentSessionConfigurationSupported`). Recorded in the backlog.
-
-### Coordinated dual preview — still blocked (2026-11-23)
-
-A dedicated `DualPreviewController` now opens both devices before configuring
-either session, which is the order the verifier proves works. From a **clean**
-state it succeeds; from a **live single preview** the pair still times out
-(`timeout opening cameras`, 12 s) even after a 700 ms settle delay.
-
-Conclusion: the remaining blocker is camera **teardown latency**. A synchronous
-acknowledgement that the previous device is fully released is required before
-opening the pair. The failure path now reopens the single preview so the app does
-not end up with no camera.
