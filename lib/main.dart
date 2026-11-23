@@ -46,6 +46,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   CameraState? _state;
   int? _textureId;
+  List<int>? _dualIds;
   bool _busy = false;
   bool _showGuides = false;
   String? _bridgeError;
@@ -111,6 +112,34 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   Widget _buildPreview(CameraState? state) {
+    final dual = _dualIds;
+    if (dual != null && state?.dualOpen != true) {
+      return const ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: Text(
+            'Starting dual preview…',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
+    }
+    if (state != null && state.dualOpen && dual != null && dual.length == 2) {
+      return ColoredBox(
+        color: Colors.black,
+        child: Row(
+          children: [
+            Expanded(
+              child: _dualTexture(dual[0], state.dualRotationPrimary),
+            ),
+            Expanded(
+              child: _dualTexture(dual[1], state.dualRotationSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_textureId == null || state == null || !state.isOpen) {
       return ColoredBox(
         color: Colors.black,
@@ -184,7 +213,53 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
+  Widget _dualTexture(int textureId, int rotation) {
+    final quarterTurns = (rotation % 360) ~/ 90;
+    Widget child = SizedBox(
+      width: 1280,
+      height: 720,
+      child: Texture(textureId: textureId),
+    );
+    if (quarterTurns != 0) {
+      child = RotatedBox(quarterTurns: quarterTurns, child: child);
+    }
+    return ClipRect(
+      child: ColoredBox(
+        color: Colors.black,
+        child: FittedBox(fit: BoxFit.cover, child: child),
+      ),
+    );
+  }
+
   Widget _buildControls(CameraState? state) {
+    if (state?.dualOpen == true) {
+      return ColoredBox(
+        color: const Color(0xFF121214),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('DUAL PREVIEW', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Text(
+                  'Both cameras are streaming.\n'
+                  'Controls are disabled while dual preview is active.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () => _host.closeDualPreview(),
+                  child: const Text('Exit dual preview'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return ColoredBox(
       color: const Color(0xFF121214),
       child: SingleChildScrollView(
@@ -432,6 +507,24 @@ class _CaptureScreenState extends State<CaptureScreen> {
                 title: const Text('Framing guides'),
                 value: _showGuides,
                 onChanged: (value) => setState(() => _showGuides = value),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Dual preview'),
+                value: state.dualOpen,
+                onChanged: (value) async {
+                  if (value) {
+                    try {
+                      final ids = await _host.openDualPreview();
+                      if (mounted) setState(() => _dualIds = ids);
+                    } catch (error) {
+                      if (mounted) setState(() => _bridgeError = '$error');
+                    }
+                  } else {
+                    await _host.closeDualPreview();
+                    if (mounted) setState(() => _dualIds = null);
+                  }
+                },
               ),
               Align(
                 alignment: Alignment.centerLeft,

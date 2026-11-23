@@ -723,6 +723,27 @@ class CameraController(private val context: Context) {
     }
 
     companion object {
+        /** Size supported by every listed camera, preferring 720p. */
+        fun chooseCommonPreviewSize(context: Context, cameraIds: List<String>): Size {
+            val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val common = cameraIds.mapNotNull { id ->
+                runCatching {
+                    manager.getCameraCharacteristics(id)
+                        .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                        ?.getOutputSizes(android.graphics.SurfaceTexture::class.java)
+                        ?.map { it.width to it.height }
+                        ?.toSet()
+                }.getOrNull()
+            }.reduceOrNull { a, b -> a intersect b } ?: emptySet()
+
+            for (preferred in listOf(1280 to 720, 1920 to 1080, 640 to 480)) {
+                if (preferred in common) return Size(preferred.first, preferred.second)
+            }
+            return common.minByOrNull { it.first * it.second }
+                ?.let { Size(it.first, it.second) }
+                ?: Size(1280, 720)
+        }
+
         /**
          * Picks a 16:9 preview size up to 1080p from the back camera's stream map.
          * Falls back to the largest size under 1080p, then 720p.

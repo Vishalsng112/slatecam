@@ -427,3 +427,15 @@ The preview toggle was removed rather than shipped black. A working dual
 preview needs a dedicated controller that opens both cameras, waits for both,
 then configures both sessions with compatible stream sizes (checked via
 `isConcurrentSessionConfigurationSupported`). Recorded in the backlog.
+
+### Coordinated dual preview — still blocked (2026-11-23)
+
+A dedicated `DualPreviewController` now opens both devices before configuring
+either session, which is the order the verifier proves works. From a **clean**
+state it succeeds; from a **live single preview** the pair still times out
+(`timeout opening cameras`, 12 s) even after a 700 ms settle delay.
+
+Conclusion: the remaining blocker is camera **teardown latency**. A synchronous
+acknowledgement that the previous device is fully released is required before
+opening the pair. The failure path now reopens the single preview so the app does
+not end up with no camera.
