@@ -807,6 +807,39 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
+### Preview resize on aspect/resolution change (Pad 3 + POCO, build 2057)
+
+**Symptom:** after switching from 16:9 to 4:3, the viewfinder showed a squashed
+square image with a black band on the right. Switching to 4K showed only part of
+the frame. Recordings were correct, so preview and recording disagreed.
+
+**Cause:** `SurfaceProducer.setSize` resized the Flutter texture but the GL
+renderer kept its existing EGL window surface at the old buffer size. The GL
+viewport took the new dimensions, so a 1440×1080 viewport was drawn into the
+left 75% of a 1920×1080 surface.
+
+**Fix:** force a fresh producer surface and recreate the EGL window surface on
+every mode change (`forcedNewSurface` + `GlPreviewRenderer.updateTarget`).
+Logcat now reports the retarget:
+
+| Transition | `output retargeted` |
+|---|---|
+| 1920×1080 -> 1440×1080 | 1440x1080 |
+| 1440×1080 -> 1920×1080 | 1920x1080 |
+| 1920×1080 -> 3840×2160 | 3840x2160 |
+| 3840×2160 -> 1440×1080 | 1440x1080 |
+
+- Pad: 4:3 now fills the 4:3 viewfinder with no black band; the outlet and cable
+  keep their proportions. A 4:3 recording is `1440×1080` Main10 and matches the
+  preview framing.
+- POCO: the same 16:9 -> 4:3 switch retargets to `1440x1080` and fills the pane.
+- Six rapid resolution/aspect cycles on the Pad left the process alive with no
+  EGL or ImageReader errors.
+
+Note: the sensor is 4:3 native (`4160×3120` on the Pad). Selecting a 16:9 stream
+still crops the sensor vertically; that is camera behaviour, not display
+scaling. Preview and encoded framing now agree in every offered aspect.
+
 ### 4K/1080 + aspect + circular exposure (Pad 3 + POCO, build 2056)
 
 - Pad: resolution offers only `4K` and `1080`; choosing 4:3 produced

@@ -35,7 +35,11 @@ rotation hint; preview and recorded framing did not match.
 4. **The capture aspect is the stream aspect.** Preview buffer, camera stream
    and encoder dimensions are the same size, so the upright frame fills the
    output without stretch. Adding 4:3 means selecting a 4:3 stream size and
-   matching preview/encoder dimensions; it is not a post-hoc resize.
+   matching preview/encoder dimensions; it is not a post-hoc resize. Changing
+   that size must also recreate the output EGL window surface: a
+   `SurfaceProducer.setSize` call alone leaves the renderer writing into the
+   previous buffer, which shows up as a cropped/squashed image with a black
+   band. The bridge forces a new producer surface and calls `updateTarget`.
 5. **Rotation policy in landscape:**
    - `ROTATION_90`: rotate by sensor orientation (90° back, 270° front on the
      test devices);
@@ -58,6 +62,9 @@ letterbox, never by non-uniform scaling.
 - A recording aspect selector (16:9 / 4:3 / anamorphic) becomes a matter of
   choosing a stream size and encoder dimensions; the transform already preserves
   aspect.
+- Preview resizes are explicit: producer surface, EGL window surface, camera
+  SurfaceTexture buffer and camera session are updated together. Verified by
+  switching FHD -> 4:3 -> 4K -> 4:3 repeatedly on the Pad 3 and POCO.
 
 ## Alternatives considered
 

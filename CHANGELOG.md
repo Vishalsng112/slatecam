@@ -125,6 +125,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Pad 3 front/back 10-bit configuration no longer fails the session; the mode
   falls back only where the target lens is not verified.
 - Preview/recording framing now match; 4:3 no longer stretches.
+- Changing resolution/aspect now recreates the preview EGL window surface. The
+  old surface kept its previous buffer size, so a 4:3 (or 4K) mode was drawn
+  into only part of the texture: the image looked cropped/squashed and the rest
+  of the viewfinder was black. `SurfaceProducer.setSize` alone does not retarget
+  the GL renderer; `forcedNewSurface` plus `updateTarget` is required.
 
 ## Earlier phases (0–4)
 - Phase 0: identity, licence, module graph, probe schema.

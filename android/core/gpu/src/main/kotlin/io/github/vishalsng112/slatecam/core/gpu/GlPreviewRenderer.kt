@@ -338,6 +338,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 0,
             )
             EGL14.eglMakeCurrent(display, outputEglSurface, outputEglSurface, context)
+            Log.i(TAG, "output retargeted ${eglSurfaceSize(outputEglSurface)}")
         }
     }
 

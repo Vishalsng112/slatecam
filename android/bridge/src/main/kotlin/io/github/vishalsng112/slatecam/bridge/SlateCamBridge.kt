@@ -193,7 +193,7 @@ class SlateCamBridge private constructor(
             val width = mode.width.toInt()
             val height = mode.height.toInt()
             producer.setSize(width, height)
-            renderer.start(outputSurface(), width, height)
+            renderer.start(freshSurface(), width, height)
             val cameraSurface = renderer.cameraSurface
                 ?: throw IllegalStateException("GL pipeline did not expose a camera surface")
             controller.open(
@@ -323,8 +323,7 @@ class SlateCamBridge private constructor(
             }
             selectedModeId = fallback.id
             if (opened) {
-                producer.setSize(fallback.width, fallback.height)
-                renderer.setPreviewSize(fallback.width, fallback.height)
+                resizePreview(fallback.width, fallback.height)
             }
             controller.configure(
                 fallback.width,
@@ -993,11 +992,35 @@ class SlateCamBridge private constructor(
         val width = mode.width.toInt()
         val height = mode.height.toInt()
         if (opened) {
-            producer.setSize(width, height)
-            renderer.setPreviewSize(width, height)
+            resizePreview(width, height)
         }
         controller.configure(width, height, mode.fps.toInt(), mode.tenBit)
     }
+
+    /**
+     * Resizes the preview for a new recording mode.
+     *
+     * `SurfaceProducer.setSize` does not retarget the GL renderer. The existing
+     * EGL window surface keeps the buffer size it was created with, so a 16:9
+     * surface asked to show 4:3 would only fill the left 75% of the texture and
+     * letterbox the rest. Force a fresh producer surface and recreate the EGL
+     * window surface at the new size; the camera SurfaceTexture buffer and the
+     * camera session are updated separately.
+     */
+    private fun resizePreview(width: Int, height: Int) {
+        producer.setSize(width, height)
+        renderer.updateTarget(freshSurface())
+        renderer.setPreviewSize(width, height)
+    }
+
+    /**
+     * A Surface positioned at the producer's current requested size. The
+     * producer can hand back an older ImageReader-backed Surface when only
+     * `setSize` was called, so ask for a fresh one instead of reusing it.
+     */
+    private fun freshSurface(): Surface =
+        producer.forcedNewSurface ?: producer.surface
+            ?: throw IllegalStateException("no preview surface")
 
     private fun recordingModes(): List<RecordingMode> {
         val cacheKey = "$shootMode|${lastCameraId}|" +
@@ -1309,8 +1332,6 @@ class SlateCamBridge private constructor(
         }
     }
 
-    private fun outputSurface(): Surface =
-        producer.surface ?: producer.forcedNewSurface
 
     private fun CameraUiState.toPigeon(
         isRecording: Boolean,
