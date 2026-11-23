@@ -619,6 +619,22 @@ class CameraController(private val context: Context) {
             request: CaptureRequest,
             result: TotalCaptureResult,
         ) {
+            // AF-lock handoff: once the HAL has focused, take the lens over at the
+            // converged distance so later moves use our cinematic ramp instead of
+            // the vendor's snap.
+            if (autoFocus) {
+                val afState = result.get(CaptureResult.CONTROL_AF_STATE)
+                val converged = result.get(CaptureResult.LENS_FOCUS_DISTANCE)
+                val focused = afState == CameraCharacteristics.CONTROL_AF_STATE_PASSIVE_FOCUSED ||
+                    afState == CameraCharacteristics.CONTROL_AF_STATE_FOCUSED_LOCKED
+                if (focused && converged != null) {
+                    focusDiopters = converged
+                    focusTarget = converged
+                    autoFocus = false
+                    applyAndEmit()
+                }
+            }
+
             if (modesVerified) return
             modesVerified = true
             checkApplied("EDGE_MODE", edgeMode, result.get(CaptureResult.EDGE_MODE), edgeModeValue(edgeMode))
