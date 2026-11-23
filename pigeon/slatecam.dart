@@ -144,6 +144,8 @@ class CameraState {
     required this.noiseReductionModes,
     required this.antibanding,
     required this.antibandingModes,
+    required this.shadingCorrection,
+    required this.shadingSupported,
     required this.exposureMode,
     required this.exposureModes,
     required this.deviceKey,
@@ -227,6 +229,10 @@ class CameraState {
   List<String> noiseReductionModes;
   String antibanding;
   List<String> antibandingModes;
+  /// Lens-shading (vignette) correction for the active sensor.
+  bool shadingCorrection;
+  /// True when the active sensor offers FAST or HIGH_QUALITY shading.
+  bool shadingSupported;
   String exposureMode;
   List<String> exposureModes;
   String deviceKey;
@@ -319,6 +325,10 @@ abstract class SlateCamHostApi {
   void setNoiseReduction(String mode);
 
   void setAntibanding(String mode);
+
+  /// Enables or disables lens-shading (vignette) correction for the active
+  /// sensor. The choice is persisted per camera ID.
+  void setShadingCorrection(bool enabled);
 
   /// Opt-in for persisted device reports. Off by default.
   void setDeviceReportOptIn(bool enabled);

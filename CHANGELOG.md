@@ -13,7 +13,8 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Per-camera capability reader (`CameraCapabilitiesReader`) for sizes, exact AE
   frame rates, autofocus modes, 10-bit claim and zoom range. Hidden/openable
   lenses are included.
-- `RecordingModeCatalog`: 4K, 1080p, 1440×1080 4:3 and 720p; 24/25/30 fps; 8-bit
+- `RecordingModeCatalog`: 4K 16:9 (3840×2160), 4K 4:3 (4096×3072, 3840×2880,
+  2880×2160), 1080p 16:9, 1440×1080/1920×1440 4:3 and 720p; 24/25/30 fps; 8-bit
   and probe-verified 10-bit. Invalid modes are disabled with a reason.
 - Movie/Vlog shoot mode: strict common-mode intersection across probe-visible,
   openable, non-macro lenses.
@@ -61,9 +62,18 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Shoot-set lenses are focal-length circles (`16mm`, `25mm`, `26mm`) instead of
   verbose chips; the facing letter is added only when two lenses share a
   focal length. Tapping a circle includes/excludes that lens.
-- Recording mode now offers only **4K** and **1080** resolutions, with circular
-  **16:9 / 4:3** aspect buttons. Choosing 4:3 at 4K drops to 1440×1080 rather
-  than offering a nonexistent mode.
+- Recording mode offers **4K** and **1080** resolution families with circular
+  **16:9 / 4:3** aspect buttons. Changing aspect keeps the family: 4K 16:9 is
+  3840×2160, and 4K 4:3 picks the first supported size from 3840×2880,
+  4096×3072 and 2880×2160 instead of dropping to 1080. Pad 3 records
+  4096×3072 30p 8-bit, POCO X6 Pro records 2880×2160 30p 8-bit. 10-bit for the
+  new 4:3 sizes is probe-gated through the new `dci43_*`, `uhd43_*` and
+  `qhd43_*` presets.
+- Lens-shading (vignette) correction is now on by default and exposed as a
+  per-sensor **Vignette correction** toggle in Processing. The controller
+  requests `SHADING_MODE_HIGH_QUALITY` (else `FAST`) instead of forcing `OFF`,
+  and the bridge remembers the choice per camera ID. Measured Pad 3
+  corner/centre luma ratio rose from 0.284 to 0.455 with correction on.
 - Exposure mode uses circular **P / S / M** buttons.
 - The Focus card and the bottom-dock focus chip are removed for now; the camera
   keeps continuous autofocus. Manual focus returns with the tap-to-focus/AF-lock

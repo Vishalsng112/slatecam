@@ -146,6 +146,7 @@ class SlateCamBridge private constructor(
                 if (shootMode == SHOOT_SINGLE) {
                     controller.setTenBit(tenBitGate(state.cameraId).available)
                 }
+                controller.setShadingCorrection(shadingEnabledFor(state.cameraId))
             }
             renderer.setTenBitSource(state.isTenBit)
             renderer.setDisplayRotation(state.previewRotationDegrees)
@@ -385,6 +386,20 @@ class SlateCamBridge private constructor(
     override fun setAntibanding(mode: String) {
         controller.setAntibanding(mode)
     }
+
+    override fun setShadingCorrection(enabled: Boolean) {
+        val id = lastState?.cameraId ?: lastCameraId ?: return
+        val disabled = (shootPrefs.getStringSet(KEY_SHADING_OFF, emptySet()) ?: emptySet())
+            .toMutableSet()
+        if (enabled) disabled.remove(id) else disabled.add(id)
+        shootPrefs.edit().putStringSet(KEY_SHADING_OFF, disabled).apply()
+        controller.setShadingCorrection(enabled)
+        pushState()
+    }
+
+    /** Vignette correction is on unless this sensor was explicitly turned off. */
+    private fun shadingEnabledFor(cameraId: String): Boolean =
+        cameraId !in (shootPrefs.getStringSet(KEY_SHADING_OFF, emptySet()) ?: emptySet())
 
     override fun setDeviceReportOptIn(enabled: Boolean) {
         deviceDatabase.setReportOptIn(enabled)
@@ -1254,6 +1269,9 @@ class SlateCamBridge private constructor(
                             width == 3840 && height == 2160 -> "uhd${fps}_10bit"
                             width == 1920 && height == 1080 -> "fhd${fps}_10bit"
                             width == 1440 && height == 1080 -> "fhd43_${fps}_10bit"
+                            width == 4096 && height == 3072 -> "dci43_${fps}_10bit"
+                            width == 3840 && height == 2880 -> "uhd43_${fps}_10bit"
+                            width == 2880 && height == 2160 -> "qhd43_${fps}_10bit"
                             else -> null
                         }
                         if (presetId == null) {
@@ -1405,6 +1423,8 @@ class SlateCamBridge private constructor(
         noiseReductionModes = noiseReductionModes,
         antibanding = antibanding,
         antibandingModes = antibandingModes,
+        shadingCorrection = shadingCorrection,
+        shadingSupported = shadingSupported,
         exposureMode = exposureMode,
         exposureModes = exposureModes,
         deviceKey = deviceSnapshot.identity.deviceKey,
@@ -1429,6 +1449,7 @@ class SlateCamBridge private constructor(
         private const val KEY_SHOOT_LENSES = "shoot_lenses"
         private const val KEY_SHOOT_PROFILES = "shoot_profiles"
         private const val KEY_ACTIVE_PROFILE = "active_profile"
+        private const val KEY_SHADING_OFF = "shading_off_cameras"
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")

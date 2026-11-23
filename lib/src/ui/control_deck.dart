@@ -458,22 +458,24 @@ class _ControlDeckState extends State<ControlDeck> {
       );
     }
 
-    final height = current.height.toInt();
-    final is4k = height == 2160;
-    final is1080 = height == 1080;
+    final family = _familyOf(current);
+    final is4k = family == '4K';
+    final is1080 = !is4k;
     final wide = _isWideMode(current);
-    final familyHeight = is4k ? 2160 : 1080;
 
     final rates = state.recordingModes
-        .where((mode) => mode.height == familyHeight && mode.height != 720)
+        .where((mode) => _familyOf(mode) == family && _isWideMode(mode) == wide)
         .map((mode) => mode.fps.toInt())
         .toSet()
         .toList()
       ..sort();
 
+    // Only show depths that can actually be selected at this size/rate. A
+    // 4K 4:3 mode is 8-bit until the probe verifies its 10-bit preset.
     final depths = state.recordingModes
         .where(
           (mode) =>
+              mode.enabled &&
               mode.width == current.width &&
               mode.height == current.height &&
               mode.fps == current.fps,
@@ -491,13 +493,13 @@ class _ControlDeckState extends State<ControlDeck> {
             [
               _modeChip(
                 label: '4K',
-                tooltip: '3840×2160',
+                tooltip: '4K family, exact size follows the aspect',
                 selected: is4k,
                 onTap: () => _selectResolution('4K'),
               ),
               _modeChip(
                 label: '1080',
-                tooltip: '1920×1080 or 1440×1080',
+                tooltip: '1080 family, exact size follows the aspect',
                 selected: is1080,
                 onTap: () => _selectResolution('1080'),
               ),
@@ -662,58 +664,83 @@ class _ControlDeckState extends State<ControlDeck> {
   bool _isWideMode(RecordingMode mode) =>
       mode.width * 9 == mode.height * 16;
 
-  (int, int) get _editableSize {
-    final current = _currentMode;
-    if (current == null) return (1920, 1080);
-    if (current.height == 2160) return (3840, 2160);
-    if (current.width == 1440) return (1440, 1080);
-    return (1920, 1080);
+  /// A mode's resolution family. 4K means a 2160-or-taller frame; the exact
+  /// size then follows the aspect (e.g. 3840x2160 for 16:9 and 4096x3072 or
+  /// 2880x2160 for 4:3). This is why changing aspect no longer drops to 1080.
+  String _familyOf(RecordingMode mode) =>
+      mode.height >= 2160 ? '4K' : '1080';
+
+  /// Candidate sizes in preference order for a family and aspect.
+  List<(int, int)> _sizesFor(String family, bool wide) {
+    if (family == '4K') {
+      if (wide) return [(3840, 2160)];
+      return [(3840, 2880), (4096, 3072), (2880, 2160)];
+    }
+    if (wide) return [(1920, 1080)];
+    // 1440x1080 is the probe-verified 4:3 mode; 1920x1440 is a fallback.
+    return [(1440, 1080), (1920, 1440)];
   }
 
   void _selectResolution(String label) {
     final current = _currentMode;
     final fps = current?.fps.toInt() ?? 30;
     final tenBit = current?.tenBit ?? true;
-    if (label == '4K') {
-      _chooseMode(3840, 2160, fps, tenBit);
-      return;
-    }
     final wide = current == null ? true : _isWideMode(current);
-    _chooseMode(wide ? 1920 : 1440, 1080, fps, tenBit);
+    _chooseFromSizes(_sizesFor(label, wide), fps, tenBit);
   }
 
   void _selectAspect(bool wide) {
     final current = _currentMode;
     final fps = current?.fps.toInt() ?? 30;
     final tenBit = current?.tenBit ?? true;
-    final is4k = current?.height == 2160;
-    if (wide) {
-      _chooseMode(is4k ? 3840 : 1920, is4k ? 2160 : 1080, fps, tenBit);
-    } else {
-      // 4:3 exists at 1440x1080; selecting it from 4K drops to 1080.
-      _chooseMode(1440, 1080, fps, tenBit);
-    }
+    final family = current == null ? '4K' : _familyOf(current);
+    _chooseFromSizes(_sizesFor(family, wide), fps, tenBit);
   }
 
   void _selectFps(int fps) {
     final current = _currentMode;
     if (current == null) return;
-    final (width, height) = _editableSize;
-    _chooseMode(width, height, fps, current.tenBit);
+    _chooseFromSizes(
+      _sizesFor(_familyOf(current), _isWideMode(current)),
+      fps,
+      current.tenBit,
+    );
   }
 
   void _selectBit(bool tenBit) {
     final current = _currentMode;
     if (current == null) return;
-    final (width, height) = _editableSize;
-    _chooseMode(width, height, current.fps.toInt(), tenBit);
+    _chooseFromSizes(
+      _sizesFor(_familyOf(current), _isWideMode(current)),
+      current.fps.toInt(),
+      tenBit,
+    );
   }
 
-  void _chooseMode(int width, int height, int fps, bool tenBit) {
-    RecordingMode? enabled(
-      int desiredFps,
-      bool desiredBit,
-    ) {
+  /// Tries each candidate size until one has an enabled combination, keeping
+  /// the requested rate and bit depth where possible. If none is enabled, asks
+  /// the bridge for the first candidate's reason instead of silently changing
+  /// resolution or aspect.
+  void _chooseFromSizes(List<(int, int)> sizes, int fps, bool tenBit) {
+    for (final (width, height) in sizes) {
+      final mode = _bestMode(width, height, fps, tenBit);
+      if (mode != null) {
+        widget.host.selectRecordingMode(mode.id);
+        return;
+      }
+    }
+    for (final (width, height) in sizes) {
+      for (final mode in state.recordingModes) {
+        if (mode.width == width && mode.height == height) {
+          widget.host.selectRecordingMode(mode.id);
+          return;
+        }
+      }
+    }
+  }
+
+  RecordingMode? _bestMode(int width, int height, int fps, bool tenBit) {
+    RecordingMode? enabled(int desiredFps, bool desiredBit) {
       for (final mode in state.recordingModes) {
         if (mode.enabled &&
             mode.width == width &&
@@ -726,24 +753,11 @@ class _ControlDeckState extends State<ControlDeck> {
       return null;
     }
 
-    final exact = enabled(fps, tenBit) ??
+    return enabled(fps, tenBit) ??
         enabled(fps, !tenBit) ??
         _nearestRate(width, height, fps, tenBit) ??
         _nearestRate(width, height, fps, !tenBit) ??
         _firstEnabledAt(width, height);
-
-    if (exact != null) {
-      widget.host.selectRecordingMode(exact.id);
-      return;
-    }
-
-    // No enabled combination at this size: surface the bridge's reason.
-    for (final mode in state.recordingModes) {
-      if (mode.width == width && mode.height == height) {
-        widget.host.selectRecordingMode(mode.id);
-        return;
-      }
-    }
   }
 
   RecordingMode? _nearestRate(
@@ -783,7 +797,11 @@ class _ControlDeckState extends State<ControlDeck> {
   String _sizeLabelFor(int width, int height) {
     return switch ((width, height)) {
       (3840, 2160) => '4K',
+      (4096, 3072) => '4K4:3',
+      (3840, 2880) => '4K4:3',
+      (2880, 2160) => '4K4:3',
       (1920, 1080) => '1080p',
+      (1920, 1440) => '4:3',
       (1440, 1080) => '4:3',
       (1280, 720) => '720p',
       _ => '$width×$height',
@@ -1272,6 +1290,22 @@ class _ControlDeckState extends State<ControlDeck> {
             widget.host.setEdgeMode,
           ),
           const SizedBox(height: 8),
+          if (state.shadingSupported)
+            _chipGroup(
+              'Vignette correction',
+              const ['on', 'off'],
+              state.shadingCorrection ? 'on' : 'off',
+              (value) =>
+                  widget.host.setShadingCorrection(value == 'on'),
+            )
+          else
+            Text(
+              'VIGNETTE CORRECTION · not offered by this sensor',
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: UiTokens.muted),
+            ),
+          const SizedBox(height: 8),
           _chipGroup(
             'Noise reduction',
             state.noiseReductionModes,
@@ -1513,7 +1547,7 @@ class _ControlDeckState extends State<ControlDeck> {
   }
 
   String _modeShort(RecordingMode mode) =>
-      '${_sizeLabel(mode)}${mode.fps}p ${mode.tenBit ? '10b' : '8b'}';
+      '${_sizeLabel(mode)} ${mode.fps}p ${mode.tenBit ? '10b' : '8b'}';
 
   String _sizeLabel(RecordingMode mode) =>
       _sizeLabelFor(mode.width.toInt(), mode.height.toInt());

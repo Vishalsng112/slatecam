@@ -40,6 +40,12 @@ rotation hint; preview and recorded framing did not match.
    `SurfaceProducer.setSize` call alone leaves the renderer writing into the
    previous buffer, which shows up as a cropped/squashed image with a black
    band. The bridge forces a new producer surface and calls `updateTarget`.
+5. **Aspect keeps the resolution family.** 4K 16:9 and 4K 4:3 are different
+   streams (3840×2160 versus the first supported of 3840×2880, 4096×3072 and
+   2880×2160), just as 1080 16:9 and 1080 4:3 are. The UI treats the size as a
+   family and tries the family's candidate sizes before reporting a reason;
+   changing aspect never silently drops 4K to 1080 because one canonical 4:3
+   size was missing.
 5. **Rotation policy in landscape:**
    - `ROTATION_90`: rotate by sensor orientation (90° back, 270° front on the
      test devices);

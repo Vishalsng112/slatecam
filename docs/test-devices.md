@@ -807,6 +807,44 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
+### 4K 4:3 and per-sensor vignette correction (Pad 3 + POCO, build 2062)
+
+**4K 4:3 aspect**
+
+| Device | 4K 16:9 | 4K 4:3 selected | Recorded clip |
+|---|---|---|---|
+| Pad 3 (back) | 3840×2160 · 30p · 10b HLG | 4096×3072 · 30p · 8b SDR | 4096×3072 HEVC Main, 5.73 s |
+| POCO X6 Pro | 3840×2160 · 30p · 8b | 2880×2160 · 30p · 8b | 2880×2160 HEVC Main |
+
+- Pad supports 4096×3072 (4:3) and 4160×3120; it does not expose 3840×2880.
+- POCO does not expose 4096×3072; 2880×2160 is its first 4K-class 4:3 stream.
+- The selector now treats 4K as a family. Tapping 4:3 from 4K no longer drops to
+  1080; tapping 16:9 returns to 3840×2160. 10-bit remains disabled for the new
+  4:3 sizes until a probe run covers `dci43_*`, `uhd43_*` or `qhd43_*`.
+- EGL retarget log: `3840x2160 -> 4096x3072` on Pad and
+  `3840x2160 -> 2880x2160` on POCO, so preview and encoder sizes stay aligned.
+- The bit-depth row lists only selectable depths. 4K 4:3 shows 8-bit alone
+  until a probe report includes its 10-bit preset; 4K 16:9 still shows both.
+
+**Vignette correction**
+
+The controller had forced `SHADING_MODE_OFF` for every sensor. It now defaults
+to correction and requests the best advertised mode.
+
+| Check | Result |
+|---|---|
+| Pad request dump | `android.shading.mode [HIGH_QUALITY]` |
+| Pad toggle off | `android.shading.mode [OFF]` |
+| Pad toggle on | `android.shading.mode [HIGH_QUALITY]` |
+| POCO request dump | `android.shading.mode [HIGH_QUALITY]` |
+| Persistence | off -> force-stop/restart -> still `OFF` |
+| Fixed-exposure corner/centre luma | 0.284 (off) -> 0.455 (on) |
+
+The Processing card shows a per-sensor **Vignette correction** on/off pair. The
+choice is stored per camera ID in `shoot-profile` prefs, so a lens that was
+turned off stays off while a different lens starts corrected. If a sensor only
+advertises `off`, the card says correction is not offered.
+
 ### Preview resize on aspect/resolution change (Pad 3 + POCO, build 2057)
 
 **Symptom:** after switching from 16:9 to 4:3, the viewfinder showed a squashed

@@ -198,17 +198,19 @@ position without opening a menu.
 
 | Row | Values | Native call |
 |---|---|---|
-| Resolution | 4K, 1080 | `selectRecordingMode` |
+| Resolution | 4K, 1080 (families) | `selectRecordingMode` |
 | Aspect | 16:9, 4:3 circles | `selectRecordingMode` |
 | Frame rate | 24, 25, 30 (whatever the size exposes) | `selectRecordingMode` |
 | Bit depth | 10-bit, 8-bit (when the combination exists) | `selectRecordingMode` |
 
-4:3 is 1440×1080 today, so selecting it from 4K switches to 1080 rather than
-offering a nonexistent 4K 4:3 mode.
+A resolution is a family, not a fixed size. 4K 16:9 is 3840×2160; 4K 4:3 picks
+the first enabled size from 3840×2880, 4096×3072 and 2880×2160. 1080 4:3 is
+1440×1080 (with 1920×1440 as a fallback). Changing aspect therefore keeps the
+resolution family instead of dropping 4K to 1080.
 
 Changing a row keeps the other two where possible and falls back to the closest
-enabled combination. A size with no enabled mode reports the bridge reason
-instead of silently changing something else.
+enabled combination. If no size in the family/aspect is enabled, the console
+reports the bridge reason and leaves the current mode alone.
 
 The shoot set lists lenses as focal-length circles (`16mm`, `25mm`, `26mm`).
 Tapping a circle includes or excludes that lens from the Movie/Vlog set; the
@@ -286,11 +288,12 @@ without UI. The API remains available for the tap-to-focus/AF-lock follow-up.
 |---|---|---|
 | Edge mode | `setEdgeMode` | Current |
 | Noise reduction | `setNoiseReduction` | Current |
+| Vignette correction (per sensor) | `setShadingCorrection` | Current |
 | Antibanding | `setAntibanding` | Current |
 | Output summary | preview size + frame rate from state | Current |
 | HLG gate status | current bit depth + probe reason | Current |
 | Shoot mode | Single vs Movie/Vlog common mode | **Current** |
-| Recording mode | per-camera size/fps/bit-depth incl. 4K/1080p/720p and 16:9/4:3, probe-gated | **Current** |
+| Recording mode | per-camera size/fps/bit-depth incl. 4K/1080p/720p, 16:9/4:3 and 4K 4:3 families, probe-gated | **Current** |
 | Resolution / frame-rate selector | replaced by the recording-mode catalog | **Current** |
 | Codec / bitrate selector | fixed HEVC, bitrate scales with mode | Future |
 | Audio source and level | native selection exists, no UI/state | Future |

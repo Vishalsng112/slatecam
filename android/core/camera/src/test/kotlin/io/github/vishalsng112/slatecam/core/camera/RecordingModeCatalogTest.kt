@@ -49,6 +49,20 @@ class RecordingModeCatalogTest {
     }
 
     @Test
+    fun `four three 4K sizes stay in the 4K family`() {
+        val modes = RecordingModeCatalog.modesFor(
+            caps("0", listOf(4096 to 3072, 2880 to 2160)),
+            verifiedAll,
+        )
+        val dci = modes.first { it.id == "4096x3072@30/8" }
+        val phone4k = modes.first { it.id == "2880x2160@30/8" }
+        assertTrue(dci.enabled)
+        assertTrue(phone4k.enabled)
+        assertTrue(dci.label.contains("4:3"))
+        assertTrue(phone4k.label.contains("4:3"))
+    }
+
+    @Test
     fun `ten bit needs the probe verifier`() {
         val modes = RecordingModeCatalog.modesFor(
             caps("0", listOf(1920 to 1080)),

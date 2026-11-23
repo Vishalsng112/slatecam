@@ -55,6 +55,7 @@ root is `android/`, not the repository root.
 | Per-camera capabilities | `:core:camera` | `CameraCapabilities.kt` |
 | Recording modes / common mode | `:core:camera` | `RecordingModeCatalog.kt` |
 | Exposure P/S/M | `:core:camera` | `ExposureEngine.kt` |
+| Lens-shading / vignette correction | `:core:camera` | `ShadingCorrection.kt`, `CameraController.applyControls` |
 | Frame rendering, shader, overlays | `:core:gpu` | `GlPreviewRenderer.kt` |
 | Recording/mux/audio | `:core:codec` | `ClipRecorder.kt`, `GyroRecorder.kt` |
 | HEVC SPS verification | `:core:common` | `HevcSps.kt` |
@@ -112,6 +113,7 @@ on camera change`
 - **Probe JSON:** schema 1.9.0, `docs/probe-schema.md`.
 - **Device DB:** `slatecam.device-db` v1, `docs/device-database.md`.
 - **Orientation/aspect:** ADR 0006.
+- **Lens-shading (vignette) correction:** ADR 0009.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current

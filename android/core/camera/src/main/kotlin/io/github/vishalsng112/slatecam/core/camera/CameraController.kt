@@ -63,6 +63,10 @@ data class CameraUiState(
     val noiseReductionModes: List<String> = emptyList(),
     val antibanding: String = "auto",
     val antibandingModes: List<String> = emptyList(),
+    /** Lens-shading (vignette) correction preference for the active sensor. */
+    val shadingCorrection: Boolean = true,
+    /** True when the sensor advertises FAST or HIGH_QUALITY shading. */
+    val shadingSupported: Boolean = false,
     val exposureMode: String = ExposureMode.PROGRAM.wireValue,
     val exposureModes: List<String> = ExposureMode.wireValues,
 )
@@ -133,6 +137,8 @@ class CameraController(private val context: Context) {
     private var antibandingModes: List<String> = emptyList()
     private var hotPixelModes: List<String> = emptyList()
     private var shadingModes: List<String> = emptyList()
+    private var shadingCorrection = true
+    private var shadingSupported = false
     private var aberrationModes: List<String> = emptyList()
     private var distortionModes: List<String> = emptyList()
 
@@ -462,6 +468,19 @@ class CameraController(private val context: Context) {
         }
     }
 
+    /**
+     * Turns lens-shading (vignette) correction on or off for the active sensor.
+     * The preference is applied to the controller only; the bridge persists it
+     * per camera ID so each lens remembers its own choice.
+     */
+    fun setShadingCorrection(enabled: Boolean) {
+        handler.post {
+            if (shadingCorrection == enabled) return@post
+            shadingCorrection = enabled
+            applyAndEmit()
+        }
+    }
+
     /** Closes the camera and stops the camera thread. Call when the owner goes away. */
     fun shutdown() {
         handler.post {
@@ -564,6 +583,7 @@ class CameraController(private val context: Context) {
             ?.map(::hotPixelName) ?: emptyList()
         shadingModes = characteristics.get(CameraCharacteristics.SHADING_AVAILABLE_MODES)
             ?.map(::shadingName) ?: emptyList()
+        shadingSupported = ShadingCorrection.isSupported(shadingModes)
         aberrationModes = characteristics.get(
             CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES,
         )?.map(::aberrationName) ?: emptyList()
@@ -764,8 +784,8 @@ class CameraController(private val context: Context) {
         if ("off" in hotPixelModes) {
             request.set(CaptureRequest.HOT_PIXEL_MODE, CameraCharacteristics.HOT_PIXEL_MODE_OFF)
         }
-        if ("off" in shadingModes) {
-            request.set(CaptureRequest.SHADING_MODE, CameraCharacteristics.SHADING_MODE_OFF)
+        shadingRequestedMode()?.let {
+            request.set(CaptureRequest.SHADING_MODE, shadingModeValue(it))
         }
         if ("off" in aberrationModes) {
             request.set(
@@ -855,6 +875,8 @@ class CameraController(private val context: Context) {
             noiseReductionModes = noiseReductionModes,
             antibanding = antibanding,
             antibandingModes = antibandingModes,
+            shadingCorrection = shadingCorrection,
+            shadingSupported = shadingSupported,
             exposureMode = exposureMode.wireValue,
             exposureModes = ExposureMode.wireValues,
         )
@@ -937,12 +959,12 @@ class CameraController(private val context: Context) {
                     CameraCharacteristics.HOT_PIXEL_MODE_OFF,
                 )
             }
-            if ("off" in shadingModes) {
+            shadingRequestedMode()?.let { requested ->
                 checkApplied(
                     "SHADING_MODE",
-                    "off",
+                    requested,
                     result.get(CaptureResult.SHADING_MODE),
-                    CameraCharacteristics.SHADING_MODE_OFF,
+                    shadingModeValue(requested),
                 )
             }
             if ("off" in aberrationModes) {
@@ -1027,11 +1049,21 @@ class CameraController(private val context: Context) {
     }
 
     private fun shadingName(value: Int): String = when (value) {
-        CameraCharacteristics.SHADING_MODE_OFF -> "off"
-        CameraCharacteristics.SHADING_MODE_FAST -> "fast"
-        CameraCharacteristics.SHADING_MODE_HIGH_QUALITY -> "high_quality"
+        CameraCharacteristics.SHADING_MODE_OFF -> ShadingCorrection.OFF
+        CameraCharacteristics.SHADING_MODE_FAST -> ShadingCorrection.FAST
+        CameraCharacteristics.SHADING_MODE_HIGH_QUALITY -> ShadingCorrection.HIGH_QUALITY
         else -> "mode_$value"
     }
+
+    private fun shadingModeValue(mode: String): Int = when (mode) {
+        ShadingCorrection.OFF -> CameraCharacteristics.SHADING_MODE_OFF
+        ShadingCorrection.FAST -> CameraCharacteristics.SHADING_MODE_FAST
+        ShadingCorrection.HIGH_QUALITY -> CameraCharacteristics.SHADING_MODE_HIGH_QUALITY
+        else -> CameraCharacteristics.SHADING_MODE_OFF
+    }
+
+    private fun shadingRequestedMode(): String? =
+        ShadingCorrection.requestedMode(shadingModes, shadingCorrection)
 
     private fun aberrationName(value: Int): String = when (value) {
         CameraCharacteristics.COLOR_CORRECTION_ABERRATION_MODE_OFF -> "off"

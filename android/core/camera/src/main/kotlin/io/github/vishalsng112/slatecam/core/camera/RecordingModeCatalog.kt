@@ -30,7 +30,11 @@ object RecordingModeCatalog {
 
     private val canonicalSizes = listOf(
         Canonical(3840, 2160, "16:9"),
+        Canonical(4096, 3072, "4:3"),
+        Canonical(3840, 2880, "4:3"),
+        Canonical(2880, 2160, "4:3"),
         Canonical(1920, 1080, "16:9"),
+        Canonical(1920, 1440, "4:3"),
         Canonical(1440, 1080, "4:3"),
         Canonical(1280, 720, "16:9"),
     )

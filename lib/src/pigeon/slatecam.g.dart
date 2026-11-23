@@ -459,6 +459,8 @@ class CameraState {
     required this.noiseReductionModes,
     required this.antibanding,
     required this.antibandingModes,
+    required this.shadingCorrection,
+    required this.shadingSupported,
     required this.exposureMode,
     required this.exposureModes,
     required this.deviceKey,
@@ -598,6 +600,12 @@ class CameraState {
 
   List<String> antibandingModes;
 
+  /// Lens-shading (vignette) correction for the active sensor.
+  bool shadingCorrection;
+
+  /// True when the active sensor offers FAST or HIGH_QUALITY shading.
+  bool shadingSupported;
+
   String exposureMode;
 
   List<String> exposureModes;
@@ -686,6 +694,8 @@ class CameraState {
       noiseReductionModes,
       antibanding,
       antibandingModes,
+      shadingCorrection,
+      shadingSupported,
       exposureMode,
       exposureModes,
       deviceKey,
@@ -766,21 +776,23 @@ class CameraState {
       noiseReductionModes: (result[53]! as List<Object?>).cast<String>(),
       antibanding: result[54]! as String,
       antibandingModes: (result[55]! as List<Object?>).cast<String>(),
-      exposureMode: result[56]! as String,
-      exposureModes: (result[57]! as List<Object?>).cast<String>(),
-      deviceKey: result[58]! as String,
-      deviceQuirks: (result[59]! as List<Object?>).cast<String>(),
-      deviceCalibrationActive: result[60]! as bool,
-      deviceCalibrationSource: result[61] as String?,
-      deviceDatabaseVersion: result[62]! as int,
-      deviceReportOptIn: result[63]! as bool,
-      deviceReportRunning: result[64]! as bool,
-      deviceReportPath: result[65] as String?,
-      deviceReportError: result[66] as String?,
-      histogram: (result[67]! as List<Object?>).cast<int>(),
-      waveform: (result[68]! as List<Object?>).cast<int>(),
-      waveformColumns: result[69]! as int,
-      waveformBins: result[70]! as int,
+      shadingCorrection: result[56]! as bool,
+      shadingSupported: result[57]! as bool,
+      exposureMode: result[58]! as String,
+      exposureModes: (result[59]! as List<Object?>).cast<String>(),
+      deviceKey: result[60]! as String,
+      deviceQuirks: (result[61]! as List<Object?>).cast<String>(),
+      deviceCalibrationActive: result[62]! as bool,
+      deviceCalibrationSource: result[63] as String?,
+      deviceDatabaseVersion: result[64]! as int,
+      deviceReportOptIn: result[65]! as bool,
+      deviceReportRunning: result[66]! as bool,
+      deviceReportPath: result[67] as String?,
+      deviceReportError: result[68] as String?,
+      histogram: (result[69]! as List<Object?>).cast<int>(),
+      waveform: (result[70]! as List<Object?>).cast<int>(),
+      waveformColumns: result[71]! as int,
+      waveformBins: result[72]! as int,
     );
   }
 
@@ -793,7 +805,7 @@ class CameraState {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(isOpen, other.isOpen) && _deepEquals(error, other.error) && _deepEquals(cameraId, other.cameraId) && _deepEquals(cameraIds, other.cameraIds) && _deepEquals(cameraLabels, other.cameraLabels) && _deepEquals(iso, other.iso) && _deepEquals(isoMin, other.isoMin) && _deepEquals(isoMax, other.isoMax) && _deepEquals(shutterNs, other.shutterNs) && _deepEquals(shutterMinNs, other.shutterMinNs) && _deepEquals(shutterMaxNs, other.shutterMaxNs) && _deepEquals(focusDiopters, other.focusDiopters) && _deepEquals(focusMin, other.focusMin) && _deepEquals(focusMax, other.focusMax) && _deepEquals(focusShiftSpeed, other.focusShiftSpeed) && _deepEquals(whiteBalanceMode, other.whiteBalanceMode) && _deepEquals(whiteBalanceModes, other.whiteBalanceModes) && _deepEquals(autoExposure, other.autoExposure) && _deepEquals(autoFocus, other.autoFocus) && _deepEquals(autoFocusSupported, other.autoFocusSupported) && _deepEquals(previewWidth, other.previewWidth) && _deepEquals(previewHeight, other.previewHeight) && _deepEquals(previewRotationDegrees, other.previewRotationDegrees) && _deepEquals(zoomRatio, other.zoomRatio) && _deepEquals(zoomMin, other.zoomMin) && _deepEquals(zoomMax, other.zoomMax) && _deepEquals(lenses, other.lenses) && _deepEquals(recordingMode, other.recordingMode) && _deepEquals(recordingModes, other.recordingModes) && _deepEquals(shootMode, other.shootMode) && _deepEquals(shootLenses, other.shootLenses) && _deepEquals(shootProfiles, other.shootProfiles) && _deepEquals(activeShootProfile, other.activeShootProfile) && _deepEquals(tenBit, other.tenBit) && _deepEquals(hlgAvailable, other.hlgAvailable) && _deepEquals(hlgReason, other.hlgReason) && _deepEquals(isRecording, other.isRecording) && _deepEquals(recordingSeconds, other.recordingSeconds) && _deepEquals(clipPath, other.clipPath) && _deepEquals(recordingError, other.recordingError) && _deepEquals(shutterAngle, other.shutterAngle) && _deepEquals(frameRate, other.frameRate) && _deepEquals(gyroSampleCount, other.gyroSampleCount) && _deepEquals(profile, other.profile) && _deepEquals(profileNames, other.profileNames) && _deepEquals(zebra, other.zebra) && _deepEquals(falseColor, other.falseColor) && _deepEquals(peaking, other.peaking) && _deepEquals(peakingSensitivity, other.peakingSensitivity) && _deepEquals(peakingStrength, other.peakingStrength) && _deepEquals(edgeMode, other.edgeMode) && _deepEquals(edgeModes, other.edgeModes) && _deepEquals(noiseReduction, other.noiseReduction) && _deepEquals(noiseReductionModes, other.noiseReductionModes) && _deepEquals(antibanding, other.antibanding) && _deepEquals(antibandingModes, other.antibandingModes) && _deepEquals(exposureMode, other.exposureMode) && _deepEquals(exposureModes, other.exposureModes) && _deepEquals(deviceKey, other.deviceKey) && _deepEquals(deviceQuirks, other.deviceQuirks) && _deepEquals(deviceCalibrationActive, other.deviceCalibrationActive) && _deepEquals(deviceCalibrationSource, other.deviceCalibrationSource) && _deepEquals(deviceDatabaseVersion, other.deviceDatabaseVersion) && _deepEquals(deviceReportOptIn, other.deviceReportOptIn) && _deepEquals(deviceReportRunning, other.deviceReportRunning) && _deepEquals(deviceReportPath, other.deviceReportPath) && _deepEquals(deviceReportError, other.deviceReportError) && _deepEquals(histogram, other.histogram) && _deepEquals(waveform, other.waveform) && _deepEquals(waveformColumns, other.waveformColumns) && _deepEquals(waveformBins, other.waveformBins);
+    return _deepEquals(isOpen, other.isOpen) && _deepEquals(error, other.error) && _deepEquals(cameraId, other.cameraId) && _deepEquals(cameraIds, other.cameraIds) && _deepEquals(cameraLabels, other.cameraLabels) && _deepEquals(iso, other.iso) && _deepEquals(isoMin, other.isoMin) && _deepEquals(isoMax, other.isoMax) && _deepEquals(shutterNs, other.shutterNs) && _deepEquals(shutterMinNs, other.shutterMinNs) && _deepEquals(shutterMaxNs, other.shutterMaxNs) && _deepEquals(focusDiopters, other.focusDiopters) && _deepEquals(focusMin, other.focusMin) && _deepEquals(focusMax, other.focusMax) && _deepEquals(focusShiftSpeed, other.focusShiftSpeed) && _deepEquals(whiteBalanceMode, other.whiteBalanceMode) && _deepEquals(whiteBalanceModes, other.whiteBalanceModes) && _deepEquals(autoExposure, other.autoExposure) && _deepEquals(autoFocus, other.autoFocus) && _deepEquals(autoFocusSupported, other.autoFocusSupported) && _deepEquals(previewWidth, other.previewWidth) && _deepEquals(previewHeight, other.previewHeight) && _deepEquals(previewRotationDegrees, other.previewRotationDegrees) && _deepEquals(zoomRatio, other.zoomRatio) && _deepEquals(zoomMin, other.zoomMin) && _deepEquals(zoomMax, other.zoomMax) && _deepEquals(lenses, other.lenses) && _deepEquals(recordingMode, other.recordingMode) && _deepEquals(recordingModes, other.recordingModes) && _deepEquals(shootMode, other.shootMode) && _deepEquals(shootLenses, other.shootLenses) && _deepEquals(shootProfiles, other.shootProfiles) && _deepEquals(activeShootProfile, other.activeShootProfile) && _deepEquals(tenBit, other.tenBit) && _deepEquals(hlgAvailable, other.hlgAvailable) && _deepEquals(hlgReason, other.hlgReason) && _deepEquals(isRecording, other.isRecording) && _deepEquals(recordingSeconds, other.recordingSeconds) && _deepEquals(clipPath, other.clipPath) && _deepEquals(recordingError, other.recordingError) && _deepEquals(shutterAngle, other.shutterAngle) && _deepEquals(frameRate, other.frameRate) && _deepEquals(gyroSampleCount, other.gyroSampleCount) && _deepEquals(profile, other.profile) && _deepEquals(profileNames, other.profileNames) && _deepEquals(zebra, other.zebra) && _deepEquals(falseColor, other.falseColor) && _deepEquals(peaking, other.peaking) && _deepEquals(peakingSensitivity, other.peakingSensitivity) && _deepEquals(peakingStrength, other.peakingStrength) && _deepEquals(edgeMode, other.edgeMode) && _deepEquals(edgeModes, other.edgeModes) && _deepEquals(noiseReduction, other.noiseReduction) && _deepEquals(noiseReductionModes, other.noiseReductionModes) && _deepEquals(antibanding, other.antibanding) && _deepEquals(antibandingModes, other.antibandingModes) && _deepEquals(shadingCorrection, other.shadingCorrection) && _deepEquals(shadingSupported, other.shadingSupported) && _deepEquals(exposureMode, other.exposureMode) && _deepEquals(exposureModes, other.exposureModes) && _deepEquals(deviceKey, other.deviceKey) && _deepEquals(deviceQuirks, other.deviceQuirks) && _deepEquals(deviceCalibrationActive, other.deviceCalibrationActive) && _deepEquals(deviceCalibrationSource, other.deviceCalibrationSource) && _deepEquals(deviceDatabaseVersion, other.deviceDatabaseVersion) && _deepEquals(deviceReportOptIn, other.deviceReportOptIn) && _deepEquals(deviceReportRunning, other.deviceReportRunning) && _deepEquals(deviceReportPath, other.deviceReportPath) && _deepEquals(deviceReportError, other.deviceReportError) && _deepEquals(histogram, other.histogram) && _deepEquals(waveform, other.waveform) && _deepEquals(waveformColumns, other.waveformColumns) && _deepEquals(waveformBins, other.waveformBins);
   }
 
   @override
@@ -802,7 +814,7 @@ class CameraState {
 
   @override
   String toString() {
-    return 'CameraState(isOpen: $isOpen, error: $error, cameraId: $cameraId, cameraIds: $cameraIds, cameraLabels: $cameraLabels, iso: $iso, isoMin: $isoMin, isoMax: $isoMax, shutterNs: $shutterNs, shutterMinNs: $shutterMinNs, shutterMaxNs: $shutterMaxNs, focusDiopters: $focusDiopters, focusMin: $focusMin, focusMax: $focusMax, focusShiftSpeed: $focusShiftSpeed, whiteBalanceMode: $whiteBalanceMode, whiteBalanceModes: $whiteBalanceModes, autoExposure: $autoExposure, autoFocus: $autoFocus, autoFocusSupported: $autoFocusSupported, previewWidth: $previewWidth, previewHeight: $previewHeight, previewRotationDegrees: $previewRotationDegrees, zoomRatio: $zoomRatio, zoomMin: $zoomMin, zoomMax: $zoomMax, lenses: $lenses, recordingMode: $recordingMode, recordingModes: $recordingModes, shootMode: $shootMode, shootLenses: $shootLenses, shootProfiles: $shootProfiles, activeShootProfile: $activeShootProfile, tenBit: $tenBit, hlgAvailable: $hlgAvailable, hlgReason: $hlgReason, isRecording: $isRecording, recordingSeconds: $recordingSeconds, clipPath: $clipPath, recordingError: $recordingError, shutterAngle: $shutterAngle, frameRate: $frameRate, gyroSampleCount: $gyroSampleCount, profile: $profile, profileNames: $profileNames, zebra: $zebra, falseColor: $falseColor, peaking: $peaking, peakingSensitivity: $peakingSensitivity, peakingStrength: $peakingStrength, edgeMode: $edgeMode, edgeModes: $edgeModes, noiseReduction: $noiseReduction, noiseReductionModes: $noiseReductionModes, antibanding: $antibanding, antibandingModes: $antibandingModes, exposureMode: $exposureMode, exposureModes: $exposureModes, deviceKey: $deviceKey, deviceQuirks: $deviceQuirks, deviceCalibrationActive: $deviceCalibrationActive, deviceCalibrationSource: $deviceCalibrationSource, deviceDatabaseVersion: $deviceDatabaseVersion, deviceReportOptIn: $deviceReportOptIn, deviceReportRunning: $deviceReportRunning, deviceReportPath: $deviceReportPath, deviceReportError: $deviceReportError, histogram: $histogram, waveform: $waveform, waveformColumns: $waveformColumns, waveformBins: $waveformBins)';
+    return 'CameraState(isOpen: $isOpen, error: $error, cameraId: $cameraId, cameraIds: $cameraIds, cameraLabels: $cameraLabels, iso: $iso, isoMin: $isoMin, isoMax: $isoMax, shutterNs: $shutterNs, shutterMinNs: $shutterMinNs, shutterMaxNs: $shutterMaxNs, focusDiopters: $focusDiopters, focusMin: $focusMin, focusMax: $focusMax, focusShiftSpeed: $focusShiftSpeed, whiteBalanceMode: $whiteBalanceMode, whiteBalanceModes: $whiteBalanceModes, autoExposure: $autoExposure, autoFocus: $autoFocus, autoFocusSupported: $autoFocusSupported, previewWidth: $previewWidth, previewHeight: $previewHeight, previewRotationDegrees: $previewRotationDegrees, zoomRatio: $zoomRatio, zoomMin: $zoomMin, zoomMax: $zoomMax, lenses: $lenses, recordingMode: $recordingMode, recordingModes: $recordingModes, shootMode: $shootMode, shootLenses: $shootLenses, shootProfiles: $shootProfiles, activeShootProfile: $activeShootProfile, tenBit: $tenBit, hlgAvailable: $hlgAvailable, hlgReason: $hlgReason, isRecording: $isRecording, recordingSeconds: $recordingSeconds, clipPath: $clipPath, recordingError: $recordingError, shutterAngle: $shutterAngle, frameRate: $frameRate, gyroSampleCount: $gyroSampleCount, profile: $profile, profileNames: $profileNames, zebra: $zebra, falseColor: $falseColor, peaking: $peaking, peakingSensitivity: $peakingSensitivity, peakingStrength: $peakingStrength, edgeMode: $edgeMode, edgeModes: $edgeModes, noiseReduction: $noiseReduction, noiseReductionModes: $noiseReductionModes, antibanding: $antibanding, antibandingModes: $antibandingModes, shadingCorrection: $shadingCorrection, shadingSupported: $shadingSupported, exposureMode: $exposureMode, exposureModes: $exposureModes, deviceKey: $deviceKey, deviceQuirks: $deviceQuirks, deviceCalibrationActive: $deviceCalibrationActive, deviceCalibrationSource: $deviceCalibrationSource, deviceDatabaseVersion: $deviceDatabaseVersion, deviceReportOptIn: $deviceReportOptIn, deviceReportRunning: $deviceReportRunning, deviceReportPath: $deviceReportPath, deviceReportError: $deviceReportError, histogram: $histogram, waveform: $waveform, waveformColumns: $waveformColumns, waveformBins: $waveformBins)';
   }
 }
 
@@ -1386,6 +1398,25 @@ class SlateCamHostApi {
       binaryMessenger: pigeonVar_binaryMessenger,
     );
     final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[mode]);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+    _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
+  }
+
+  /// Enables or disables lens-shading (vignette) correction for the active
+  /// sensor. The choice is persisted per camera ID.
+  Future<void> setShadingCorrection(bool enabled) async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.setShadingCorrection$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[enabled]);
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
     _extractReplyValueOrThrow(
         pigeonVar_replyList,

@@ -47,6 +47,15 @@ object PresetCatalog {
         // 4:3 is a first-class shoot mode; its 10-bit path is verified per lens.
         cinemaRates.forEach { fps -> add(Preset("fhd43_${fps}_8bit", 1440, 1080, fps, false)) }
         cinemaRates.forEach { fps -> add(Preset("fhd43_${fps}_10bit", 1440, 1080, fps, true)) }
+        // 4K-class 4:3 sizes differ by sensor: DCI 4096x3072, UHD 3840x2880 and
+        // the phone 2880x2160. Each needs its own verdict so the aspect button
+        // never has to fall back to 1080 when one of them exists.
+        cinemaRates.forEach { fps -> add(Preset("dci43_${fps}_8bit", 4096, 3072, fps, false)) }
+        cinemaRates.forEach { fps -> add(Preset("dci43_${fps}_10bit", 4096, 3072, fps, true)) }
+        cinemaRates.forEach { fps -> add(Preset("uhd43_${fps}_8bit", 3840, 2880, fps, false)) }
+        cinemaRates.forEach { fps -> add(Preset("uhd43_${fps}_10bit", 3840, 2880, fps, true)) }
+        cinemaRates.forEach { fps -> add(Preset("qhd43_${fps}_8bit", 2880, 2160, fps, false)) }
+        cinemaRates.forEach { fps -> add(Preset("qhd43_${fps}_10bit", 2880, 2160, fps, true)) }
         add(Preset("fhd60_8bit", 1920, 1080, 60, false))
         add(Preset("fhd120_8bit", 1920, 1080, 120, false))
         add(Preset("hd240_8bit", 1280, 720, 240, false))
