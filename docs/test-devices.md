@@ -372,3 +372,14 @@ On the POCO X6 Pro the property is false, so the log shows
 `audio source=camcorder`. The clip still verifies as AAC-LC, 48 kHz, stereo,
 non-silent. No noise suppressor, AGC or echo canceller is attached: they are
 destructive and belong in post-processing.
+
+## Phase 5 — shutter angle and gyro (2026-11-23)
+
+| Item | Result |
+|---|---|
+| Angle math | 180° @ 30 fps = 1/60 s, 360° = one frame, unit-tested |
+| Live display | 20.00 ms at 30 fps reads **216°**, which is correct |
+| Presets | 45 / 90 / 180 / 270 / 360 in the control panel |
+| Gyro capture | 206 samples in a 5 s clip (~41 Hz), `SENSOR_INFO_TIMESTAMP_SOURCE = realtime` |
+| Sidecar | `files/gyro/<clip>.gyro.json`, samples as `{t,x,y,z}` |
+| Not done | Frame alignment and container embedding; the sidecar is keyed by clip filename |

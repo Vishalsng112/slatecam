@@ -18,6 +18,7 @@ import android.os.Looper
 import android.util.Range
 import android.util.Size
 import android.view.Surface
+import io.github.vishalsng112.slatecam.core.common.ShutterAngle
 import java.util.concurrent.Executor
 
 /** Snapshot of camera state. Kotlin owns this; Dart only renders it. */
@@ -41,6 +42,8 @@ data class CameraUiState(
     val previewHeight: Int,
     val previewRotationDegrees: Int,
     val isTenBit: Boolean = false,
+    val shutterAngle: Float = 0f,
+    val frameRate: Int = 30,
     val edgeMode: String = "off",
     val edgeModes: List<String> = emptyList(),
     val noiseReduction: String = "off",
@@ -109,6 +112,10 @@ class CameraController(private val context: Context) {
     private var noiseReduction = "off"
     private var antibanding = "auto"
     private var modesVerified = false
+    private var frameRate = 30
+    private var timestampRealtime = false
+
+    val isTimestampRealtime: Boolean get() = timestampRealtime
 
     val isTenBitActive: Boolean get() = tenBitActive
 
@@ -176,6 +183,15 @@ class CameraController(private val context: Context) {
     fun setShutterNs(value: Long) {
         handler.post {
             shutterNs = value.coerceIn(shutterMinNs, shutterMaxNs)
+            autoExposure = false
+            applyAndEmit()
+        }
+    }
+
+    fun setShutterAngle(degrees: Float) {
+        val exposure = ShutterAngle.exposureNs(degrees, frameRate)
+        handler.post {
+            shutterNs = exposure.coerceIn(shutterMinNs, shutterMaxNs)
             autoExposure = false
             applyAndEmit()
         }
@@ -286,6 +302,9 @@ class CameraController(private val context: Context) {
         }
 
         fpsRange = pickFpsRange(characteristics)
+        frameRate = fpsRange?.upper ?: 30
+        timestampRealtime = characteristics.get(CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE) ==
+            CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME
 
         edgeModes = characteristics.get(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES)
             ?.map(::edgeModeName) ?: emptyList()
@@ -521,6 +540,8 @@ class CameraController(private val context: Context) {
             previewHeight = previewSize.height,
             previewRotationDegrees = rotationDegrees,
             isTenBit = tenBitActive,
+            shutterAngle = ShutterAngle.degrees(shutterNs, frameRate),
+            frameRate = frameRate,
             edgeMode = edgeMode,
             edgeModes = edgeModes,
             noiseReduction = noiseReduction,

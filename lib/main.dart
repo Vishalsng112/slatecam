@@ -40,6 +40,8 @@ class CaptureScreen extends StatefulWidget {
 }
 
 class _CaptureScreenState extends State<CaptureScreen> {
+  static const _angleOptions = [45.0, 90.0, 180.0, 270.0, 360.0];
+
   final SlateCamHostApi _host = SlateCamHostApi();
 
   CameraState? _state;
@@ -231,6 +233,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
+              if (state.gyroSampleCount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Gyro samples: ${state.gyroSampleCount}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
             ],
             if (state == null) ...[
               const SizedBox(height: 12),
@@ -270,6 +280,28 @@ class _CaptureScreenState extends State<CaptureScreen> {
                 onChanged: (value) =>
                     setState(() => state.shutterNs = value.round()),
                 onChangeEnd: (value) => _host.setShutterNs(value.round()),
+              ),
+              _label(
+                'Shutter angle',
+                '${state.shutterAngle.toStringAsFixed(0)}° @ ${state.frameRate} fps',
+              ),
+              DropdownButton<double>(
+                isExpanded: true,
+                value: _angleOptions.contains(state.shutterAngle.roundToDouble())
+                    ? state.shutterAngle.roundToDouble()
+                    : null,
+                items: [
+                  for (final angle in _angleOptions)
+                    DropdownMenuItem(
+                      value: angle,
+                      child: Text('${angle.toInt()}°'),
+                    ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => state.shutterAngle = value);
+                  _host.setShutterAngle(value);
+                },
               ),
               _label(
                 'Focus',

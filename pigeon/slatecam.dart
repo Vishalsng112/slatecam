@@ -25,6 +25,9 @@ class CameraState {
     required this.recordingSeconds,
     required this.clipPath,
     required this.recordingError,
+    required this.shutterAngle,
+    required this.frameRate,
+    required this.gyroSampleCount,
     required this.profile,
     required this.profileNames,
     required this.zebra,
@@ -63,6 +66,9 @@ class CameraState {
   int recordingSeconds;
   String? clipPath;
   String? recordingError;
+  double shutterAngle;
+  int frameRate;
+  int gyroSampleCount;
   String profile;
   List<String> profileNames;
   bool zebra;
@@ -90,6 +96,8 @@ abstract class SlateCamHostApi {
   void setIso(int iso);
 
   void setShutterNs(int nanoseconds);
+
+  void setShutterAngle(double degrees);
 
   void setFocusDiopters(double diopters);
 

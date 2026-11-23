@@ -40,6 +40,8 @@ left floating in conversation.
 | Audio capability probe (unprocessed, devices, effects) | 1 | schema 1.6.0 |
 | Colour input-profile model (matrix + trims, versioned) | 4 | `InputProfile`, unit-tested; calibration pending |
 | Audio source selection (UNPROCESSED → CAMCORDER → MIC) | 3 | POCO reports no UNPROCESSED, so CAMCORDER; AAC stereo verified |
+| Shutter angle (math + control) | 5 | 180°@30 = 1/60 s, unit-tested; live angle shown in UI |
+| Gyro sample capture + sidecar | 5 | 206 samples in 5 s, realtime timestamps, `files/gyro/*.json` |
 
 ## Phase 2 completion — remaining
 
@@ -72,8 +74,7 @@ left floating in conversation.
 | Item | Notes |
 |---|---|
 | RAW burst → DNG sequence | Camera2 has no RAW video; expect low fps and large files |
-| Shutter angle | Derived from exposure time and frame rate; UI over the existing shutter control |
-| Gyro metadata | Requires `SENSOR_INFO_TIMESTAMP_SOURCE == realtime` and aligned sensor clocks |
+| Gyro alignment / embedding | Samples and sidecar exist; frame alignment and container embedding remain |
 | Dual camera / concurrent sessions | Gated by `getConcurrentCameraIds` and `isConcurrentSessionConfigurationSupported` |
 
 Framing guides moved to Phase 4 (done).

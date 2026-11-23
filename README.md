@@ -14,17 +14,15 @@ no account, and no subscription.
 
 Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
-> **Status: Phase 4 — profiles and monitoring tools.**
-> Picture profiles (`standard`, `slatelog`, `mono`, `warm` LUT, plus user
-> `.cube` files from `files/luts`) run in the GL shader, with the SlateLog curve
-> unit-tested on the JVM. Zebra, false colour, framing guides, a 64-bin
-> histogram and a waveform are live on the preview path and never reach
-> recordings. A 17³ LUT is packed into a 2D texture, so the pipeline stays on
-> GLES 2.0.
+> **Status: Phase 5 — advanced features (in progress).**
+> Shutter angle is implemented from the exposure/fps relationship and shown
+> live (20 ms at 30 fps reads 216°). Gyro samples are captured during recording
+> with realtime timestamps and written to a sidecar. Frame alignment and
+> container embedding remain, as do RAW burst and dual camera.
 >
-> Recording remains 8-bit SDR via MediaStore. HLG is implemented but disabled
-> because the prober proved this device's encoder claims Main10 while emitting
-> 8-bit Main. See [docs/test-devices.md](docs/test-devices.md).
+> Phases 0–4 are complete: preview, manual and capture controls, 8-bit SDR
+> recording via MediaStore, profiles, LUTs, and monitoring tools. HLG remains
+> gated because this device's encoder claims Main10 while emitting 8-bit Main.
 
 ---
 

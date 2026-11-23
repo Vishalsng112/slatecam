@@ -20,6 +20,7 @@ import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamHostApi
 import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
+import io.github.vishalsng112.slatecam.core.codec.GyroRecorder
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
 import io.github.vishalsng112.slatecam.core.profile.BuiltInLuts
 import io.github.vishalsng112.slatecam.core.profile.InputProfile
@@ -54,6 +55,7 @@ class SlateCamBridge private constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val recorder = ClipRecorder(context)
+    private val gyro = GyroRecorder(context)
 
     /**
      * HLG recording is disabled until the encoder's bitstream is verified to be
@@ -70,6 +72,7 @@ class SlateCamBridge private constructor(
     private var recordingStartMs = 0L
     private var clipPath: String? = null
     private var recordingError: String? = null
+    private var gyroSampleCount = 0
 
     private var activeDestination: Destination? = null
     private var pendingPfd: ParcelFileDescriptor? = null
@@ -159,6 +162,10 @@ class SlateCamBridge private constructor(
 
     override fun setShutterNs(nanoseconds: Long) {
         controller.setShutterNs(nanoseconds)
+    }
+
+    override fun setShutterAngle(degrees: Double) {
+        controller.setShutterAngle(degrees.toFloat())
     }
 
     override fun setFocusDiopters(diopters: Double) {
@@ -286,6 +293,15 @@ class SlateCamBridge private constructor(
             clipPath = null
             recordingError = null
             recordingStartMs = SystemClock.elapsedRealtime()
+            gyroSampleCount = 0
+            if (controller.isTimestampRealtime && gyro.isAvailable()) {
+                gyro.start()
+            } else {
+                android.util.Log.w(
+                    "SlateCam",
+                    "gyro metadata disabled (realtime sensor timestamp required)",
+                )
+            }
             mainHandler.post(tick)
             pushState()
         } catch (t: Throwable) {
@@ -300,6 +316,20 @@ class SlateCamBridge private constructor(
 
         Thread({
             val finalized = recorder.stop()
+            val samples = gyro.stop()
+            if (samples > 0) {
+                val base = activeDestination?.label
+                    ?.substringAfterLast('/')
+                    ?.removeSuffix(".mp4")
+                    ?: "clip-${System.currentTimeMillis()}"
+                val file = File(File(context.filesDir, "gyro"), "$base.gyro.json")
+                val written = gyro.writeSidecar(file)
+                android.util.Log.i(
+                    "SlateCam",
+                    "gyro samples=$samples written=$written path=${file.absolutePath}",
+                )
+            }
+            gyroSampleCount = samples
             commitDestination(activeDestination, finalized)
             activeDestination = null
             mainHandler.post { pushState() }
@@ -313,6 +343,7 @@ class SlateCamBridge private constructor(
             renderer.detachEncoderSurface()
             val destination = activeDestination
             val finalized = recorder.stop()
+            gyro.stop()
             commitDestination(destination, finalized)
             activeDestination = null
         }
@@ -509,6 +540,9 @@ class SlateCamBridge private constructor(
         recordingSeconds = recordingSeconds.toLong(),
         clipPath = clipPath,
         recordingError = recordingError,
+        shutterAngle = shutterAngle.toDouble(),
+        frameRate = frameRate.toLong(),
+        gyroSampleCount = gyroSampleCount.toLong(),
         profile = profileId,
         profileNames = PictureProfile.all.map { it.id } + lutEntries.map { it.id },
         zebra = zebraEnabled,
