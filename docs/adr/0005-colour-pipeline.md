@@ -1,6 +1,6 @@
 # ADR 0005 — Colour pipeline and picture profiles
 
-- **Status:** Accepted
+- **Status:** Accepted (SlateLog removed by ADR 0020)
 - **Date:** 2026-11-23
 - **Phase:** 4 (in progress)
 - **Depends on:** ADR 0003 (modules)

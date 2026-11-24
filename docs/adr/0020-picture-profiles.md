@@ -16,14 +16,13 @@ HLG/Rec.709 metadata, so log and gamut names cannot change the container.
 
 ## Decision
 
-1. **Four picture profiles.**
-   - `standard` — identity. No creative tone curve, matrix, saturation, black
-     level or gamma; only technical input/output transforms and per-lens
-     calibration run.
-   - `slatelook` — the house look: Cine2-style shoulder, a small black pedestal,
-     middle black gamma, a 95% knee and a modest Cinema matrix/saturation.
-   - `slatelog` — flat monitoring view only. The encoder still receives HLG or
-     Rec.709.
+1. **Three picture profiles.**
+   - `standard` — the camera's native look. Identity: no creative tone curve,
+     matrix, saturation, black level or gamma; only technical input/output
+     transforms and per-lens calibration run.
+   - `slatelook` — Sony S-Cinetone-inspired: the S-Cinetone shoulder, a soft
+     manual knee, middle black gamma, slightly muted saturation, a touch of
+     warm phase and a Cinema matrix.
    - `custom` — user-editable settings, persisted across restarts.
 2. **Custom settings exposed now.**
    - Black level −15…+15
@@ -44,7 +43,7 @@ HLG/Rec.709 metadata, so log and gamut names cannot change the container.
    input EOTF → per-lens WB/CCM/shadow → creative black level → black gamma →
    colour matrix → colour phase/depth → saturation → knee → output transfer →
    look gamma → creative LUT → overlays.
-5. **Creative LUT is separate from the profile.** The profile list stays at four;
+5. **Creative LUT is separate from the profile.** The profile list stays at three;
    external `.cube` LUTs are selected independently and persisted.
 6. **The Colour science card is removed.** Custom profile is the single creative
    editor. `ColorScience.kt`, `ToneShaper.kt` and the five live-trim commands are
@@ -64,7 +63,9 @@ HLG/Rec.709 metadata, so log and gamut names cannot change the container.
 - Standard is a true no-look path: `colorOps=false`, identity gamma and no
   creative values, while per-lens calibration still applies.
 - SlateLook visibly differs from Standard without changing the encoded transfer.
-- SlateLog remains monitoring-only and the Colour card says so.
+- SlateLog was removed; a flat monitoring view is no longer offered. The
+  standard profile is the camera look and SlateLook is the S-Cinetone-style
+  look.
 - Custom settings and the active profile persist across restarts; the creative
   LUT selection persists separately.
 - Strong looks affect the analysis frame (waveform/false colour and, for now,

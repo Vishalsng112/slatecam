@@ -65,7 +65,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uColorDepthA = 0
     private var uColorDepthB = 0
     private var uSaturation = 0
-    private var uLogPreview = 0
     private var uMono = 0
     private var uZebra = 0
     private var uZebraThreshold = 0
@@ -133,7 +132,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var previewWidth = 1920
     private var previewHeight = 1080
     private var started = false
-    private var lastPreviewLogRoute = false
 
     @Volatile
     private var tenBitSource = false
@@ -171,7 +169,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var colorPhase = 0f
     @Volatile private var colorDepths = FloatArray(6)
     @Volatile private var saturation = 1f
-    @Volatile private var logEnabled = false
     @Volatile private var monochrome = false
     @Volatile private var zebra = false
     @Volatile private var zebraThreshold = 0.9f
@@ -236,7 +233,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         colorPhase: Float,
         colorDepths: FloatArray,
         saturation: Float,
-        logEnabled: Boolean,
         monochrome: Boolean,
     ) {
         require(colorMatrix.size == 9) { "colour matrix must be 3x3" }
@@ -255,13 +251,12 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         this.colorPhase = colorPhase
         this.colorDepths = colorDepths.copyOf()
         this.saturation = saturation
-        this.logEnabled = logEnabled
         this.monochrome = monochrome
         Log.i(
             TAG,
             "profile black=$blackLevel gamma=${gammaPower}/${gammaContrast}/${gammaShoulder} " +
                 "bg=$blackGammaLevel knee=$kneePoint/$kneeSlope " +
-                "sat=$saturation log=$logEnabled mono=$monochrome colorOps=$colorOps",
+                "sat=$saturation mono=$monochrome colorOps=$colorOps",
         )
     }
 
@@ -738,7 +733,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uColorDepthA = GLES20.glGetUniformLocation(program, "uColorDepthA")
         uColorDepthB = GLES20.glGetUniformLocation(program, "uColorDepthB")
         uSaturation = GLES20.glGetUniformLocation(program, "uSaturation")
-        uLogPreview = GLES20.glGetUniformLocation(program, "uLogPreview")
         uMono = GLES20.glGetUniformLocation(program, "uMono")
         uZebra = GLES20.glGetUniformLocation(program, "uZebra")
         uZebraThreshold = GLES20.glGetUniformLocation(program, "uZebraThreshold")
@@ -891,12 +885,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform3f(uColorDepthA, colorDepths[0], colorDepths[1], colorDepths[2])
         GLES20.glUniform3f(uColorDepthB, colorDepths[3], colorDepths[4], colorDepths[5])
         GLES20.glUniform1f(uSaturation, saturation)
-        val previewLog = isPreview && logEnabled
-        GLES20.glUniform1i(uLogPreview, if (previewLog) 1 else 0)
-        if (isPreview && previewLog != lastPreviewLogRoute) {
-            lastPreviewLogRoute = previewLog
-            Log.i(TAG, "preview log route=$previewLog (uniform=$uLogPreview)")
-        }
         GLES20.glUniform1i(uMono, if (monochrome) 1 else 0)
         GLES20.glUniform1i(uZebra, if (overlay && zebra) 1 else 0)
         GLES20.glUniform1f(uZebraThreshold, zebraThreshold)
@@ -1435,7 +1423,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform vec3 uColorDepthA;
             uniform vec3 uColorDepthB;
             uniform float uSaturation;
-            uniform int uLogPreview;
             uniform int uMono;
             uniform int uZebra;
             uniform float uZebraThreshold;
@@ -1585,11 +1572,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 return clamp(g, 0.0, 1.0);
             }
 
-            vec3 slateLog(vec3 c) {
-                return clamp(0.738 + 0.169 * log2(max(c, vec3(0.0)) + 0.07),
-                             0.0, 1.0);
-            }
-
             vec3 applyLut(vec3 c) {
                 float n = uLutSize;
                 float slice = clamp(c.b, 0.0, 1.0) * (n - 1.0);
@@ -1639,11 +1621,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 // 4/5. Output routing and creative LUT in the delivery domain.
                 if (uIsPreview == 1) {
                     vec3 displayLinear = bt2020To709(c);
-                    if (uLogPreview == 1) {
-                        c = slateLog(clamp(displayLinear, 0.0, 1.0));
-                    } else {
-                        c = linearToBt709(clamp(displayLinear, 0.0, 1.0));
-                    }
+                    c = linearToBt709(clamp(displayLinear, 0.0, 1.0));
                 } else if (uOutputHlg == 1) {
                     c = linearToHlg(clamp(c, 0.0, 1.0));
                 } else {

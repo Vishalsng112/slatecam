@@ -288,7 +288,7 @@ restarts. There is no face or eye tracking.
 
 | Element | Native call | Status |
 |---|---|---|
-| Profile chips: Standard / SlateLook / SlateLog / Custom | `setProfile` | Current |
+| Profile chips: Standard / SlateLook / Custom | `setProfile` | Current |
 | Reload LUTs | `reloadLuts` | Current |
 | White balance mode | `setWhiteBalanceMode` | Current |
 | Input calibration status | device database / InputProfile | Current (display only) |
@@ -303,7 +303,7 @@ restarts. There is no face or eye tracking.
 
 | Element | Native call | Status |
 |---|---|---|
-| Profile: Standard / SlateLook / SlateLog / Custom | `setProfile` | Current |
+| Profile: Standard / SlateLook / Custom | `setProfile` | Current |
 | Black level −15…+15 | `setProfileSettings` | Current |
 | Gamma preset | `setProfileSettings` | Current |
 | Black gamma range + level | `setProfileSettings` | Current |
@@ -315,11 +315,10 @@ restarts. There is no face or eye tracking.
 | Reload LUTs | `reloadLuts` | Current |
 | White balance modes | `setWhiteBalanceMode` | Current |
 
-Standard is an identity profile (no creative processing). The Custom editor is
-the only creative tone/colour path; the old Colour science card was removed.
-Preset profiles show the same values read-only and direct the user to Custom.
-SlateLog is a monitoring view: the preview is flat while the encoder receives
-HLG or Rec.709.
+Standard is the camera look (identity, no creative processing). SlateLook is
+tuned to a Sony S-Cinetone-style picture profile. The Custom editor is the only
+creative tone/colour path; the old Colour science card was removed. Preset
+profiles show the same values read-only and direct the user to Custom.
 
 Gamma presets are look curves in the delivery domain, not container transfers.
 S-Log/HLG/S-Gamut gamut modes are not offered until a recordable-log delivery

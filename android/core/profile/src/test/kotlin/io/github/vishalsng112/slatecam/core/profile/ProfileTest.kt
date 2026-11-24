@@ -6,37 +6,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class SlateLogTest {
-
-    @Test
-    fun `black maps to a lifted toe`() {
-        assertEquals(0.09f, SlateLog.encode(0f), 0.01f)
-    }
-
-    @Test
-    fun `18 percent grey maps to 0_40`() {
-        assertEquals(0.40f, SlateLog.encode(0.18f), 0.01f)
-    }
-
-    @Test
-    fun `100 percent white maps to about 0_75`() {
-        assertEquals(0.754f, SlateLog.encode(1.0f), 0.01f)
-    }
-
-    @Test
-    fun `encode and decode round trip within the representable range`() {
-        for (value in listOf(0.05f, 0.1f, 0.18f, 0.5f, 1.0f, 2.5f)) {
-            val roundTrip = SlateLog.decode(SlateLog.encode(value))
-            assertEquals(value, roundTrip, value * 0.03f + 0.002f)
-        }
-    }
-
-    @Test
-    fun `highlights are clamped at white`() {
-        assertEquals(1f, SlateLog.encode(10_000f), 0f)
-    }
-}
-
 class Lut3DTest {
 
     private val identity = """

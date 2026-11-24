@@ -27,20 +27,15 @@ class PictureProfileTest {
     }
 
     @Test
-    fun `slate look applies a filmic curve and colour`() {
-        val render = PictureProfile.SLATE_LOOK.render()
+    fun `slate look is an S-Cinetone-style curve`() {
+        val profile = PictureProfile.SLATE_LOOK
+        assertEquals(GammaPreset.SCINETONE, profile.settings.gamma)
+        val render = profile.render()
         assertTrue(render.gammaShoulder > 0f)
         assertTrue(render.colorOps)
         assertTrue(render.kneePoint < 1f)
-        assertTrue(render.blackLevel > 0f)
-    }
-
-    @Test
-    fun `slate log is preview only`() {
-        val render = PictureProfile.SLATE_LOG.render()
-        assertTrue(render.logPreview)
-        assertFalse(render.monochrome)
-        assertEquals(1f, render.gammaPower, 0.0001f)
+        assertEquals(0.02f, render.gammaToe, 0.0001f)
+        assertEquals(-2, profile.settings.saturation)
     }
 
     @Test
@@ -102,10 +97,14 @@ class PictureProfileTest {
     }
 
     @Test
-    fun `only four profiles are offered`() {
+    fun `only three profiles are offered`() {
         assertEquals(
-            listOf("standard", "slatelook", "slatelog", "custom"),
+            listOf("standard", "slatelook", "custom"),
             PictureProfile.all.map { it.id },
+        )
+        assertEquals(
+            ProfileKind.STANDARD,
+            PictureProfile.byId("slatelog").kind,
         )
     }
 }

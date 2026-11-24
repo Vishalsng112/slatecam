@@ -1,6 +1,6 @@
 # ADR 0018 — Scene-linear colour shader and output routing
 
-- **Status:** Accepted (profile parameters updated by ADR 0020)
+- **Status:** Accepted (profile parameters and SlateLog updated by ADR 0020)
 - **Date:** 2026-11-24
 - **Phase:** 4/5 (colour pipeline)
 - **Depends on:** ADR 0005 (colour), ADR 0016 (colour architecture),

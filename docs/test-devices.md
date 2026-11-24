@@ -1150,26 +1150,26 @@ errors, and the label matches the applied exposure (`1/100 · 10.00 ms`,
 frequency because the detected 50/60 Hz value is not readable once AE is off;
 both test devices report region `IN`, so auto uses the 50 Hz grid.
 
-## Picture profiles and look pipeline (Pad 3 + Pad 6, build 2090)
+## Picture profiles and look pipeline (Pad 3, build 2091)
 
-The Colour card is now **Picture profile** with exactly four entries:
-`standard`, `SlateLook`, `SlateLog`, `custom`. The Colour science card and its
-five commands are gone. `SlateCamGl` reports the resolved look.
+The Colour card is now **Picture profile** with three entries: `standard`,
+`SlateLook`, `custom`. SlateLog and the flat monitoring view were removed. The
+Colour science card and its five commands are gone. `SlateCamGl` reports the
+resolved look.
 
 | Check | Result |
 |---|---|
-| Standard | `profile black=0.0 gamma=1.0/1.0/0.0 … colorOps=false`; preview and clip visually identical to the technical base |
-| SlateLook (Pad 3) | `gamma=1.0/1.0/0.3 bg=0.071 knee=0.95/0.2 sat=1.125 colorOps=true`; recorded `1920×1080 Main 10 arib-std-b67 bt2020` |
-| SlateLook (Pad 6) | same look; recorded `1920×1080 Main bt709` |
-| SlateLog (Pad 3) | preview `log=true`, `preview log route=true`; recorded clip stayed `Main 10 arib-std-b67` |
-| Custom gamma | selecting Cine1 then Cine4 logged `gamma=1.04/0.96/0.25` then `1.14/0.88/0.40` |
-| Custom B&W | `mono=true colorOps=true`; the preview turned monochrome |
-| Custom reset | returned `gamma=1.0/1.0/0.0 sat=1.0 mono=false colorOps=false` |
-| Persistence | a custom saturation of `-27` (`sat=0.15625`) survived a force-stop/relaunch; the active profile id is stored separately |
-| Creative LUT | dropdown shows `None` plus scanned LUT ids; selection is independent of the four profiles |
-| Shader | no compile or runtime errors on either GPU; Standard pays only the identity path |
+| Profile list | exactly `standard`, `slatelook`, `custom`; the SlateLog chip and its note are absent |
+| Standard | `profile black=0.0 gamma=1.0/1.0/0.0 bg=0.0 knee=1.0/0.0 sat=1.0 colorOps=false`; UI says “Camera look: no creative processing.” |
+| SlateLook | `gamma=1.0/1.02/0.32 bg=0.071 knee=0.95/0.4 sat=0.9375 colorOps=true` (S-Cinetone curve, soft knee, slightly muted, warm phase) |
+| SlateLook recording | `1920×1080 Main 10 arib-std-b67 bt2020`, FP16 intermediate, 30 fps |
+| Custom | persisted Cine4 settings selected and logged `gamma=1.14/0.88/0.40`; the editor opens |
+| Removed log route | no `preview log route` diagnostics remain; the preview always uses the BT.709 display transform |
+| Shader | no compile or runtime errors; Standard takes the identity path |
 
-Notes: the gamma presets are parameterised look curves, not bit-exact Sony
-transfers. Auto knee is a static max-point/sensitivity mapping, and Detail
-controls are deferred. S-Log/S-Gamut remain absent because the encoder still
-writes truthful HLG/Rec.709 metadata.
+Pad 6 was offline for build 2091; its build-2090 evidence for the profile,
+Custom and recording paths still applies, with SlateLog now removed. The gamma
+presets are parameterised look curves, not bit-exact Sony transfers. Auto knee
+is a static max-point/sensitivity mapping, and Detail controls are deferred.
+S-Log/S-Gamut remain absent because the encoder writes truthful HLG/Rec.709
+metadata.

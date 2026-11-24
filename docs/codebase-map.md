@@ -35,7 +35,7 @@ android/core/probe/          capability prober, verifiers, report model
 android/core/camera/         Camera2 controller, capabilities, modes
 android/core/gpu/            EGL/GLES renderer and shader
 android/core/codec/          HEVC/AAC recorder, gyro recorder
-android/core/profile/        SlateLog, profiles, LUTs, input profile
+android/core/profile/        picture profiles, LUTs, input profile
 android/core/storage/        declared, no source yet
 android/core/device/         device database, quirks, calibration, gates
 android/core/ai/             AI contracts only (NoOp engine)
@@ -73,7 +73,7 @@ root is `android/`, not the repository root.
 | Frame rendering, shader, overlays | `:core:gpu` | `GlPreviewRenderer.kt` |
 | Recording/mux/audio | `:core:codec` | `ClipRecorder.kt`, `GyroRecorder.kt` |
 | HEVC SPS verification | `:core:common` | `HevcSps.kt` |
-| Look, log, LUT | `:core:profile` | `PictureProfile.kt`, `SlateLog.kt`, `Lut3D.kt` |
+| Look, LUT | `:core:profile` | `PictureProfile.kt`, `Lut3D.kt` |
 | Device quirks/calibration | `:core:device` | `DeviceDatabase.kt`, `DeviceDatabaseRepository.kt`, `CapabilityGates.kt` |
 | Probe | `:core:probe` | `ProbeRunner.kt`, `source/`, `verify/`, `eval/` |
 | Flutter state/commands | `:bridge` | `SlateCamBridge.kt`, generated Pigeon |

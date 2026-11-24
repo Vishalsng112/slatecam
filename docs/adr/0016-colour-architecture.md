@@ -1,6 +1,6 @@
 # ADR 0016 — Staged colour architecture: math, per-lens data, probe
 
-- **Status:** Accepted (tone math updated by ADR 0020) (phase 1–3); scene-linear shader deferred
+- **Status:** Accepted; tone math and SlateLog updated by ADR 0020
 - **Date:** 2026-11-24
 - **Phase:** 4/5/7 (colour)
 - **Depends on:** ADR 0005 (colour pipeline), ADR 0009 (lens shading)

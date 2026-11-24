@@ -1,7 +1,7 @@
 package io.github.vishalsng112.slatecam.core.profile
 
-/** The four built-in picture profiles. */
-enum class ProfileKind { STANDARD, SLATE_LOOK, SLATE_LOG, CUSTOM }
+/** The built-in picture profiles. */
+enum class ProfileKind { STANDARD, SLATE_LOOK, CUSTOM }
 
 /**
  * Look gamma presets. These are creative curves in the delivery domain, not the
@@ -155,7 +155,6 @@ data class PictureProfile(
     val kind: ProfileKind,
     val settings: ProfileSettings = ProfileSettings.IDENTITY,
 ) {
-    val logEnabled: Boolean get() = kind == ProfileKind.SLATE_LOG
     val monochrome: Boolean get() = settings.colorMode.monochrome
     val editable: Boolean get() = kind == ProfileKind.CUSTOM
 
@@ -194,24 +193,28 @@ data class PictureProfile(
             ),
             saturation = 1f + settings.saturation / 32f,
             monochrome = monochrome,
-            logPreview = logEnabled,
         )
     }
 
     companion object {
         private val STANDARD_SETTINGS = ProfileSettings()
 
-        /** A gentle filmic look: soft shoulder, a touch of warmth and colour. */
+        /**
+         * Sony S-Cinetone-inspired look: the S-Cinetone shoulder, a soft knee,
+         * slightly muted saturation, a touch of warmth and 18% grey anchored
+         * without a pedestal.
+         */
         private val SLATE_LOOK_SETTINGS = ProfileSettings(
-            blackLevel = 1,
-            gamma = GammaPreset.CINE2,
+            blackLevel = 0,
+            gamma = GammaPreset.SCINETONE,
             blackGammaRange = BlackGammaRange.MIDDLE,
             blackGammaLevel = 1,
             kneeMode = KneeMode.MANUAL,
             kneePoint = 95,
-            kneeSlope = 1,
+            kneeSlope = 2,
             colorMode = ColorMode.CINEMA,
-            saturation = 4,
+            saturation = -2,
+            colorPhase = 1,
         )
 
         val STANDARD = PictureProfile(
@@ -226,13 +229,6 @@ data class PictureProfile(
             settings = SLATE_LOOK_SETTINGS,
         )
 
-        /** Flat preview; the encoder still receives HLG or Rec.709. */
-        val SLATE_LOG = PictureProfile(
-            id = "slatelog",
-            kind = ProfileKind.SLATE_LOG,
-            settings = ProfileSettings.IDENTITY,
-        )
-
         val CUSTOM = PictureProfile(
             id = "custom",
             kind = ProfileKind.CUSTOM,
@@ -240,7 +236,7 @@ data class PictureProfile(
         )
 
         val all: List<PictureProfile> =
-            listOf(STANDARD, SLATE_LOOK, SLATE_LOG, CUSTOM)
+            listOf(STANDARD, SLATE_LOOK, CUSTOM)
 
         fun custom(settings: ProfileSettings): PictureProfile =
             CUSTOM.copy(settings = settings.normalized())
@@ -248,7 +244,6 @@ data class PictureProfile(
         fun byId(id: String, customSettings: ProfileSettings = ProfileSettings.IDENTITY): PictureProfile =
             when (id) {
                 SLATE_LOOK.id -> SLATE_LOOK
-                SLATE_LOG.id -> SLATE_LOG
                 CUSTOM.id -> custom(customSettings)
                 else -> STANDARD
             }
@@ -272,7 +267,6 @@ data class ProfileRender(
     val colorDepths: FloatArray,
     val saturation: Float,
     val monochrome: Boolean,
-    val logPreview: Boolean,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -291,8 +285,7 @@ data class ProfileRender(
             colorPhase == other.colorPhase &&
             colorDepths.contentEquals(other.colorDepths) &&
             saturation == other.saturation &&
-            monochrome == other.monochrome &&
-            logPreview == other.logPreview
+            monochrome == other.monochrome
     }
 
     override fun hashCode(): Int {
@@ -311,7 +304,6 @@ data class ProfileRender(
         result = 31 * result + colorDepths.contentHashCode()
         result = 31 * result + saturation.hashCode()
         result = 31 * result + monochrome.hashCode()
-        result = 31 * result + logPreview.hashCode()
         return result
     }
 }

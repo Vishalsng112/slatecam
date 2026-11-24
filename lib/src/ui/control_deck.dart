@@ -1248,9 +1248,16 @@ class _ControlDeckState extends State<ControlDeck> {
                 ),
             ],
           ),
-          if (state.profile == 'slatelog')
+          if (state.profile == 'slatelook')
             Text(
-              'Monitoring view only; clips are delivered HLG/Rec.709.',
+              'S-Cinetone-inspired look: soft shoulder, gentle knee, warm skin.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+            )
+          else if (state.profile == 'standard')
+            Text(
+              'Camera look: no creative processing.',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
@@ -1635,8 +1642,6 @@ class _ControlDeckState extends State<ControlDeck> {
     switch (id) {
       case 'slatelook':
         return 'SlateLook';
-      case 'slatelog':
-        return 'SlateLog';
       default:
         return humanizeWireValue(id);
     }

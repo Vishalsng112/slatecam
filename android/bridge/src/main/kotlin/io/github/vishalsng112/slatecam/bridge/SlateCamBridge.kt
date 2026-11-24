@@ -126,7 +126,7 @@ class SlateCamBridge private constructor(
     private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
 
     private var profileId = (shootPrefs.getString(KEY_PROFILE, null) ?: PictureProfile.STANDARD.id)
-        .takeUnless { it.startsWith("lut:") }
+        .takeIf { id -> PictureProfile.all.any { it.id == id } }
         ?: PictureProfile.STANDARD.id
     private var zebraEnabled = false
     private var falseColorEnabled = false
@@ -711,7 +711,6 @@ class SlateCamBridge private constructor(
             colorPhase = look.colorPhase,
             colorDepths = look.colorDepths,
             saturation = look.saturation,
-            logEnabled = look.logPreview,
             monochrome = look.monochrome,
         )
         applyCreativeLut()

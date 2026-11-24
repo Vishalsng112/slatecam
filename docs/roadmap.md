@@ -31,7 +31,7 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | 1 | Capability prober running on real devices; verified feature dictionary |
 | 2 | Camera2 session, Pigeon bridge, texture preview, manual ISO/shutter/focus/WB, P/S/M |
 | 3 | 8-bit and 10-bit HLG HEVC with audio, MediaStore, recording modes, thermal guard |
-| 4 | SlateLog, LUTs, picture profiles, shader histogram/zebra/false colour/waveform/peaking/guides |
+| 4 | picture profiles, LUTs, shader histogram/zebra/false colour/waveform/peaking/guides |
 | 5 | RAW burst, shutter angle, gyro metadata/alignment, focus shift, metering/AE response, software contrast AF with scenarios |
 | 5.5 | Per-camera capability modes, Movie/Vlog common mode, switch while recording, per-camera colour matching |
 | 6 | LiteRT subject tracking and focus assist; optional local assistant |
