@@ -6,6 +6,47 @@ import 'widgets.dart';
 
 const _angleOptions = [45.0, 90.0, 180.0, 270.0, 360.0];
 
+const _gammaOptions = <String, String>{
+  'standard': 'Standard',
+  'movie': 'Movie',
+  'still': 'Still',
+  'cine1': 'Cine1',
+  'cine2': 'Cine2',
+  'cine3': 'Cine3',
+  'cine4': 'Cine4',
+  'itu709': 'ITU709',
+  'itu709_800': 'ITU709(800%)',
+  'scinetone': 'S-Cinetone',
+};
+
+const _blackGammaRangeOptions = <String, String>{
+  'wide': 'Wide',
+  'middle': 'Middle',
+  'narrow': 'Narrow',
+};
+
+const _kneeModeOptions = <String, String>{
+  'auto': 'Auto',
+  'manual': 'Manual',
+};
+
+const _kneeSensitivityOptions = <String, String>{
+  'high': 'High',
+  'mid': 'Mid',
+  'low': 'Low',
+};
+
+const _colorModeOptions = <String, String>{
+  'movie': 'Movie',
+  'still': 'Still',
+  'cinema': 'Cinema',
+  'pro': 'Pro',
+  'itu709_matrix': 'ITU709 Matrix',
+  'mono': 'B & W',
+  'bt2020': 'BT.2020',
+  'bt709': '709',
+};
+
 /// One control surface for the whole camera.
 ///
 /// Every primary action lives on this rail: no tabs, no nested menus for the
@@ -48,11 +89,7 @@ class _ControlDeckState extends State<ControlDeck> {
   double? _meterSpeedDraft;
   double? _focusSensitivityDraft;
   double? _focusTransitionDraft;
-  double? _colorEvDraft;
-  double? _colorContrastDraft;
-  double? _colorSaturationDraft;
-  double? _colorTemperatureDraft;
-  double? _colorTintDraft;
+  final Map<String, double> _profileDrafts = {};
   double? _peakingSensitivityDraft;
   double? _peakingStrengthDraft;
 
@@ -72,20 +109,8 @@ class _ControlDeckState extends State<ControlDeck> {
     if (oldWidget.state.focusTransitionSpeed != state.focusTransitionSpeed) {
       _focusTransitionDraft = null;
     }
-    if (oldWidget.state.colorExposureEv != state.colorExposureEv) {
-      _colorEvDraft = null;
-    }
-    if (oldWidget.state.colorContrast != state.colorContrast) {
-      _colorContrastDraft = null;
-    }
-    if (oldWidget.state.colorSaturation != state.colorSaturation) {
-      _colorSaturationDraft = null;
-    }
-    if (oldWidget.state.colorTemperature != state.colorTemperature) {
-      _colorTemperatureDraft = null;
-    }
-    if (oldWidget.state.colorTint != state.colorTint) {
-      _colorTintDraft = null;
+    if (oldWidget.state.profileSettings != state.profileSettings) {
+      _profileDrafts.clear();
     }
     if (oldWidget.state.peakingSensitivity != state.peakingSensitivity) {
       _peakingSensitivityDraft = null;
@@ -102,13 +127,6 @@ class _ControlDeckState extends State<ControlDeck> {
       _focusSensitivityDraft ?? state.focusShiftSensitivity;
   double get _focusTransition =>
       _focusTransitionDraft ?? state.focusTransitionSpeed;
-  double get _colorEv => _colorEvDraft ?? state.colorExposureEv;
-  double get _colorContrast => _colorContrastDraft ?? state.colorContrast;
-  double get _colorSaturation =>
-      _colorSaturationDraft ?? state.colorSaturation;
-  double get _colorTemperature =>
-      _colorTemperatureDraft ?? state.colorTemperature;
-  double get _colorTint => _colorTintDraft ?? state.colorTint;
   double get _peakingSensitivity =>
       _peakingSensitivityDraft ?? state.peakingSensitivity;
   double get _peakingStrength => _peakingStrengthDraft ?? state.peakingStrength;
@@ -144,7 +162,6 @@ class _ControlDeckState extends State<ControlDeck> {
                   final secondary = <Widget>[
                     _shootSetCard(context),
                     _colourCard(context),
-                    _colourScienceCard(context),
                   ];
                   final tertiary = <Widget>[
                     _viewfinderCard(context),
@@ -1205,8 +1222,10 @@ class _ControlDeckState extends State<ControlDeck> {
     final calibration = state.deviceCalibrationActive
         ? (state.deviceCalibrationSource ?? 'measured matrix')
         : 'identity · no measured data';
+    final settings = state.profileSettings;
+    final editable = state.profile == 'custom';
     return DeckCard(
-      title: 'Colour',
+      title: 'Picture profile',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1221,7 +1240,7 @@ class _ControlDeckState extends State<ControlDeck> {
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   label: Text(
-                    humanizeWireValue(profile),
+                    _profileLabel(profile),
                     style: const TextStyle(fontSize: 10),
                   ),
                   selected: profile == state.profile,
@@ -1235,7 +1254,235 @@ class _ControlDeckState extends State<ControlDeck> {
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+            )
+          else if (!editable)
+            Text(
+              'Preset look. Select Custom to edit every control.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
             ),
+          if (editable) ...[
+            const Divider(height: 10, color: UiTokens.border),
+            Text('CUSTOM PROFILE', style: Theme.of(context).textTheme.labelSmall),
+            _profileSlider(
+              context,
+              key: 'blackLevel',
+              label: 'Black level',
+              value: settings.blackLevel,
+              min: -15,
+              max: 15,
+              divisions: 30,
+              onCommit: (value) =>
+                  _patchProfile(blackLevel: value.round()),
+            ),
+            _profileChoiceGroup(
+              'Gamma',
+              _gammaOptions,
+              settings.gamma,
+              (value) => _patchProfile(gamma: value),
+            ),
+            _profileChoiceGroup(
+              'Black gamma range',
+              _blackGammaRangeOptions,
+              settings.blackGammaRange,
+              (value) => _patchProfile(blackGammaRange: value),
+            ),
+            _profileSlider(
+              context,
+              key: 'blackGammaLevel',
+              label: 'Black gamma level',
+              value: settings.blackGammaLevel,
+              min: -7,
+              max: 7,
+              divisions: 14,
+              onCommit: (value) =>
+                  _patchProfile(blackGammaLevel: value.round()),
+            ),
+            _profileChoiceGroup(
+              'Knee mode',
+              _kneeModeOptions,
+              settings.kneeMode,
+              (value) => _patchProfile(kneeMode: value),
+            ),
+            if (settings.kneeMode == 'auto') ...[
+              _profileSlider(
+                context,
+                key: 'kneeAutoMaxPoint',
+                label: 'Knee max point',
+                value: settings.kneeAutoMaxPoint,
+                min: 90,
+                max: 100,
+                divisions: 10,
+                suffix: '%',
+                onCommit: (value) =>
+                    _patchProfile(kneeAutoMaxPoint: value.round()),
+              ),
+              _profileChoiceGroup(
+                'Knee sensitivity',
+                _kneeSensitivityOptions,
+                settings.kneeAutoSensitivity,
+                (value) => _patchProfile(kneeAutoSensitivity: value),
+              ),
+            ] else ...[
+              _profileSlider(
+                context,
+                key: 'kneePoint',
+                label: 'Knee point',
+                value: settings.kneePoint,
+                min: 75,
+                max: 105,
+                divisions: 30,
+                suffix: '%',
+                onCommit: (value) =>
+                    _patchProfile(kneePoint: value.round()),
+              ),
+              _profileSlider(
+                context,
+                key: 'kneeSlope',
+                label: 'Knee slope',
+                value: settings.kneeSlope,
+                min: -5,
+                max: 5,
+                divisions: 10,
+                onCommit: (value) =>
+                    _patchProfile(kneeSlope: value.round()),
+              ),
+            ],
+            _profileChoiceGroup(
+              'Color mode',
+              _colorModeOptions,
+              settings.colorMode,
+              (value) => _patchProfile(colorMode: value),
+            ),
+            _profileSlider(
+              context,
+              key: 'saturation',
+              label: 'Saturation',
+              value: settings.saturation,
+              min: -32,
+              max: 32,
+              divisions: 64,
+              onCommit: (value) =>
+                  _patchProfile(saturation: value.round()),
+            ),
+            _profileSlider(
+              context,
+              key: 'colorPhase',
+              label: 'Color phase',
+              value: settings.colorPhase,
+              min: -7,
+              max: 7,
+              divisions: 14,
+              onCommit: (value) =>
+                  _patchProfile(colorPhase: value.round()),
+            ),
+            Text(
+              'COLOR DEPTH',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            _profileSlider(
+              context,
+              key: 'colorDepthR',
+              label: 'R',
+              value: settings.colorDepthR,
+              min: -7,
+              max: 7,
+              divisions: 14,
+              onCommit: (value) =>
+                  _patchProfile(colorDepthR: value.round()),
+            ),
+            _profileSlider(
+              context,
+              key: 'colorDepthG',
+              label: 'G',
+              value: settings.colorDepthG,
+              min: -7,
+              max: 7,
+              divisions: 14,
+              onCommit: (value) =>
+                  _patchProfile(colorDepthG: value.round()),
+            ),
+            _profileSlider(
+              context,
+              key: 'colorDepthB',
+              label: 'B',
+              value: settings.colorDepthB,
+              min: -7,
+              max: 7,
+              divisions: 14,
+              onCommit: (value) =>
+                  _patchProfile(colorDepthB: value.round()),
+            ),
+            _profileSlider(
+              context,
+              key: 'colorDepthC',
+              label: 'C',
+              value: settings.colorDepthC,
+              min: -7,
+              max: 7,
+              divisions: 14,
+              onCommit: (value) =>
+                  _patchProfile(colorDepthC: value.round()),
+            ),
+            _profileSlider(
+              context,
+              key: 'colorDepthM',
+              label: 'M',
+              value: settings.colorDepthM,
+              min: -7,
+              max: 7,
+              divisions: 14,
+              onCommit: (value) =>
+                  _patchProfile(colorDepthM: value.round()),
+            ),
+            _profileSlider(
+              context,
+              key: 'colorDepthY',
+              label: 'Y',
+              value: settings.colorDepthY,
+              min: -7,
+              max: 7,
+              divisions: 14,
+              onCommit: (value) =>
+                  _patchProfile(colorDepthY: value.round()),
+            ),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+              onPressed: widget.host.resetProfile,
+              icon: const Icon(Icons.restart_alt, size: 15),
+              label: const Text(
+                'Reset custom profile',
+                style: TextStyle(fontSize: 11),
+              ),
+            ),
+          ],
+          const Divider(height: 10, color: UiTokens.border),
+          Text('CREATIVE LUT', style: Theme.of(context).textTheme.labelSmall),
+          const SizedBox(height: 4),
+          DropdownButton<String>(
+            value: state.creativeLuts.contains(state.creativeLut)
+                ? state.creativeLut
+                : 'none',
+            isExpanded: true,
+            isDense: true,
+            items: [
+              for (final id in state.creativeLuts)
+                DropdownMenuItem(
+                  value: id,
+                  child: Text(
+                    id == 'none' ? 'None' : id,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) widget.host.setCreativeLut(value);
+            },
+          ),
           TextButton.icon(
             style: TextButton.styleFrom(
               visualDensity: VisualDensity.compact,
@@ -1245,7 +1492,7 @@ class _ControlDeckState extends State<ControlDeck> {
             icon: const Icon(Icons.refresh, size: 14),
             label: const Text('Reload LUTs', style: TextStyle(fontSize: 10)),
           ),
-          const Divider(height: 8, color: UiTokens.border),
+          const Divider(height: 10, color: UiTokens.border),
           Text('WHITE BALANCE', style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 4),
           Wrap(
@@ -1265,7 +1512,7 @@ class _ControlDeckState extends State<ControlDeck> {
                 ),
             ],
           ),
-          const Divider(height: 8, color: UiTokens.border),
+          const Divider(height: 10, color: UiTokens.border),
           Text(
             'Input calibration',
             style: Theme.of(context).textTheme.bodyMedium,
@@ -1274,6 +1521,125 @@ class _ControlDeckState extends State<ControlDeck> {
         ],
       ),
     );
+  }
+
+  void _patchProfile({
+    int? blackLevel,
+    String? gamma,
+    String? blackGammaRange,
+    int? blackGammaLevel,
+    String? kneeMode,
+    int? kneeAutoMaxPoint,
+    String? kneeAutoSensitivity,
+    int? kneePoint,
+    int? kneeSlope,
+    String? colorMode,
+    int? saturation,
+    int? colorPhase,
+    int? colorDepthR,
+    int? colorDepthG,
+    int? colorDepthB,
+    int? colorDepthC,
+    int? colorDepthM,
+    int? colorDepthY,
+  }) {
+    final s = state.profileSettings;
+    _profileDrafts.clear();
+    widget.host.setProfileSettings(
+      ProfileSettings(
+        blackLevel: blackLevel ?? s.blackLevel,
+        gamma: gamma ?? s.gamma,
+        blackGammaRange: blackGammaRange ?? s.blackGammaRange,
+        blackGammaLevel: blackGammaLevel ?? s.blackGammaLevel,
+        kneeMode: kneeMode ?? s.kneeMode,
+        kneeAutoMaxPoint: kneeAutoMaxPoint ?? s.kneeAutoMaxPoint,
+        kneeAutoSensitivity: kneeAutoSensitivity ?? s.kneeAutoSensitivity,
+        kneePoint: kneePoint ?? s.kneePoint,
+        kneeSlope: kneeSlope ?? s.kneeSlope,
+        colorMode: colorMode ?? s.colorMode,
+        saturation: saturation ?? s.saturation,
+        colorPhase: colorPhase ?? s.colorPhase,
+        colorDepthR: colorDepthR ?? s.colorDepthR,
+        colorDepthG: colorDepthG ?? s.colorDepthG,
+        colorDepthB: colorDepthB ?? s.colorDepthB,
+        colorDepthC: colorDepthC ?? s.colorDepthC,
+        colorDepthM: colorDepthM ?? s.colorDepthM,
+        colorDepthY: colorDepthY ?? s.colorDepthY,
+      ),
+    );
+  }
+
+  Widget _profileSlider(
+    BuildContext context, {
+    required String key,
+    required String label,
+    required int value,
+    required double min,
+    required double max,
+    int? divisions,
+    String suffix = '',
+    required void Function(double value) onCommit,
+  }) {
+    final draft = _profileDrafts[key];
+    return LabeledSlider(
+      label: label,
+      valueLabel: '${draft?.round() ?? value}$suffix',
+      value: draft ?? value.toDouble(),
+      min: min,
+      max: max,
+      divisions: divisions,
+      onChanged: (next) => setState(() => _profileDrafts[key] = next),
+      onChangeEnd: (next) {
+        _profileDrafts.remove(key);
+        setState(() => onCommit(next));
+      },
+    );
+  }
+
+  Widget _profileChoiceGroup(
+    String label,
+    Map<String, String> options,
+    String selected,
+    ValueChanged<String> onSelected,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label.toUpperCase(), style: Theme.of(context).textTheme.labelSmall),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              for (final entry in options.entries)
+                ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  label: Text(
+                    entry.value,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  selected: entry.key == selected,
+                  onSelected: (_) => onSelected(entry.key),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _profileLabel(String id) {
+    switch (id) {
+      case 'slatelook':
+        return 'SlateLook';
+      case 'slatelog':
+        return 'SlateLog';
+      default:
+        return humanizeWireValue(id);
+    }
   }
 
   Widget _monitorCard(BuildContext context) {
@@ -1732,93 +2098,6 @@ class _ControlDeckState extends State<ControlDeck> {
         ],
       ),
     );
-  }
-
-  Widget _colourScienceCard(BuildContext context) {
-    return DeckCard(
-      title: 'Colour science',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          LabeledSlider(
-            label: 'Exposure',
-            valueLabel:
-                '${_colorEv >= 0 ? '+' : ''}${_colorEv.toStringAsFixed(1)} EV',
-            value: _colorEv,
-            min: -2,
-            max: 2,
-            onChanged: (value) => setState(() => _colorEvDraft = value),
-            onChangeEnd: widget.host.setColorExposure,
-          ),
-          LabeledSlider(
-            label: 'Contrast',
-            valueLabel: _colorContrast.toStringAsFixed(2),
-            value: _colorContrast,
-            min: 0.25,
-            max: 2,
-            onChanged: (value) =>
-                setState(() => _colorContrastDraft = value),
-            onChangeEnd: widget.host.setColorContrast,
-          ),
-          LabeledSlider(
-            label: 'Saturation',
-            valueLabel: _colorSaturation.toStringAsFixed(2),
-            value: _colorSaturation,
-            min: 0,
-            max: 2,
-            onChanged: (value) =>
-                setState(() => _colorSaturationDraft = value),
-            onChangeEnd: widget.host.setColorSaturation,
-          ),
-          LabeledSlider(
-            label: 'Temperature',
-            valueLabel: _temperatureLabel(_colorTemperature),
-            value: _colorTemperature,
-            min: -1,
-            max: 1,
-            onChanged: (value) =>
-                setState(() => _colorTemperatureDraft = value),
-            onChangeEnd: widget.host.setColorTemperature,
-          ),
-          LabeledSlider(
-            label: 'Tint',
-            valueLabel: _tintLabel(_colorTint),
-            value: _colorTint,
-            min: -1,
-            max: 1,
-            onChanged: (value) => setState(() => _colorTintDraft = value),
-            onChangeEnd: widget.host.setColorTint,
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-              ),
-              onPressed: widget.host.resetColorScience,
-              icon: const Icon(Icons.restart_alt, size: 15),
-              label: const Text(
-                'Reset colour science',
-                style: TextStyle(fontSize: 11),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _temperatureLabel(double value) {
-    final amount = (value.abs() * 100).round();
-    if (amount < 1) return 'neutral';
-    return value > 0 ? 'warm $amount%' : 'cool $amount%';
-  }
-
-  String _tintLabel(double value) {
-    final amount = (value.abs() * 100).round();
-    if (amount < 1) return 'neutral';
-    return value > 0 ? 'magenta $amount%' : 'green $amount%';
   }
 
   Widget _deviceCard(BuildContext context) {

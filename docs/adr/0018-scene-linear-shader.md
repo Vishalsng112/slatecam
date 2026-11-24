@@ -1,6 +1,6 @@
 # ADR 0018 — Scene-linear colour shader and output routing
 
-- **Status:** Accepted
+- **Status:** Accepted (profile parameters updated by ADR 0020)
 - **Date:** 2026-11-24
 - **Phase:** 4/5 (colour pipeline)
 - **Depends on:** ADR 0005 (colour), ADR 0016 (colour architecture),
@@ -25,7 +25,8 @@ preview outputs.
    Rec.2020 luma weights.
 3. **Profile tone shaping is linear and per channel.** Contrast around the 18%
    pivot, shadow-toe lift, highlight knee and saturation are applied in working
-   space. The GLSL matches `ToneShaper`.
+   space. The GLSL matches `PictureProfile.render()` (ADR 0020 replaced the
+   earlier `ToneShaper`).
 4. **The creative LUT is applied in the delivery/preview transfer domain.** The
    existing `.cube`/built-in LUTs are display-referred; applying them to linear
    values would break their look. Order: linear look → output transfer →

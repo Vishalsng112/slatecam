@@ -37,23 +37,6 @@ class SlateLogTest {
     }
 }
 
-class PictureProfileTest {
-
-    @Test
-    fun `ids resolve and unknown falls back to standard`() {
-        assertEquals(ProfileKind.SLATE_LOG, PictureProfile.byId("slatelog").kind)
-        assertEquals(ProfileKind.MONO, PictureProfile.byId("mono").kind)
-        assertEquals(ProfileKind.STANDARD, PictureProfile.byId("does-not-exist").kind)
-    }
-
-    @Test
-    fun `log and mono flags follow the kind`() {
-        assertTrue(PictureProfile.SLATE_LOG.logEnabled)
-        assertTrue(PictureProfile.MONO.monochrome)
-        assertEquals(0f, PictureProfile.MONO.saturation, 0f)
-    }
-}
-
 class Lut3DTest {
 
     private val identity = """

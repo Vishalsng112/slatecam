@@ -50,12 +50,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uInputHlg = 0
     private var uOutputHlg = 0
     private var uIsPreview = 0
-    private var uExposure = 0
-    private var uContrast = 0
+    private var uBlackLevel = 0
+    private var uGammaPower = 0
+    private var uGammaContrast = 0
+    private var uGammaToe = 0
+    private var uGammaShoulder = 0
+    private var uBlackGammaWidth = 0
+    private var uBlackGammaLevel = 0
+    private var uKneePoint = 0
+    private var uKneeSlope = 0
+    private var uColorMatrix = 0
+    private var uColorOps = 0
+    private var uColorPhase = 0
+    private var uColorDepthA = 0
+    private var uColorDepthB = 0
     private var uSaturation = 0
-    private var uPivot = 0
-    private var uKnee = 0
-    private var uToe = 0
     private var uLogPreview = 0
     private var uMono = 0
     private var uZebra = 0
@@ -66,7 +75,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uInputSaturation = 0
     private var uInputWb = 0
     private var uInputShadowLift = 0
-    private var uWhiteBalance = 0
     private var uPeaking = 0
     private var uPeakingThreshold = 0
     private var uPeakingStrength = 0
@@ -149,14 +157,22 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
      */
     private var encoderBaseTimestampNs = -1L
 
-    @Volatile private var exposure = 1f
-    @Volatile private var contrast = 1f
+    @Volatile private var blackLevel = 0f
+    @Volatile private var gammaPower = 1f
+    @Volatile private var gammaContrast = 1f
+    @Volatile private var gammaToe = 0f
+    @Volatile private var gammaShoulder = 0f
+    @Volatile private var blackGammaWidth = 0.18f
+    @Volatile private var blackGammaLevel = 0f
+    @Volatile private var kneePoint = 1f
+    @Volatile private var kneeSlope = 0f
+    @Volatile private var colorMatrixLook = floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f)
+    @Volatile private var colorOps = false
+    @Volatile private var colorPhase = 0f
+    @Volatile private var colorDepths = FloatArray(6)
     @Volatile private var saturation = 1f
     @Volatile private var logEnabled = false
     @Volatile private var monochrome = false
-    @Volatile private var profilePivot = 0.18f
-    @Volatile private var profileKnee = 0.8f
-    @Volatile private var profileToe = 0f
     @Volatile private var zebra = false
     @Volatile private var zebraThreshold = 0.9f
     @Volatile private var falseColor = false
@@ -168,7 +184,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var inputWbR = 1f
     @Volatile private var inputWbB = 1f
     @Volatile private var inputShadowLift = 0f
-    @Volatile private var whiteBalance = floatArrayOf(1f, 1f, 1f)
     @Volatile private var peaking = false
     @Volatile private var peakingThreshold = 0.12f
     @Volatile private var peakingStrength = 0.8f
@@ -201,40 +216,53 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         inputShadowLift = shadowLift
     }
 
-    /** Warm/cool and green/magenta trim applied after sensor calibration. */
-    fun setWhiteBalanceTuning(temperature: Float, tint: Float) {
-        val t = temperature.coerceIn(-1f, 1f)
-        val g = tint.coerceIn(-1f, 1f)
-        val red = (1f + 0.18f * t + 0.06f * g).coerceAtLeast(0.05f)
-        val green = (1f - 0.10f * g).coerceAtLeast(0.05f)
-        val blue = (1f - 0.18f * t + 0.06f * g).coerceAtLeast(0.05f)
-        val mean = (red + green + blue) / 3f
-        whiteBalance = floatArrayOf(red / mean, green / mean, blue / mean)
-    }
-
+    /**
+     * Applies the resolved picture-profile look. Values are already mapped from
+     * the user-facing ranges by [io.github.vishalsng112.slatecam.core.profile].
+     */
+    @Suppress("LongParameterList")
     fun applyProfile(
-        exposure: Float,
-        contrast: Float,
+        blackLevel: Float,
+        gammaPower: Float,
+        gammaContrast: Float,
+        gammaToe: Float,
+        gammaShoulder: Float,
+        blackGammaWidth: Float,
+        blackGammaLevel: Float,
+        kneePoint: Float,
+        kneeSlope: Float,
+        colorMatrix: FloatArray,
+        colorOps: Boolean,
+        colorPhase: Float,
+        colorDepths: FloatArray,
         saturation: Float,
         logEnabled: Boolean,
         monochrome: Boolean,
-        pivot: Float = 0.18f,
-        highlightRolloffKnee: Float = 0.8f,
-        shadowToe: Float = 0f,
     ) {
-        this.exposure = exposure
-        this.contrast = contrast
+        require(colorMatrix.size == 9) { "colour matrix must be 3x3" }
+        require(colorDepths.size == 6) { "colour depth must have six axes" }
+        this.blackLevel = blackLevel
+        this.gammaPower = gammaPower
+        this.gammaContrast = gammaContrast
+        this.gammaToe = gammaToe
+        this.gammaShoulder = gammaShoulder
+        this.blackGammaWidth = blackGammaWidth
+        this.blackGammaLevel = blackGammaLevel
+        this.kneePoint = kneePoint
+        this.kneeSlope = kneeSlope
+        this.colorMatrixLook = colorMatrix.copyOf()
+        this.colorOps = colorOps
+        this.colorPhase = colorPhase
+        this.colorDepths = colorDepths.copyOf()
         this.saturation = saturation
         this.logEnabled = logEnabled
         this.monochrome = monochrome
         Log.i(
             TAG,
-            "profile exp=$exposure contrast=$contrast sat=$saturation " +
-                "log=$logEnabled mono=$monochrome pivot=$pivot knee=$highlightRolloffKnee",
+            "profile black=$blackLevel gamma=${gammaPower}/${gammaContrast}/${gammaShoulder} " +
+                "bg=$blackGammaLevel knee=$kneePoint/$kneeSlope " +
+                "sat=$saturation log=$logEnabled mono=$monochrome colorOps=$colorOps",
         )
-        this.profilePivot = pivot
-        this.profileKnee = highlightRolloffKnee
-        this.profileToe = shadowToe
     }
 
     fun setZebra(enabled: Boolean, threshold: Float) {
@@ -695,12 +723,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uInputHlg = GLES20.glGetUniformLocation(program, "uInputHlg")
         uOutputHlg = GLES20.glGetUniformLocation(program, "uOutputHlg")
         uIsPreview = GLES20.glGetUniformLocation(program, "uIsPreview")
-        uExposure = GLES20.glGetUniformLocation(program, "uExposure")
-        uContrast = GLES20.glGetUniformLocation(program, "uContrast")
+        uBlackLevel = GLES20.glGetUniformLocation(program, "uBlackLevel")
+        uGammaPower = GLES20.glGetUniformLocation(program, "uGammaPower")
+        uGammaContrast = GLES20.glGetUniformLocation(program, "uGammaContrast")
+        uGammaToe = GLES20.glGetUniformLocation(program, "uGammaToe")
+        uGammaShoulder = GLES20.glGetUniformLocation(program, "uGammaShoulder")
+        uBlackGammaWidth = GLES20.glGetUniformLocation(program, "uBlackGammaWidth")
+        uBlackGammaLevel = GLES20.glGetUniformLocation(program, "uBlackGammaLevel")
+        uKneePoint = GLES20.glGetUniformLocation(program, "uKneePoint")
+        uKneeSlope = GLES20.glGetUniformLocation(program, "uKneeSlope")
+        uColorMatrix = GLES20.glGetUniformLocation(program, "uColorMatrix")
+        uColorOps = GLES20.glGetUniformLocation(program, "uColorOps")
+        uColorPhase = GLES20.glGetUniformLocation(program, "uColorPhase")
+        uColorDepthA = GLES20.glGetUniformLocation(program, "uColorDepthA")
+        uColorDepthB = GLES20.glGetUniformLocation(program, "uColorDepthB")
         uSaturation = GLES20.glGetUniformLocation(program, "uSaturation")
-        uPivot = GLES20.glGetUniformLocation(program, "uPivot")
-        uKnee = GLES20.glGetUniformLocation(program, "uKnee")
-        uToe = GLES20.glGetUniformLocation(program, "uToe")
         uLogPreview = GLES20.glGetUniformLocation(program, "uLogPreview")
         uMono = GLES20.glGetUniformLocation(program, "uMono")
         uZebra = GLES20.glGetUniformLocation(program, "uZebra")
@@ -711,7 +748,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uInputSaturation = GLES20.glGetUniformLocation(program, "uInputSaturation")
         uInputWb = GLES20.glGetUniformLocation(program, "uInputWb")
         uInputShadowLift = GLES20.glGetUniformLocation(program, "uInputShadowLift")
-        uWhiteBalance = GLES20.glGetUniformLocation(program, "uWhiteBalance")
         uPeaking = GLES20.glGetUniformLocation(program, "uPeaking")
         uPeakingThreshold = GLES20.glGetUniformLocation(program, "uPeakingThreshold")
         uPeakingStrength = GLES20.glGetUniformLocation(program, "uPeakingStrength")
@@ -840,12 +876,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform1i(uInputHlg, if (tenBitSource) 1 else 0)
         GLES20.glUniform1i(uOutputHlg, if (!isPreview && tenBitSource) 1 else 0)
         GLES20.glUniform1i(uIsPreview, if (isPreview) 1 else 0)
-        GLES20.glUniform1f(uExposure, exposure)
-        GLES20.glUniform1f(uContrast, contrast)
+        GLES20.glUniform1f(uBlackLevel, blackLevel)
+        GLES20.glUniform1f(uGammaPower, gammaPower)
+        GLES20.glUniform1f(uGammaContrast, gammaContrast)
+        GLES20.glUniform1f(uGammaToe, gammaToe)
+        GLES20.glUniform1f(uGammaShoulder, gammaShoulder)
+        GLES20.glUniform1f(uBlackGammaWidth, blackGammaWidth)
+        GLES20.glUniform1f(uBlackGammaLevel, blackGammaLevel)
+        GLES20.glUniform1f(uKneePoint, kneePoint)
+        GLES20.glUniform1f(uKneeSlope, kneeSlope)
+        GLES20.glUniformMatrix3fv(uColorMatrix, 1, false, colorMatrixLook, 0)
+        GLES20.glUniform1i(uColorOps, if (colorOps) 1 else 0)
+        GLES20.glUniform1f(uColorPhase, colorPhase)
+        GLES20.glUniform3f(uColorDepthA, colorDepths[0], colorDepths[1], colorDepths[2])
+        GLES20.glUniform3f(uColorDepthB, colorDepths[3], colorDepths[4], colorDepths[5])
         GLES20.glUniform1f(uSaturation, saturation)
-        GLES20.glUniform1f(uPivot, profilePivot)
-        GLES20.glUniform1f(uKnee, profileKnee)
-        GLES20.glUniform1f(uToe, profileToe)
         val previewLog = isPreview && logEnabled
         GLES20.glUniform1i(uLogPreview, if (previewLog) 1 else 0)
         if (isPreview && previewLog != lastPreviewLogRoute) {
@@ -861,7 +906,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform1f(uInputSaturation, inputSaturation)
         GLES20.glUniform2f(uInputWb, inputWbR, inputWbB)
         GLES20.glUniform1f(uInputShadowLift, inputShadowLift)
-        GLES20.glUniform3fv(uWhiteBalance, 1, whiteBalance, 0)
         GLES20.glUniform1i(uPeaking, if (overlay && peaking) 1 else 0)
         GLES20.glUniform1f(uPeakingThreshold, peakingThreshold)
         GLES20.glUniform1f(uPeakingStrength, peakingStrength)
@@ -1376,12 +1420,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform int uInputHlg;
             uniform int uOutputHlg;
             uniform int uIsPreview;
-            uniform float uExposure;
-            uniform float uContrast;
+            uniform float uBlackLevel;
+            uniform float uGammaPower;
+            uniform float uGammaContrast;
+            uniform float uGammaToe;
+            uniform float uGammaShoulder;
+            uniform float uBlackGammaWidth;
+            uniform float uBlackGammaLevel;
+            uniform float uKneePoint;
+            uniform float uKneeSlope;
+            uniform mat3 uColorMatrix;
+            uniform int uColorOps;
+            uniform float uColorPhase;
+            uniform vec3 uColorDepthA;
+            uniform vec3 uColorDepthB;
             uniform float uSaturation;
-            uniform float uPivot;
-            uniform float uKnee;
-            uniform float uToe;
             uniform int uLogPreview;
             uniform int uMono;
             uniform int uZebra;
@@ -1392,7 +1445,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform float uInputSaturation;
             uniform vec2 uInputWb;
             uniform float uInputShadowLift;
-            uniform vec3 uWhiteBalance;
             uniform int uPeaking;
             uniform float uPeakingThreshold;
             uniform float uPeakingStrength;
@@ -1455,31 +1507,82 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 );
             }
 
-            float shapeChannel(float v) {
-                float p = clamp(uPivot, 0.001, 1.0);
-                float c = max(uContrast, 0.01);
-                float x = max(v, 0.0);
-                if (x > 0.0) {
-                    x = p * pow(x / p, c);
-                }
-                if (uToe > 0.0 && x < p) {
-                    float t = clamp(x / p, 0.0, 1.0);
-                    x += clamp(uToe, 0.0, 1.0) * 0.05 * (1.0 - t) * (1.0 - t);
-                }
-                float k = clamp(uKnee, 0.1, 1.0);
-                if (x > k && k < 1.0) {
-                    float range = max(1.0 - k, 0.001);
-                    x = k + range * (1.0 - exp(-(x - k) / range));
-                }
-                return clamp(x, 0.0, 1.0);
+            vec3 applyBlackLevel(vec3 c) {
+                return max(c + vec3(uBlackLevel), 0.0);
             }
 
-            vec3 shape(vec3 c) {
-                return vec3(
-                    shapeChannel(c.r),
-                    shapeChannel(c.g),
-                    shapeChannel(c.b)
-                );
+            vec3 applyBlackGamma(vec3 c) {
+                if (abs(uBlackGammaLevel) < 0.001) return c;
+                float l = luma2020(c);
+                float mask = 1.0 - smoothstep(0.0, max(uBlackGammaWidth, 0.01), l);
+                vec3 gamma = vec3(1.0 - clamp(uBlackGammaLevel, -0.5, 0.5));
+                return mix(c, pow(max(c, 0.0), gamma), mask);
+            }
+
+            vec3 applyKnee(vec3 c) {
+                float k = clamp(uKneePoint, 0.5, 1.0);
+                if (k >= 0.999) return c;
+                vec3 over = max(c - k, 0.0);
+                float range = max(1.0 - k, 0.001);
+                float strength = clamp(1.0 + uKneeSlope, 0.1, 2.0);
+                vec3 compressed = k + range * (1.0 - exp(-over / range * strength));
+                return mix(c, compressed, step(vec3(k), c));
+            }
+
+            vec3 rgb2hsv(vec3 c) {
+                vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+                vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+                vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+                float d = q.x - min(q.w, q.y);
+                float e = 1.0e-10;
+                return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)),
+                            d / (q.x + e), q.x);
+            }
+
+            vec3 hsv2rgb(vec3 c) {
+                vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+                vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+                return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+            }
+
+            float axisWeight(float h, float center) {
+                float d = abs(fract(h - center + 0.5) - 0.5);
+                return 1.0 - smoothstep(0.0, 0.18, d);
+            }
+
+            vec3 applyColorLook(vec3 c) {
+                if (uColorOps == 0) return c;
+                c = uColorMatrix * c;
+                if (uColorPhase == 0.0 &&
+                    uColorDepthA == vec3(0.0) &&
+                    uColorDepthB == vec3(0.0)) {
+                    return c;
+                }
+                vec3 hsv = rgb2hsv(max(c, 0.0));
+                hsv.x = fract(hsv.x + uColorPhase);
+                float depth =
+                    uColorDepthA.x * axisWeight(hsv.x, 0.0) +
+                    uColorDepthB.z * axisWeight(hsv.x, 1.0 / 6.0) +
+                    uColorDepthA.y * axisWeight(hsv.x, 2.0 / 6.0) +
+                    uColorDepthB.x * axisWeight(hsv.x, 3.0 / 6.0) +
+                    uColorDepthA.z * axisWeight(hsv.x, 4.0 / 6.0) +
+                    uColorDepthB.y * axisWeight(hsv.x, 5.0 / 6.0);
+                hsv.y = clamp(hsv.y * (1.0 + depth), 0.0, 1.0);
+                return hsv2rgb(hsv);
+            }
+
+            vec3 applyGammaLook(vec3 c) {
+                vec3 g = pow(clamp(c, 0.0, 1.0), vec3(max(uGammaPower, 0.1)));
+                g = clamp((g - 0.5) * uGammaContrast + 0.5, 0.0, 1.0);
+                g += uGammaToe * (1.0 - g) * (1.0 - g);
+                if (uGammaShoulder > 0.001) {
+                    float k = 1.0 - clamp(uGammaShoulder, 0.0, 0.9);
+                    vec3 over = max(g - k, 0.0);
+                    float norm = 1.0 - exp(-1.0);
+                    g = min(g, vec3(k)) +
+                        (1.0 - k) * (1.0 - exp(-over / (1.0 - k))) / norm;
+                }
+                return clamp(g, 0.0, 1.0);
             }
 
             vec3 slateLog(vec3 c) {
@@ -1521,12 +1624,13 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 float inputLuma = luma2020(c);
                 c = mix(vec3(inputLuma), c, uInputSaturation);
 
-                // 3. Creative trim and profile tone shaping in linear.
-                c *= uWhiteBalance;
-                c *= uExposure;
-                c = shape(c);
-                float shapedLuma = luma2020(c);
-                c = mix(vec3(shapedLuma), c, uSaturation);
+                // 3. Picture-profile look in the linear working space.
+                c = applyBlackLevel(c);
+                c = applyBlackGamma(c);
+                c = applyColorLook(c);
+                float profileLuma = luma2020(c);
+                c = mix(vec3(profileLuma), c, uSaturation);
+                c = applyKnee(c);
 
                 if (uMono == 1) {
                     c = vec3(luma2020(c));
@@ -1547,6 +1651,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 }
                 c = clamp(c, 0.0, 1.0);
 
+                // 6. Look gamma then the display-referred creative LUT.
+                c = applyGammaLook(c);
                 if (uLutEnabled == 1) {
                     c = applyLut(c);
                 }

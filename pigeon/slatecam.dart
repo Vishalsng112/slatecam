@@ -85,6 +85,62 @@ class ShootLens {
   bool selected;
 }
 
+/// Editable settings for the Custom picture profile.
+class ProfileSettings {
+  ProfileSettings({
+    required this.blackLevel,
+    required this.gamma,
+    required this.blackGammaRange,
+    required this.blackGammaLevel,
+    required this.kneeMode,
+    required this.kneeAutoMaxPoint,
+    required this.kneeAutoSensitivity,
+    required this.kneePoint,
+    required this.kneeSlope,
+    required this.colorMode,
+    required this.saturation,
+    required this.colorPhase,
+    required this.colorDepthR,
+    required this.colorDepthG,
+    required this.colorDepthB,
+    required this.colorDepthC,
+    required this.colorDepthM,
+    required this.colorDepthY,
+  });
+
+  /// -15..+15 linear pedestal.
+  int blackLevel;
+  /// standard | movie | still | cine1..cine4 | itu709 | itu709_800 | scinetone
+  String gamma;
+  /// wide | middle | narrow
+  String blackGammaRange;
+  /// -7..+7
+  int blackGammaLevel;
+  /// auto | manual
+  String kneeMode;
+  /// 90..100
+  int kneeAutoMaxPoint;
+  /// high | mid | low
+  String kneeAutoSensitivity;
+  /// 75..105
+  int kneePoint;
+  /// -5..+5
+  int kneeSlope;
+  /// movie | still | cinema | pro | itu709_matrix | mono | bt2020 | bt709
+  String colorMode;
+  /// -32..+32
+  int saturation;
+  /// -7..+7
+  int colorPhase;
+  /// -7..+7 per hue axis.
+  int colorDepthR;
+  int colorDepthG;
+  int colorDepthB;
+  int colorDepthC;
+  int colorDepthM;
+  int colorDepthY;
+}
+
 /// Immutable camera snapshot. Kotlin owns this state; Dart only renders it.
 class CameraState {
   CameraState({
@@ -143,11 +199,9 @@ class CameraState {
     required this.gyroSampleCount,
     required this.profile,
     required this.profileNames,
-    required this.colorExposureEv,
-    required this.colorContrast,
-    required this.colorSaturation,
-    required this.colorTemperature,
-    required this.colorTint,
+    required this.profileSettings,
+    required this.creativeLut,
+    required this.creativeLuts,
     required this.zebra,
     required this.falseColor,
     required this.peaking,
@@ -260,12 +314,12 @@ class CameraState {
   int gyroSampleCount;
   String profile;
   List<String> profileNames;
-  /// Manual colour-science trim on top of the active profile.
-  double colorExposureEv;
-  double colorContrast;
-  double colorSaturation;
-  double colorTemperature;
-  double colorTint;
+  /// Settings of the active profile; editable only for `custom`.
+  ProfileSettings profileSettings;
+  /// Selected creative LUT id, or empty for none.
+  String creativeLut;
+  /// LUTs available on this device, including `none`.
+  List<String> creativeLuts;
   bool zebra;
   bool falseColor;
   bool peaking;
@@ -392,17 +446,14 @@ abstract class SlateCamHostApi {
 
   void setProfile(String profileId);
 
-  void setColorExposure(double ev);
+  /// Rewrites the Custom profile settings.
+  void setProfileSettings(ProfileSettings settings);
 
-  void setColorContrast(double value);
+  /// Resets the Custom profile to identity.
+  void resetProfile();
 
-  void setColorSaturation(double value);
-
-  void setColorTemperature(double value);
-
-  void setColorTint(double value);
-
-  void resetColorScience();
+  /// Selects a creative LUT, or `none` to disable it.
+  void setCreativeLut(String lutId);
 
   void setZebra(bool enabled);
 

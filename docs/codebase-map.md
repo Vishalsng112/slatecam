@@ -65,8 +65,8 @@ root is `android/`, not the repository root.
 | Scene-linear shader / output routing | `:core:gpu` | `GlPreviewRenderer.ShaderSource.FRAGMENT` |
 | Flicker-safe exposure grid | `:core:common` | `FlickerGrid`, `CameraController.setShutterNs` |
 | Viewfinder tap-to-focus / pinch | `lib/src/ui/capture_screen.dart`, `:core:gpu` transform, `:core:camera` AF region | `GlPreviewRenderer.viewfinderToBuffer`, `CameraController.setFocusPoint` |
-| Colour-science trim | `:core:profile` | `ColorScience.kt`, `SlateCamBridge.applyProfile` |
-| Linear tone math (pivot/knee/toe) | `:core:profile` | `ToneShaper.kt`, `PictureProfile.kt` |
+| Picture profiles / look pipeline | `:core:profile` | `PictureProfile.kt`, `SlateCamBridge.applyProfile` |
+| Custom profile persistence | `:bridge` | `setProfileSettings`, `encodeSettings`/`decodeSettings` |
 | Per-lens calibration / WB / shadow | `:core:device` | `CalibrationEntry`, `DeviceDatabase.calibrationFor`, `InputProfile` |
 | Independent viewfinder resolution | `:core:gpu`, `:bridge`, Flutter | `GlPreviewRenderer` capture/preview sizes, `SlateCamBridge.previewOutputFor` |
 | OIS / EIS requests | `:core:camera` | `CameraController.readCapabilities/applyControls` |
@@ -132,12 +132,13 @@ on camera change`
 - **Exposure metering and response speed:** ADR 0011.
 - **Software focus engine and scenarios:** ADR 0012.
 - **Viewfinder gestures and tap-to-focus:** ADR 0013.
-- **Colour-science trim:** ADR 0014.
+- **Colour-science trim (superseded):** ADR 0014.
 - **Independent viewfinder resolution:** ADR 0015.
 - **Staged colour architecture:** ADR 0016.
 - **FP16 encoder intermediate:** ADR 0017.
 - **Scene-linear shader and routing:** ADR 0018.
 - **Flicker-safe manual exposure:** ADR 0019.
+- **Picture profiles and look pipeline:** ADR 0020.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current

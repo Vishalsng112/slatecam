@@ -1149,3 +1149,27 @@ errors, and the label matches the applied exposure (`1/100 · 10.00 ms`,
 `1/120 · 8.33 ms`, `1/24 · 41.67 ms`). `auto` falls back to the region's mains
 frequency because the detected 50/60 Hz value is not readable once AE is off;
 both test devices report region `IN`, so auto uses the 50 Hz grid.
+
+## Picture profiles and look pipeline (Pad 3 + Pad 6, build 2090)
+
+The Colour card is now **Picture profile** with exactly four entries:
+`standard`, `SlateLook`, `SlateLog`, `custom`. The Colour science card and its
+five commands are gone. `SlateCamGl` reports the resolved look.
+
+| Check | Result |
+|---|---|
+| Standard | `profile black=0.0 gamma=1.0/1.0/0.0 … colorOps=false`; preview and clip visually identical to the technical base |
+| SlateLook (Pad 3) | `gamma=1.0/1.0/0.3 bg=0.071 knee=0.95/0.2 sat=1.125 colorOps=true`; recorded `1920×1080 Main 10 arib-std-b67 bt2020` |
+| SlateLook (Pad 6) | same look; recorded `1920×1080 Main bt709` |
+| SlateLog (Pad 3) | preview `log=true`, `preview log route=true`; recorded clip stayed `Main 10 arib-std-b67` |
+| Custom gamma | selecting Cine1 then Cine4 logged `gamma=1.04/0.96/0.25` then `1.14/0.88/0.40` |
+| Custom B&W | `mono=true colorOps=true`; the preview turned monochrome |
+| Custom reset | returned `gamma=1.0/1.0/0.0 sat=1.0 mono=false colorOps=false` |
+| Persistence | a custom saturation of `-27` (`sat=0.15625`) survived a force-stop/relaunch; the active profile id is stored separately |
+| Creative LUT | dropdown shows `None` plus scanned LUT ids; selection is independent of the four profiles |
+| Shader | no compile or runtime errors on either GPU; Standard pays only the identity path |
+
+Notes: the gamma presets are parameterised look curves, not bit-exact Sony
+transfers. Auto knee is a static max-point/sensitivity mapping, and Detail
+controls are deferred. S-Log/S-Gamut remain absent because the encoder still
+writes truthful HLG/Rec.709 metadata.

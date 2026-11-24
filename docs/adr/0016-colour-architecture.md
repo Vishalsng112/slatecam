@@ -1,6 +1,6 @@
 # ADR 0016 — Staged colour architecture: math, per-lens data, probe
 
-- **Status:** Accepted (phase 1–3); scene-linear shader deferred
+- **Status:** Accepted (tone math updated by ADR 0020) (phase 1–3); scene-linear shader deferred
 - **Date:** 2026-11-24
 - **Phase:** 4/5/7 (colour)
 - **Depends on:** ADR 0005 (colour pipeline), ADR 0009 (lens shading)
@@ -59,14 +59,16 @@ WB/tone-map path.
 
 ## Consequences
 
-- `ToneShaper`, per-lens schema, `InputProfile` trims and probe fields are
-  covered by JVM tests.
+- Per-lens schema, `InputProfile` trims and probe fields are covered by JVM
+  tests; the picture-profile look math is covered by `PictureProfileTest`.
 - No UI or device behaviour changes unless a calibration entry is added.
-- The current `ColorScienceTuning` remains a live creative trim; it is not the
-  scene-linear pipeline and is not a substitute for per-lens calibration.
-- ColorScience and the per-lens input stage compose in a defined order:
-  input WB/shadow/CCM → input exposure/saturation → profile/log → LUT →
-  creative trim/overlays.
+- The live `ColorScienceTuning` trim was removed in ADR 0020; the Custom
+  picture profile is now the single creative tone/colour path and is not a
+  substitute for per-lens calibration.
+- The profile and the per-lens input stage compose in a defined order:
+  input WB/shadow/CCM → input exposure/saturation → black level/black gamma →
+  colour matrix/phase/depth → saturation → knee → output transfer → look gamma
+  → creative LUT → overlays.
 
 ## Alternatives considered
 

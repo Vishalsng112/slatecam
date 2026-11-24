@@ -18,6 +18,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.view.TextureRegistry
 import io.github.vishalsng112.slatecam.bridge.pigeon.CameraState
 import io.github.vishalsng112.slatecam.bridge.pigeon.LensOption
+import io.github.vishalsng112.slatecam.bridge.pigeon.ProfileSettings as PigeonProfileSettings
 import io.github.vishalsng112.slatecam.bridge.pigeon.RecordingMode
 import io.github.vishalsng112.slatecam.bridge.pigeon.ShootLens
 import io.github.vishalsng112.slatecam.bridge.pigeon.ShootProfile
@@ -38,11 +39,15 @@ import io.github.vishalsng112.slatecam.core.device.DeviceDatabaseSnapshot
 import io.github.vishalsng112.slatecam.core.device.FeatureGate
 import io.github.vishalsng112.slatecam.core.device.QuirkActions
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
-import io.github.vishalsng112.slatecam.core.profile.BuiltInLuts
-import io.github.vishalsng112.slatecam.core.profile.ColorScienceTuning
+import io.github.vishalsng112.slatecam.core.profile.BlackGammaRange
+import io.github.vishalsng112.slatecam.core.profile.ColorMode
+import io.github.vishalsng112.slatecam.core.profile.GammaPreset
 import io.github.vishalsng112.slatecam.core.profile.InputProfile
+import io.github.vishalsng112.slatecam.core.profile.KneeMode
+import io.github.vishalsng112.slatecam.core.profile.KneeSensitivity
 import io.github.vishalsng112.slatecam.core.profile.LutLibrary
 import io.github.vishalsng112.slatecam.core.profile.PictureProfile
+import io.github.vishalsng112.slatecam.core.profile.ProfileSettings as CoreProfileSettings
 import io.github.vishalsng112.slatecam.core.probe.model.CameraInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -95,13 +100,9 @@ class SlateCamBridge private constructor(
     private var previewQuality = shootPrefs.getString(KEY_PREVIEW_QUALITY, "full") ?: "full"
     private var previewOutputWidth = 0
     private var previewOutputHeight = 0
-    private var colorTuning = ColorScienceTuning(
-        exposureEv = shootPrefs.getFloat(KEY_COLOR_EV, 0f),
-        contrast = shootPrefs.getFloat(KEY_COLOR_CONTRAST, 1f),
-        saturation = shootPrefs.getFloat(KEY_COLOR_SATURATION, 1f),
-        temperature = shootPrefs.getFloat(KEY_COLOR_TEMPERATURE, 0f),
-        tint = shootPrefs.getFloat(KEY_COLOR_TINT, 0f),
-    ).normalized()
+    private var customSettings = decodeSettings(shootPrefs.getString(KEY_CUSTOM_PROFILE, null))
+    private var creativeLutId = shootPrefs.getString(KEY_CREATIVE_LUT, null)
+        ?.takeIf { it.isNotBlank() && it != "none" }
     private var modesCacheKey: String? = null
     private var modesCache: List<RecordingMode> = emptyList()
 
@@ -124,7 +125,9 @@ class SlateCamBridge private constructor(
     private var powerManager: PowerManager? = null
     private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
 
-    private var profileId = PictureProfile.STANDARD.id
+    private var profileId = (shootPrefs.getString(KEY_PROFILE, null) ?: PictureProfile.STANDARD.id)
+        .takeUnless { it.startsWith("lut:") }
+        ?: PictureProfile.STANDARD.id
     private var zebraEnabled = false
     private var falseColorEnabled = false
     private var peakingEnabled = false
@@ -199,7 +202,7 @@ class SlateCamBridge private constructor(
             renderer.setGlRotation(state.glRotationDegrees)
             pushState()
         }
-        applyProfile(PictureProfile.STANDARD)
+        applyProfileById(profileId)
 
         renderer.setAnalysisEnabled(true)
         renderer.onAnalysis = { analysis ->
@@ -479,41 +482,36 @@ class SlateCamBridge private constructor(
         pushState()
     }
 
-    override fun setColorExposure(ev: Double) {
-        updateColorTuning(colorTuning.copy(exposureEv = ev.toFloat()))
-    }
-
-    override fun setColorContrast(value: Double) {
-        updateColorTuning(colorTuning.copy(contrast = value.toFloat()))
-    }
-
-    override fun setColorSaturation(value: Double) {
-        updateColorTuning(colorTuning.copy(saturation = value.toFloat()))
-    }
-
-    override fun setColorTemperature(value: Double) {
-        updateColorTuning(colorTuning.copy(temperature = value.toFloat()))
-    }
-
-    override fun setColorTint(value: Double) {
-        updateColorTuning(colorTuning.copy(tint = value.toFloat()))
-    }
-
-    override fun resetColorScience() {
-        updateColorTuning(ColorScienceTuning.IDENTITY)
-    }
-
-    private fun updateColorTuning(value: ColorScienceTuning) {
-        colorTuning = value.normalized()
-        shootPrefs.edit()
-            .putFloat(KEY_COLOR_EV, colorTuning.exposureEv)
-            .putFloat(KEY_COLOR_CONTRAST, colorTuning.contrast)
-            .putFloat(KEY_COLOR_SATURATION, colorTuning.saturation)
-            .putFloat(KEY_COLOR_TEMPERATURE, colorTuning.temperature)
-            .putFloat(KEY_COLOR_TINT, colorTuning.tint)
-            .apply()
-        applyProfileById(profileId)
+    override fun setProfileSettings(settings: PigeonProfileSettings) {
+        customSettings = settings.toCore().normalized()
+        persistCustomSettings()
+        if (profileId == PictureProfile.CUSTOM.id) applyProfileById(profileId)
         pushState()
+    }
+
+    override fun resetProfile() {
+        customSettings = CoreProfileSettings.IDENTITY
+        persistCustomSettings()
+        if (profileId == PictureProfile.CUSTOM.id) applyProfileById(profileId)
+        pushState()
+    }
+
+    override fun setCreativeLut(lutId: String) {
+        creativeLutId = lutId.takeIf { id ->
+            id != "none" && lutEntries.any { it.id == id }
+        }
+        shootPrefs.edit().apply {
+            if (creativeLutId == null) remove(KEY_CREATIVE_LUT)
+            else putString(KEY_CREATIVE_LUT, creativeLutId)
+        }.apply()
+        applyCreativeLut()
+        pushState()
+    }
+
+    private fun persistCustomSettings() {
+        shootPrefs.edit()
+            .putString(KEY_CUSTOM_PROFILE, encodeSettings(customSettings))
+            .apply()
     }
 
     override fun setZebra(enabled: Boolean) {
@@ -648,33 +646,24 @@ class SlateCamBridge private constructor(
 
     private fun refreshLuts() {
         lutEntries = LutLibrary.scan(File(context.filesDir, "luts"))
-        if (profileId.startsWith("lut:") && lutEntries.none { it.id == profileId }) {
-            applyProfile(PictureProfile.STANDARD)
+        if (creativeLutId != null && lutEntries.none { it.id == creativeLutId }) {
+            creativeLutId = null
+            shootPrefs.edit().remove(KEY_CREATIVE_LUT).apply()
         }
+        applyCreativeLut()
     }
 
     private fun applyProfileById(id: String) {
-        if (id.startsWith("lut:")) {
-            val entry = lutEntries.firstOrNull { it.id == id }
-            if (entry != null) {
-                profileId = id
-                val tuning = colorTuning
-                renderer.applyProfile(
-                    tuning.exposureMultiplier(),
-                    tuning.contrast,
-                    tuning.saturation,
-                    false,
-                    false,
-                    0.18f,
-                    1f,
-                    0f,
-                )
-                renderer.setWhiteBalanceTuning(tuning.temperature, tuning.tint)
-                renderer.setLut(entry.lut.size, entry.lut.copyData())
-                return
-            }
+        applyProfile(PictureProfile.byId(id, customSettings))
+    }
+
+    private fun applyCreativeLut() {
+        val entry = creativeLutId?.let { id -> lutEntries.firstOrNull { it.id == id } }
+        if (entry != null) {
+            renderer.setLut(entry.lut.size, entry.lut.copyData())
+        } else {
+            renderer.setLut(0, null)
         }
-        applyProfile(PictureProfile.byId(id))
     }
 
     /** Device-testing hook: apply profile/zebra from launch intent extras. */
@@ -705,24 +694,27 @@ class SlateCamBridge private constructor(
 
     private fun applyProfile(profile: PictureProfile) {
         profileId = profile.id
-        val tuning = colorTuning
+        shootPrefs.edit().putString(KEY_PROFILE, profile.id).apply()
+        val look = profile.render()
         renderer.applyProfile(
-            exposure = profile.exposure * tuning.exposureMultiplier(),
-            contrast = profile.contrast * tuning.contrast,
-            saturation = profile.saturation * tuning.saturation,
-            logEnabled = profile.logEnabled,
-            monochrome = profile.monochrome,
-            pivot = profile.pivot,
-            highlightRolloffKnee = profile.highlightRolloffKnee,
-            shadowToe = profile.shadowToe,
+            blackLevel = look.blackLevel,
+            gammaPower = look.gammaPower,
+            gammaContrast = look.gammaContrast,
+            gammaToe = look.gammaToe,
+            gammaShoulder = look.gammaShoulder,
+            blackGammaWidth = look.blackGammaWidth,
+            blackGammaLevel = look.blackGammaLevel,
+            kneePoint = look.kneePoint,
+            kneeSlope = look.kneeSlope,
+            colorMatrix = look.colorMatrix,
+            colorOps = look.colorOps,
+            colorPhase = look.colorPhase,
+            colorDepths = look.colorDepths,
+            saturation = look.saturation,
+            logEnabled = look.logPreview,
+            monochrome = look.monochrome,
         )
-        renderer.setWhiteBalanceTuning(tuning.temperature, tuning.tint)
-        val lut = profile.lutId?.let(BuiltInLuts::byId)
-        if (lut != null) {
-            renderer.setLut(lut.size, lut.copyData())
-        } else {
-            renderer.setLut(0, null)
-        }
+        applyCreativeLut()
     }
 
     private fun refreshDeviceSnapshot(cameraId: String?) {
@@ -1667,12 +1659,12 @@ class SlateCamBridge private constructor(
         frameRate = frameRate.toLong(),
         gyroSampleCount = gyroSampleCount.toLong(),
         profile = profileId,
-        profileNames = PictureProfile.all.map { it.id } + lutEntries.map { it.id },
-        colorExposureEv = colorTuning.exposureEv.toDouble(),
-        colorContrast = colorTuning.contrast.toDouble(),
-        colorSaturation = colorTuning.saturation.toDouble(),
-        colorTemperature = colorTuning.temperature.toDouble(),
-        colorTint = colorTuning.tint.toDouble(),
+        profileNames = PictureProfile.all.map { it.id },
+        profileSettings = PictureProfile.byId(profileId, customSettings)
+            .settings
+            .toPigeon(),
+        creativeLut = creativeLutId ?: "none",
+        creativeLuts = listOf("none") + lutEntries.map { it.id },
         zebra = zebraEnabled,
         falseColor = falseColorEnabled,
         peaking = peakingEnabled,
@@ -1727,11 +1719,9 @@ class SlateCamBridge private constructor(
         private const val KEY_FOCUS_SPEED = "focus_transition_speed"
         private const val KEY_FOCUS_SOFTWARE = "focus_software"
         private const val KEY_PREVIEW_QUALITY = "preview_quality"
-        private const val KEY_COLOR_EV = "color_exposure_ev"
-        private const val KEY_COLOR_CONTRAST = "color_contrast"
-        private const val KEY_COLOR_SATURATION = "color_saturation"
-        private const val KEY_COLOR_TEMPERATURE = "color_temperature"
-        private const val KEY_COLOR_TINT = "color_tint"
+        private const val KEY_CUSTOM_PROFILE = "custom_picture_profile"
+        private const val KEY_CREATIVE_LUT = "creative_lut"
+        private const val KEY_PROFILE = "picture_profile"
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")
@@ -1764,4 +1754,95 @@ class SlateCamBridge private constructor(
             return bridge
         }
     }
+}
+
+private fun CoreProfileSettings.toPigeon(): PigeonProfileSettings = PigeonProfileSettings(
+    blackLevel = blackLevel.toLong(),
+    gamma = gamma.wire,
+    blackGammaRange = blackGammaRange.wire,
+    blackGammaLevel = blackGammaLevel.toLong(),
+    kneeMode = kneeMode.wire,
+    kneeAutoMaxPoint = kneeAutoMaxPoint.toLong(),
+    kneeAutoSensitivity = kneeAutoSensitivity.wire,
+    kneePoint = kneePoint.toLong(),
+    kneeSlope = kneeSlope.toLong(),
+    colorMode = colorMode.wire,
+    saturation = saturation.toLong(),
+    colorPhase = colorPhase.toLong(),
+    colorDepthR = colorDepthR.toLong(),
+    colorDepthG = colorDepthG.toLong(),
+    colorDepthB = colorDepthB.toLong(),
+    colorDepthC = colorDepthC.toLong(),
+    colorDepthM = colorDepthM.toLong(),
+    colorDepthY = colorDepthY.toLong(),
+)
+
+private fun PigeonProfileSettings.toCore(): CoreProfileSettings = CoreProfileSettings(
+    blackLevel = blackLevel.toInt(),
+    gamma = GammaPreset.fromWire(gamma),
+    blackGammaRange = BlackGammaRange.fromWire(blackGammaRange),
+    blackGammaLevel = blackGammaLevel.toInt(),
+    kneeMode = KneeMode.fromWire(kneeMode),
+    kneeAutoMaxPoint = kneeAutoMaxPoint.toInt(),
+    kneeAutoSensitivity = KneeSensitivity.fromWire(kneeAutoSensitivity),
+    kneePoint = kneePoint.toInt(),
+    kneeSlope = kneeSlope.toInt(),
+    colorMode = ColorMode.fromWire(colorMode),
+    saturation = saturation.toInt(),
+    colorPhase = colorPhase.toInt(),
+    colorDepthR = colorDepthR.toInt(),
+    colorDepthG = colorDepthG.toInt(),
+    colorDepthB = colorDepthB.toInt(),
+    colorDepthC = colorDepthC.toInt(),
+    colorDepthM = colorDepthM.toInt(),
+    colorDepthY = colorDepthY.toInt(),
+)
+
+private fun encodeSettings(settings: CoreProfileSettings): String = listOf(
+    settings.blackLevel,
+    settings.gamma.wire,
+    settings.blackGammaRange.wire,
+    settings.blackGammaLevel,
+    settings.kneeMode.wire,
+    settings.kneeAutoMaxPoint,
+    settings.kneeAutoSensitivity.wire,
+    settings.kneePoint,
+    settings.kneeSlope,
+    settings.colorMode.wire,
+    settings.saturation,
+    settings.colorPhase,
+    settings.colorDepthR,
+    settings.colorDepthG,
+    settings.colorDepthB,
+    settings.colorDepthC,
+    settings.colorDepthM,
+    settings.colorDepthY,
+).joinToString("|")
+
+private fun decodeSettings(raw: String?): CoreProfileSettings {
+    if (raw.isNullOrBlank()) return CoreProfileSettings.IDENTITY
+    val parts = raw.split("|")
+    if (parts.size != 18) return CoreProfileSettings.IDENTITY
+    return runCatching {
+        CoreProfileSettings(
+            blackLevel = parts[0].toInt(),
+            gamma = GammaPreset.fromWire(parts[1]),
+            blackGammaRange = BlackGammaRange.fromWire(parts[2]),
+            blackGammaLevel = parts[3].toInt(),
+            kneeMode = KneeMode.fromWire(parts[4]),
+            kneeAutoMaxPoint = parts[5].toInt(),
+            kneeAutoSensitivity = KneeSensitivity.fromWire(parts[6]),
+            kneePoint = parts[7].toInt(),
+            kneeSlope = parts[8].toInt(),
+            colorMode = ColorMode.fromWire(parts[9]),
+            saturation = parts[10].toInt(),
+            colorPhase = parts[11].toInt(),
+            colorDepthR = parts[12].toInt(),
+            colorDepthG = parts[13].toInt(),
+            colorDepthB = parts[14].toInt(),
+            colorDepthC = parts[15].toInt(),
+            colorDepthM = parts[16].toInt(),
+            colorDepthY = parts[17].toInt(),
+        ).normalized()
+    }.getOrDefault(CoreProfileSettings.IDENTITY)
 }

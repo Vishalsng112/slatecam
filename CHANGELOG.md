@@ -9,6 +9,26 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — Picture profiles (build 2090)
+- The Colour card is now **Picture profile** with exactly four profiles:
+  **Standard** (identity, no creative processing), **SlateLook** (house filmic
+  look), **SlateLog** (flat monitoring view; clips stay HLG/Rec.709) and
+  **Custom** (user-editable, persisted).
+- Custom exposes black level, gamma presets (standard/movie/still/cine1–4/
+  ITU709/ITU709(800%)/S-Cinetone), black gamma range+level, knee auto/manual
+  with max point/sensitivity or point/slope, color mode, saturation, colour
+  phase, six-axis colour depth (R/G/B/C/M/Y) and reset.
+- New scene-linear look pipeline: black level → black gamma → colour matrix/
+  phase/depth → saturation → knee in working space, then the look-gamma curve
+  and creative LUT in the delivery domain. Standard bypasses all of it.
+- The Colour science card and its five commands (`setColorExposure` … `resetColorScience`) are removed; `ColorScience.kt`, `ToneShaper.kt` and the built-in WARM profile are deleted. Custom is the single creative path.
+- Creative LUTs are now a separate persisted selection so the profile list stays
+  at four.
+- Pigeon adds `ProfileSettings`, `setProfileSettings`, `resetProfile`,
+  `setCreativeLut`, `profileSettings`, `creativeLut` and `creativeLuts`.
+- Gamma presets are look curves, not container transfers; S-Log/HLG/S-Gamut
+  modes stay preview-only or deferred. Auto knee is a static mapping; Detail
+  controls are not yet exposed.
 ### Added — Phase 5.5 shoot profiles
 - Per-camera capability reader (`CameraCapabilitiesReader`) for sizes, exact AE
   frame rates, autofocus modes, 10-bit claim and zoom range. Hidden/openable

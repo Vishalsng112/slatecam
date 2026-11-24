@@ -1,8 +1,9 @@
 # ADR 0014 — Live colour-science trim
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR 0020
 - **Date:** 2026-11-24
 - **Phase:** 4/5 (colour pipeline)
+- **Superseded by:** ADR 0020 (picture profiles)
 - **Depends on:** ADR 0005 (colour pipeline), ADR 0009 (lens shading)
 
 ## Context

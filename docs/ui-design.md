@@ -284,38 +284,46 @@ restarts. There is no face or eye tracking.
 | Hybrid CDAF | hill-climb focus engine | Future |
 | Focus peaking controls | Monitoring card | Current |
 
-### 5.6 Colour card
+### 5.6 Picture profile card
 
 | Element | Native call | Status |
 |---|---|---|
-| Profile dropdown | `setProfile` | Current |
+| Profile chips: Standard / SlateLook / SlateLog / Custom | `setProfile` | Current |
 | Reload LUTs | `reloadLuts` | Current |
 | White balance mode | `setWhiteBalanceMode` | Current |
 | Input calibration status | device database / InputProfile | Current (display only) |
 | LUT SAF picker | requires plugin/native picker | Future |
-| Profile editor UI | profile persistence | Future |
+| Detail controls (V/H, crispening, highlight) | spatial detail pass | Future |
 | Creative vignette | shader effect | Future |
 | Colour-space menu (SDR/HLG) | gated by probe | Future |
-| Transfer/gamma selection | needs 10-bit path | Future |
+| Recordable log / S-Gamut delivery | needs a truthful log container | Future |
 | ColorChecker capture workflow | `ColorCalibration` solver; capture tooling | Solver current, workflow Future |
 
-### 5.6.1 Colour science card
+### 5.6.1 Picture profile card
 
 | Element | Native call | Status |
 |---|---|---|
-| Exposure trim (-2…+2 EV) | `setColorExposure` | Current |
-| Contrast (0.25…2.00) | `setColorContrast` | Current |
-| Saturation (0…2) | `setColorSaturation` | Current |
-| Temperature (cool…warm) | `setColorTemperature` | Current |
-| Tint (green…magenta) | `setColorTint` | Current |
-| Reset | `resetColorScience` | Current |
+| Profile: Standard / SlateLook / SlateLog / Custom | `setProfile` | Current |
+| Black level −15…+15 | `setProfileSettings` | Current |
+| Gamma preset | `setProfileSettings` | Current |
+| Black gamma range + level | `setProfileSettings` | Current |
+| Knee auto/manual, point/slope/max point/sensitivity | `setProfileSettings` | Current |
+| Color mode | `setProfileSettings` | Current |
+| Saturation, colour phase, colour depth R/G/B/C/M/Y | `setProfileSettings` | Current |
+| Reset custom | `resetProfile` | Current |
+| Creative LUT | `setCreativeLut` | Current |
+| Reload LUTs | `reloadLuts` | Current |
+| White balance modes | `setWhiteBalanceMode` | Current |
 
-The trim is composed with the active picture profile and LUT, applies to the
-preview and the recording through the same shader, and persists across restarts.
-SlateLog is a monitoring view: selecting it shows a flat log preview while the
-encoder still receives HLG or Rec.709. The Colour card states this explicitly.
-Named profile saving/editing and a separate monitoring-only LUT remain future
-work.
+Standard is an identity profile (no creative processing). The Custom editor is
+the only creative tone/colour path; the old Colour science card was removed.
+Preset profiles show the same values read-only and direct the user to Custom.
+SlateLog is a monitoring view: the preview is flat while the encoder receives
+HLG or Rec.709.
+
+Gamma presets are look curves in the delivery domain, not container transfers.
+S-Log/HLG/S-Gamut gamut modes are not offered until a recordable-log delivery
+exists. Detail controls are deferred.
 
 ### 5.6.2 Viewfinder card
 
