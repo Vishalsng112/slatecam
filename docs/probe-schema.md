@@ -1,7 +1,7 @@
 # Probe report schema
 
 - **Schema id:** `slatecam.probe`
-- **Version:** `1.10.0`
+- **Version:** `1.11.0`
 - **Status:** draft for Phase 1
 - **Owner:** `:core:probe`
 
@@ -240,7 +240,10 @@ logical camera IDs are not guaranteed contiguous.
     "awb_lock_available": true,
     "max_regions": { "ae": 1, "af": 1, "awb": 0 },
     "focus_distance_calibration": "approximate",
-    "scaler_rotate_and_crop": ["none", "90", "180", "270", "auto"]
+    "scaler_rotate_and_crop": ["none", "90", "180", "270", "auto"],
+    "tone_map_modes": ["contrast_curve", "fast", "high_quality", "gamma_value"],
+    "max_tone_map_curve_points": 64,
+    "color_correction_modes": ["transform_matrix", "fast", "high_quality"]
   },
   "dynamic_range": {
     "ten_bit_streams": true,
@@ -328,6 +331,9 @@ These exist to drive the UI, not to gate features:
 | `controls.max_regions` | `CONTROL_MAX_REGIONS_AE/AF/AWB` | Enabling tap-to-focus and spot metering |
 | `controls.focus_distance_calibration` | `LENS_INFO_FOCUS_DISTANCE_CALIBRATION` | Whether dioptres map to real distances |
 | `controls.scaler_rotate_and_crop` | `SCALER_AVAILABLE_ROTATE_AND_CROP_MODES` | Stabilisation crop behaviour |
+| `controls.tone_map_modes` | `TONEMAP_AVAILABLE_TONE_MAP_MODES` | Whether a manual tone curve is even offered (1.11.0) |
+| `controls.max_tone_map_curve_points` | `TONEMAP_MAX_CURVE_POINTS` | Curve resolution ceiling (1.11.0) |
+| `controls.color_correction_modes` | `COLOR_CORRECTION_AVAILABLE_MODES` | Whether a manual CCM/WB path is offered (1.11.0) |
 | `zoom.ratio_range` | `CONTROL_ZOOM_RATIO_RANGE` | Zoom slider in ratio units, not digital factor |
 | `dynamic_range.recommended_profile` | `REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE` | HLG10 vs HDR10 preference |
 
@@ -680,6 +686,10 @@ Schema 1.9.0 adds relative lens roles and the data a zoom interface needs:
 `physical_cameras`, per-lens 35 mm equivalents, and the top-level `camera_aux`
 policy block. Roles are evaluated relative to an explicit default policy, never
 from a device name or a fixed camera ID. All additions are optional.
+
+Schema 1.11.0 adds the tone-map and colour-correction control lists used by the
+staged manual-colour pipeline (ADR 0016). They are probes, not promises: a mode
+being advertised does not mean the HAL applies it to video or HLG10.
 
 Schema 1.10.0 adds 4:3 presets (`fhd43_24/25/30_8bit/10bit`) and verifies the
 HLG10 session per lens. The extra checks use

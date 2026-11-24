@@ -23,10 +23,12 @@ const val SCHEMA_ID = "slatecam.probe"
  * confidence, 35 mm-equivalent focal lengths, unlisted-camera scan, and the OEM
  * auxiliary-camera exposure policy.
  *
+ * 1.11.0: tone-map and colour-correction mode lists for the future manual
+ * colour pipeline.
  * 1.10.0: 4:3 presets (`fhd43_*`) and per-lens HLG10 session checks, so every
  * camera in a shoot set carries its own verified 10-bit verdict.
  */
-const val SCHEMA_VERSION = "1.10.0"
+const val SCHEMA_VERSION = "1.11.0"
 
 @Serializable
 data class ProbeReport(
@@ -263,6 +265,9 @@ data class ControlsInfo(
     @SerialName("shading_modes") val shadingModes: List<String> = emptyList(),
     @SerialName("aberration_modes") val aberrationModes: List<String> = emptyList(),
     @SerialName("distortion_modes") val distortionModes: List<String> = emptyList(),
+    @SerialName("tone_map_modes") val toneMapModes: List<String> = emptyList(),
+    @SerialName("max_tone_map_curve_points") val maxToneMapCurvePoints: Int? = null,
+    @SerialName("color_correction_modes") val colorCorrectionModes: List<String> = emptyList(),
 )
 
 @Serializable

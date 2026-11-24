@@ -11,7 +11,7 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | Phase | Theme | Status |
 |---|---|---|
 | 0 | Foundation | Done |
-| 1 | Prober | Done (schema 1.9.0, prober 1.8.0) |
+| 1 | Prober | Done (schema 1.11.0, prober 1.10.0) |
 | 2 | Camera core + preview | Done |
 | 3 | Recording | Done on Pad 3 and POCO X6 Pro |
 | 4 | GPU + profiles | Done |

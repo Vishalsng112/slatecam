@@ -14,6 +14,12 @@ data class PictureProfile(
     val contrast: Float = 1f,
     val saturation: Float = 1f,
     val lutId: String? = null,
+    /** Linear middle-grey anchor for contrast, 0.18 by convention. */
+    val pivot: Float = 0.18f,
+    /** Soft-clip knee in linear 0..1; values above it roll toward white. */
+    val highlightRolloffKnee: Float = 0.80f,
+    /** Subtle shadow lift below the pivot, 0..1. */
+    val shadowToe: Float = 0f,
 ) {
     val logEnabled: Boolean get() = kind == ProfileKind.SLATE_LOG
     val monochrome: Boolean get() = kind == ProfileKind.MONO

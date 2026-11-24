@@ -828,6 +828,21 @@ test harness can inject single taps but not multi-touch, so this pass verifies t
 tap path on hardware and the pinch path by construction; the on-screen zoom
 slider remains the precision fallback.
 
+### Colour architecture foundation (Pad 3, build 2080)
+
+- Probe report re-run on the Pad: **schema 1.11.0 / prober 1.10.0**.
+- Both back and front cameras advertise:
+  - `tone_map_modes`: `contrast_curve`, `fast`, `high_quality`
+  - `max_tone_map_curve_points`: `512`
+  - `color_correction_modes`: `transform_matrix`, `fast`, `high_quality`
+- `gamma_value` is not advertised, which supports the decision not to force a
+  custom tone-map/gamma mode. A manual CCM/WB path is advertised but remains
+  gated behind the future scene-linear phase.
+- The app starts normally after the probe; SAF remained locked and the probe
+  report was written to `files/probe.json`.
+- Calibration data remains empty, so per-lens WB/CCM/shadow defaults are
+  identity. The schema and matching are covered by JVM tests.
+
 ### Colour science and viewfinder resolution (Pad 3, build 2079)
 
 | Check | Result |

@@ -37,6 +37,10 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 |---|---|
 | Phase-detect/hybrid AF | Software contrast AF ships; Camera2 exposes no PDAF controls for a hybrid pass |
 | Scene-referred metering | Metering shares the analysis frame with the histogram/waveform, so a strong LUT or log profile can bias the target; add a pre-look metering pass |
+| 10-bit / FP16 GL intermediate | Required before the full scene-linear colour shader; the encoder stream is Main10 but the current GL intermediate is RGBA8888 |
+| Scene-linear colour shader | Pending the 10-bit intermediate and delivery/working-space decision (ADR 0016) |
+| Per-lens CCM/WB measurement | Schema and lookup ship; the database still has no measured ColorChecker data |
+| 65³ LUT support | The 2D atlas `n*n × n` exceeds common texture limits at 65; needs tiling or GLES3 3D textures |
 | Hybrid contrast-detect AF | Laplacian variance from the analysis FBO + HAL coarse acquisition; fall back to HAL AF |
 | RAW burst → DNG sequence | Camera2 has no RAW video; expect low fps and large files |
 | Gyro container embedding | Sidecar v2 is frame-aligned; embedding an MP4 metadata track remains |

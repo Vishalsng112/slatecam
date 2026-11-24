@@ -30,17 +30,32 @@ data class DeviceDatabase(
      * Exact camera calibration wins, then a wildcard entry. Newer versions win
      * when a database carries more than one entry for the same camera.
      */
-    fun calibrationFor(identity: DeviceIdentity, cameraId: String? = null): CalibrationEntry? {
+    fun calibrationFor(
+        identity: DeviceIdentity,
+        cameraId: String? = null,
+        lensKey: String? = null,
+    ): CalibrationEntry? {
         val forDevice = calibrations.filter {
             it.deviceKey.equals(identity.deviceKey, ignoreCase = true)
         }
-        val exact = forDevice
-            .filter { cameraId != null && it.cameraId == cameraId }
+        val exactLens = if (lensKey != null) {
+            forDevice
+                .filter { it.lensKey.equals(lensKey, ignoreCase = true) }
+                .maxByOrNull { it.version }
+        } else {
+            null
+        }
+        val exactCamera = forDevice
+            .filter {
+                cameraId != null &&
+                    it.cameraId == cameraId &&
+                    (it.lensKey.isNullOrBlank() || lensKey == null)
+            }
             .maxByOrNull { it.version }
         val wildcard = forDevice
-            .filter { it.cameraId == WILDCARD_CAMERA }
+            .filter { it.cameraId == WILDCARD_CAMERA && it.lensKey.isNullOrBlank() }
             .maxByOrNull { it.version }
-        return exact ?: wildcard
+        return exactLens ?: exactCamera ?: wildcard
     }
 
     /**
@@ -109,6 +124,19 @@ data class DeviceDatabase(
             }
             if (calibration.saturationTrim < 0f || !calibration.saturationTrim.isFinite()) {
                 problems += "calibrations[$index].saturation_trim must be non-negative"
+            }
+            val lensKey = calibration.lensKey
+            if (!lensKey.isNullOrBlank() && lensKey.split(':').size != 3) {
+                problems += "calibrations[$index].lens_key must be facing:role:focal"
+            }
+            if (calibration.wbROffset !in 0.1f..10f || !calibration.wbROffset.isFinite()) {
+                problems += "calibrations[$index].wb_r_offset is out of range"
+            }
+            if (calibration.wbBOffset !in 0.1f..10f || !calibration.wbBOffset.isFinite()) {
+                problems += "calibrations[$index].wb_b_offset is out of range"
+            }
+            if (calibration.shadowLift !in -1f..1f || !calibration.shadowLift.isFinite()) {
+                problems += "calibrations[$index].shadow_lift is out of range"
             }
         }
         return problems
@@ -202,15 +230,27 @@ object QuirkActions {
 data class CalibrationEntry(
     @SerialName("device_key") val deviceKey: String,
     @SerialName("camera_id") val cameraId: String = DeviceDatabase.WILDCARD_CAMERA,
+    /** Probe-stable lens key (`facing:role:focal`), preferred over camera_id. */
+    @SerialName("lens_key") val lensKey: String? = null,
     val version: Int = 1,
+    /** Row-major 3x3 CCM into the linear working space. */
     val matrix: List<Float> = InputProfile.IDENTITY_MATRIX,
     @SerialName("exposure_trim") val exposureTrim: Float = 1f,
     @SerialName("saturation_trim") val saturationTrim: Float = 1f,
+    /** Per-lens white-balance multipliers applied before the CCM. */
+    @SerialName("wb_r_offset") val wbROffset: Float = 1f,
+    @SerialName("wb_b_offset") val wbBOffset: Float = 1f,
+    /** Small display-space shadow lift used to align lenses. */
+    @SerialName("shadow_lift") val shadowLift: Float = 0f,
     val source: String = "",
     @SerialName("created_at") val createdAt: String? = null,
 ) {
     internal val key: String
-        get() = "${deviceKey.lowercase()}/${cameraId.lowercase()}"
+        get() = if (lensKey.isNullOrBlank()) {
+            "${deviceKey.lowercase()}/${cameraId.lowercase()}"
+        } else {
+            "${deviceKey.lowercase()}/${lensKey.lowercase()}"
+        }
 
     fun toInputProfile(): InputProfile = InputProfile(
         version = version,
@@ -219,6 +259,9 @@ data class CalibrationEntry(
         matrix = matrix,
         exposureTrim = exposureTrim,
         saturationTrim = saturationTrim,
+        wbROffset = wbROffset,
+        wbBOffset = wbBOffset,
+        shadowLift = shadowLift,
     )
 }
 

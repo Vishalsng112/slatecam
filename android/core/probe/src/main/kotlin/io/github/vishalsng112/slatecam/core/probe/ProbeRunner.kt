@@ -306,7 +306,7 @@ class ProbeRunner(private val context: Context) {
         }
 
     companion object {
-        const val PROBER_VERSION = "1.9.0"
+        const val PROBER_VERSION = "1.10.0"
 
         /**
          * Sizes the prober exercises for the 10-bit path. UHD first: it is the

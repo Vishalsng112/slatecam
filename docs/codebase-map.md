@@ -63,6 +63,8 @@ root is `android/`, not the repository root.
 | Focus sharpness score | `:core:gpu` | `FrameAnalysis.focusScore`, `GlPreviewRenderer.focusScore` |
 | Viewfinder tap-to-focus / pinch | `lib/src/ui/capture_screen.dart`, `:core:gpu` transform, `:core:camera` AF region | `GlPreviewRenderer.viewfinderToBuffer`, `CameraController.setFocusPoint` |
 | Colour-science trim | `:core:profile` | `ColorScience.kt`, `SlateCamBridge.applyProfile` |
+| Linear tone math (pivot/knee/toe) | `:core:profile` | `ToneShaper.kt`, `PictureProfile.kt` |
+| Per-lens calibration / WB / shadow | `:core:device` | `CalibrationEntry`, `DeviceDatabase.calibrationFor`, `InputProfile` |
 | Independent viewfinder resolution | `:core:gpu`, `:bridge`, Flutter | `GlPreviewRenderer` capture/preview sizes, `SlateCamBridge.previewOutputFor` |
 | OIS / EIS requests | `:core:camera` | `CameraController.readCapabilities/applyControls` |
 | Frame rendering, shader, overlays | `:core:gpu` | `GlPreviewRenderer.kt` |
@@ -119,7 +121,7 @@ on camera change`
 - **Pigeon:** `pigeon/slatecam.dart` is the source of truth. Regenerate both
   clients after edits:
   `dart run pigeon --input pigeon/slatecam.dart --dart_out lib/src/pigeon/slatecam.g.dart --kotlin_out android/bridge/src/main/kotlin/io/github/vishalsng112/slatecam/bridge/pigeon/SlateCamPigeon.kt --kotlin_package io.github.vishalsng112.slatecam.bridge.pigeon`
-- **Probe JSON:** schema 1.9.0, `docs/probe-schema.md`.
+- **Probe JSON:** schema 1.11.0, `docs/probe-schema.md`.
 - **Device DB:** `slatecam.device-db` v1, `docs/device-database.md`.
 - **Orientation/aspect:** ADR 0006.
 - **Lens-shading (vignette) correction:** ADR 0009.
@@ -129,6 +131,7 @@ on camera change`
 - **Viewfinder gestures and tap-to-focus:** ADR 0013.
 - **Colour-science trim:** ADR 0014.
 - **Independent viewfinder resolution:** ADR 0015.
+- **Staged colour architecture:** ADR 0016.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current

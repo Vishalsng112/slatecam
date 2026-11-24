@@ -1,7 +1,7 @@
 # Device database, quirks and colour calibration
 
 **Owner:** `:core:device`
-**Bundled schema:** `slatecam.device-db`, version 1
+**Bundled schema:** `slatecam.device-db`, version 1 (additive per-lens fields)
 **Status:** Phase 7 complete; the calibration solver ships, measured target data is still to add
 
 The device database is the Phase 7 data layer between probe reports and the
@@ -61,10 +61,14 @@ quirks without reinstalling the app.
     {
       "device_key": "xiaomi/duchamp",
       "camera_id": "0",
+      "lens_key": "back:default:25",
       "version": 1,
       "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
       "exposure_trim": 1.0,
       "saturation_trim": 1.0,
+      "wb_r_offset": 1.0,
+      "wb_b_offset": 1.0,
+      "shadow_lift": 0.0,
       "source": "ColorChecker Classic, D65, 2026-11-23",
       "created_at": "2026-11-23T12:00:00Z"
     }
@@ -100,16 +104,24 @@ Android release.
 
 ### Calibration matching
 
-Calibration is keyed by `device_key` and `camera_id`. An exact camera match wins;
-`"*"` is the device-wide fallback. When duplicates exist, the highest `version`
-wins.
+Calibration prefers the probe-stable `lens_key` (`facing:role:focal`), then an
+exact `camera_id`, then the `"*"` device-wide fallback. Entries with a
+`lens_key` are keyed by `device_key + lens_key`; entries without one keep the
+`device_key + camera_id` key. When duplicates exist, the highest `version` wins.
 
-The matrix is row-major 3×3 RGB. `exposure_trim` and `saturation_trim` are
-multipliers applied after the matrix and before the creative profile. The
-pipeline order is documented in [ADR 0005](adr/0005-colour-pipeline.md):
+The matrix is the row-major 3×3 CCM into the working space. `wb_r_offset` and
+`wb_b_offset` are per-lens white-balance multipliers applied before the CCM;
+`shadow_lift` is a small shadow-floor trim. `exposure_trim` and
+`saturation_trim` are multipliers after the matrix. The current renderer applies
+the WB/shadow trims in display space as an interim step; the scene-linear phase
+(ADR 0016) moves them into the linear shader. Identity values are the defaults,
+so an entry without these fields behaves exactly as before.
+
+The pipeline order is documented in [ADR 0005](adr/0005-colour-pipeline.md) and
+[ADR 0016](adr/0016-colour-architecture.md):
 
 ```text
-camera → (HLG→SDR preview) → input profile matrix + trims
+camera → (HLG→SDR preview) → per-lens WB + shadow trim + CCM
        → creative profile → LUT → preview overlays
 ```
 

@@ -44,11 +44,19 @@ class DeviceDatabaseTest {
         cameraId: String = "0",
         version: Int = 1,
         exposureTrim: Float = 1f,
+        lensKey: String? = null,
+        wbR: Float = 1f,
+        wbB: Float = 1f,
+        shadowLift: Float = 0f,
     ) = CalibrationEntry(
         deviceKey = deviceKey,
         cameraId = cameraId,
+        lensKey = lensKey,
         version = version,
         exposureTrim = exposureTrim,
+        wbROffset = wbR,
+        wbBOffset = wbB,
+        shadowLift = shadowLift,
         source = "ColorChecker test",
     )
 
@@ -106,6 +114,51 @@ class DeviceDatabaseTest {
         assertEquals(DeviceDatabase.WILDCARD_CAMERA, wildcard?.cameraId)
 
         assertNull(database.calibrationFor(poco.copy(deviceKey = "other/device"), "0"))
+    }
+
+    @Test
+    fun `lens key calibration wins over the camera id`() {
+        val database = DeviceDatabase(
+            calibrations = listOf(
+                calibration(cameraId = "0", version = 5, exposureTrim = 1.5f),
+                calibration(
+                    cameraId = "0",
+                    lensKey = "back:default:25",
+                    version = 1,
+                    exposureTrim = 1.1f,
+                ),
+            ),
+        )
+        val byLens = database.calibrationFor(poco, "0", "back:default:25")
+        assertEquals(1.1f, byLens?.exposureTrim)
+        val byCamera = database.calibrationFor(poco, "0")
+        assertEquals(1.5f, byCamera?.exposureTrim)
+    }
+
+    @Test
+    fun `per-lens white balance and shadow lift map to the input profile`() {
+        val profile = calibration(
+            lensKey = "back:default:25",
+            wbR = 1.05f,
+            wbB = 0.95f,
+            shadowLift = 0.01f,
+        ).toInputProfile()
+        assertEquals(1.05f, profile.wbROffset, 0.0001f)
+        assertEquals(0.95f, profile.wbBOffset, 0.0001f)
+        assertEquals(0.01f, profile.shadowLift, 0.0001f)
+    }
+
+    @Test
+    fun `validation rejects malformed lens keys and offsets`() {
+        val database = DeviceDatabase(
+            calibrations = listOf(
+                calibration(lensKey = "not-a-lens-key", wbR = 0f, shadowLift = 2f),
+            ),
+        )
+        val problems = database.validate()
+        assertTrue(problems.any { it.contains("lens_key") })
+        assertTrue(problems.any { it.contains("wb_r_offset") })
+        assertTrue(problems.any { it.contains("shadow_lift") })
     }
 
     @Test

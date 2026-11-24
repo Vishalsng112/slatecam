@@ -76,13 +76,16 @@ class DeviceDatabaseRepository(
         return report
     }
 
-    fun snapshot(cameraId: String? = null): DeviceDatabaseSnapshot {
+    fun snapshot(
+        cameraId: String? = null,
+        lensKey: String? = null,
+    ): DeviceDatabaseSnapshot {
         val database = database()
         return DeviceDatabaseSnapshot(
             identity = identity,
             databaseVersion = database.version,
             quirks = database.quirksFor(identity, cameraId),
-            calibration = database.calibrationFor(identity, cameraId),
+            calibration = database.calibrationFor(identity, cameraId, lensKey),
             reportOptIn = reportOptIn(),
             lastReportPath = lastReportPath(),
             lastReportAtMs = lastReportAtMs(),

@@ -101,6 +101,17 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   GL texture transform, not a guessed sensor rotation; hardware AF gets a
   weighted AF region plus a one-shot trigger, and SAF moves its contrast ROI.
   The existing zoom slider remains as a precise fallback.
+- Staged colour architecture foundation: `ToneShaper` (linear pivot contrast,
+  shadow toe, highlight knee), `PictureProfile` pivot/knee/toe data, and
+  `InputProfile` per-lens WB/shadow trims. The device database accepts optional
+  `lens_key`, `wb_r_offset`, `wb_b_offset` and `shadow_lift`, looked up by the
+  stable lens key before the camera id. Missing data stays identity.
+- Probe schema 1.11.0 records tone-map modes/curve points and colour-correction
+  modes. No tone curve or manual AWB is forced; those remain gated on verified
+  `CaptureResult` support and the future scene-linear path.
+- Pad 3 probe evidence: schema 1.11.0 reports `contrast_curve`/`fast`/
+  `high_quality`, 512 curve points and `transform_matrix`/`fast`/`high_quality`
+  for both cameras; `gamma_value` is not advertised.
 - Colour science tuning: a live Colour science card with **Exposure**,
   **Contrast**, **Saturation**, **Temperature** and **Tint** sliders plus reset.
   The trim is applied on top of the active picture profile (including LUT

@@ -587,7 +587,7 @@ class SlateCamBridge private constructor(
 
     override fun setDeviceReportOptIn(enabled: Boolean) {
         deviceDatabase.setReportOptIn(enabled)
-        deviceSnapshot = deviceDatabase.snapshot(lastCameraId)
+        deviceSnapshot = snapshotFor(lastCameraId)
         pushState()
     }
 
@@ -613,7 +613,7 @@ class SlateCamBridge private constructor(
                 outcome.onSuccess { result ->
                     deviceReportPath = result.archived?.absolutePath ?: result.latest.absolutePath
                     modesCacheKey = null
-                    deviceSnapshot = deviceDatabase.snapshot(lastCameraId)
+                    deviceSnapshot = snapshotFor(lastCameraId)
                 }.onFailure { error ->
                     deviceReportError = error.message ?: "device report failed"
                 }
@@ -628,7 +628,7 @@ class SlateCamBridge private constructor(
         if (recorder.isRecording) stopRecording()
         modesCacheKey = null
         deviceDatabase.reload()
-        deviceSnapshot = deviceDatabase.snapshot(lastCameraId)
+        deviceSnapshot = snapshotFor(lastCameraId)
         deviceReportPath = deviceSnapshot.lastReportPath
         applyDeviceSnapshot(deviceSnapshot)
         if (opened) reopenCamera()
@@ -720,16 +720,35 @@ class SlateCamBridge private constructor(
     }
 
     private fun refreshDeviceSnapshot(cameraId: String?) {
-        deviceSnapshot = deviceDatabase.snapshot(cameraId)
+        deviceSnapshot = snapshotFor(cameraId)
         deviceReportPath = deviceSnapshot.lastReportPath
         applyDeviceSnapshot(deviceSnapshot)
     }
+
+    /**
+     * Calibration lookup prefers the probe-stable lens key over the Camera2 ID,
+     * because vendor camera IDs can be renumbered between boots.
+     */
+    private fun snapshotFor(cameraId: String?) = deviceDatabase.snapshot(
+        cameraId,
+        deviceDatabase.latestReport()
+            ?.cameras
+            ?.firstOrNull { it.id == cameraId }
+            ?.let(::lensKey),
+    )
 
     private fun applyDeviceSnapshot(snapshot: DeviceDatabaseSnapshot) {
         val profile = snapshot.calibration?.toInputProfile() ?: InputProfile.IDENTITY
         if (profile != lastAppliedProfile) {
             lastAppliedProfile = profile
-            renderer.setInputProfile(profile.matrixArray(), profile.exposureTrim, profile.saturationTrim)
+            renderer.setInputProfile(
+                profile.matrixArray(),
+                profile.exposureTrim,
+                profile.saturationTrim,
+                profile.wbROffset,
+                profile.wbBOffset,
+                profile.shadowLift,
+            )
         }
 
         val quirkIds = snapshot.quirks.map { it.id }.toSet()

@@ -522,6 +522,11 @@ class CameraSource(private val context: Context) {
             distortionModes = c.get(
                 CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES,
             )?.map(::distortionName) ?: emptyList(),
+            toneMapModes = c.get(CameraCharacteristics.TONEMAP_AVAILABLE_TONE_MAP_MODES)
+                ?.map(::toneMapName) ?: emptyList(),
+            maxToneMapCurvePoints = c.get(CameraCharacteristics.TONEMAP_MAX_CURVE_POINTS),
+            colorCorrectionModes = c.get(CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_MODES)
+                ?.map(::colorCorrectionName) ?: emptyList(),
         )
     }
 
@@ -642,6 +647,22 @@ class CameraSource(private val context: Context) {
         CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_ON -> "on"
         CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION -> "preview"
         else -> "mode_$mode"
+    }
+
+    private fun toneMapName(value: Int): String = when (value) {
+        CameraCharacteristics.TONEMAP_MODE_CONTRAST_CURVE -> "contrast_curve"
+        CameraCharacteristics.TONEMAP_MODE_FAST -> "fast"
+        CameraCharacteristics.TONEMAP_MODE_HIGH_QUALITY -> "high_quality"
+        CameraCharacteristics.TONEMAP_MODE_GAMMA_VALUE -> "gamma_value"
+        CameraCharacteristics.TONEMAP_MODE_PRESET_CURVE -> "preset_curve"
+        else -> "mode_$value"
+    }
+
+    private fun colorCorrectionName(value: Int): String = when (value) {
+        CameraCharacteristics.COLOR_CORRECTION_MODE_TRANSFORM_MATRIX -> "transform_matrix"
+        CameraCharacteristics.COLOR_CORRECTION_MODE_FAST -> "fast"
+        CameraCharacteristics.COLOR_CORRECTION_MODE_HIGH_QUALITY -> "high_quality"
+        else -> "mode_$value"
     }
 
     private fun focusCalibrationName(value: Int?): String? = when (value) {

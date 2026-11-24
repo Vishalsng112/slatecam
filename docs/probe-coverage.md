@@ -38,6 +38,8 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 | ✅ Zoom ratio (1.3.0) | `CONTROL_ZOOM_RATIO_RANGE` | Digital zoom alone ignores logical multi-camera switching |
 | ✅ Focus calibration (1.3.0) | `LENS_INFO_FOCUS_DISTANCE_CALIBRATION` | Whether dioptre values map to real distances |
 | ✅ Rotate and crop (1.3.0) | `SCALER_AVAILABLE_ROTATE_AND_CROP_MODES` | Stabilisation crop behaviour |
+| ✅ Tone-map modes (1.11.0) | `TONEMAP_AVAILABLE_TONE_MAP_MODES` · `TONEMAP_MAX_CURVE_POINTS` | Whether a manual curve is offered; still verify the applied result |
+| ✅ Colour-correction modes (1.11.0) | `COLOR_CORRECTION_AVAILABLE_MODES` | Whether a manual CCM/WB path is offered |
 | ✅ Buffer stall durations (1.3.0) | `StreamConfigurationMap.getOutputStallDuration` | Sizing `ImageReader` and encoder queues |
 | ✅ Recommended 10-bit profile (1.3.0) | `REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE` | We assume HLG10; the device may prefer HDR10 |
 | ✅ Available dynamic range profiles | `REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES` + `camera_hlg10_session` check | Whether HLG10 actually configures at a given size |

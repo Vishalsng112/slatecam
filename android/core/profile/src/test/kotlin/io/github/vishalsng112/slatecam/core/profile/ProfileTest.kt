@@ -160,6 +160,23 @@ class InputProfileTest {
     }
 
     @Test
+    fun `white-balance offsets trim red and blue before the matrix`() {
+        val profile = InputProfile(wbROffset = 1.1f, wbBOffset = 0.9f)
+        val out = profile.transform(1f, 0.5f, 0.25f)
+        assertEquals(1.1f, out[0], 0.0001f)
+        assertEquals(0.5f, out[1], 0.0001f)
+        assertEquals(0.225f, out[2], 0.0001f)
+    }
+
+    @Test
+    fun `shadow lift is applied to all channels`() {
+        val out = InputProfile(shadowLift = 0.02f).transform(0f, 0f, 0f)
+        assertEquals(0.02f, out[0], 0.0001f)
+        assertEquals(0.02f, out[1], 0.0001f)
+        assertEquals(0.02f, out[2], 0.0001f)
+    }
+
+    @Test
     fun `exposure and saturation trims apply`() {
         val profile = InputProfile(exposureTrim = 2f, saturationTrim = 0f)
         val out = profile.transform(1f, 0f, 0f)

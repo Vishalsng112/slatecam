@@ -57,6 +57,16 @@ class ProbeReportRoundTripTest {
     }
 
     @Test
+    fun `new colour-control fields are absent in old reports`() {
+        val report = ProbeRunner.json.decodeFromString<ProbeReport>(unverified())
+        val back = report.cameras.first { it.facing == "back" }
+        val controls = checkNotNull(back.controls)
+        assertTrue(controls.toneMapModes.isEmpty())
+        assertTrue(controls.colorCorrectionModes.isEmpty())
+        assertEquals(null, controls.maxToneMapCurvePoints)
+    }
+
+    @Test
     fun `poco exposes ten-bit capture but no Main10 encoder claim`() {
         val report = ProbeRunner.json.decodeFromString<ProbeReport>(unverified())
         val back = report.cameras.first { it.facing == "back" }

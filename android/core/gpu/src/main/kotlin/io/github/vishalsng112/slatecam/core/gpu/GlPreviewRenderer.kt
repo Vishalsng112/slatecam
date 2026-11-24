@@ -59,6 +59,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uInputMatrix = 0
     private var uInputExposure = 0
     private var uInputSaturation = 0
+    private var uInputWb = 0
+    private var uInputShadowLift = 0
     private var uWhiteBalance = 0
     private var uPeaking = 0
     private var uPeakingThreshold = 0
@@ -143,6 +145,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var inputMatrix = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
     @Volatile private var inputExposure = 1f
     @Volatile private var inputSaturation = 1f
+    @Volatile private var inputWbR = 1f
+    @Volatile private var inputWbB = 1f
+    @Volatile private var inputShadowLift = 0f
     @Volatile private var whiteBalance = floatArrayOf(1f, 1f, 1f)
     @Volatile private var peaking = false
     @Volatile private var peakingThreshold = 0.12f
@@ -159,11 +164,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
      * Per-device normalisation, applied before the creative look. Identity by
      * default; calibration data arrives in Phase 7.
      */
-    fun setInputProfile(matrix: FloatArray, exposure: Float, saturation: Float) {
+    fun setInputProfile(
+        matrix: FloatArray,
+        exposure: Float,
+        saturation: Float,
+        wbROffset: Float = 1f,
+        wbBOffset: Float = 1f,
+        shadowLift: Float = 0f,
+    ) {
         require(matrix.size == 9) { "colour matrix must be 3x3" }
         inputMatrix = matrix.copyOf()
         inputExposure = exposure
         inputSaturation = saturation
+        inputWbR = wbROffset
+        inputWbB = wbBOffset
+        inputShadowLift = shadowLift
     }
 
     /** Warm/cool and green/magenta trim applied after sensor calibration. */
@@ -655,6 +670,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uInputMatrix = GLES20.glGetUniformLocation(program, "uInputMatrix")
         uInputExposure = GLES20.glGetUniformLocation(program, "uInputExposure")
         uInputSaturation = GLES20.glGetUniformLocation(program, "uInputSaturation")
+        uInputWb = GLES20.glGetUniformLocation(program, "uInputWb")
+        uInputShadowLift = GLES20.glGetUniformLocation(program, "uInputShadowLift")
         uWhiteBalance = GLES20.glGetUniformLocation(program, "uWhiteBalance")
         uPeaking = GLES20.glGetUniformLocation(program, "uPeaking")
         uPeakingThreshold = GLES20.glGetUniformLocation(program, "uPeakingThreshold")
@@ -799,6 +816,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniformMatrix3fv(uInputMatrix, 1, false, inputMatrix, 0)
         GLES20.glUniform1f(uInputExposure, inputExposure)
         GLES20.glUniform1f(uInputSaturation, inputSaturation)
+        GLES20.glUniform2f(uInputWb, inputWbR, inputWbB)
+        GLES20.glUniform1f(uInputShadowLift, inputShadowLift)
         GLES20.glUniform3fv(uWhiteBalance, 1, whiteBalance, 0)
         GLES20.glUniform1i(uPeaking, if (overlay && peaking) 1 else 0)
         GLES20.glUniform1f(uPeakingThreshold, peakingThreshold)
@@ -1122,6 +1141,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform mat3 uInputMatrix;
             uniform float uInputExposure;
             uniform float uInputSaturation;
+            uniform vec2 uInputWb;
+            uniform float uInputShadowLift;
             uniform vec3 uWhiteBalance;
             uniform int uPeaking;
             uniform float uPeakingThreshold;
@@ -1166,11 +1187,14 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 }
 
                 // Device normalisation runs before any creative transform.
+                c.r *= uInputWb.x;
+                c.b *= uInputWb.y;
                 c = uInputMatrix * c;
                 c *= uInputExposure;
                 c *= uWhiteBalance;
                 float inputLuma = luma(c);
                 c = mix(vec3(inputLuma), c, uInputSaturation);
+                c += vec3(uInputShadowLift);
 
                 c *= uExposure;
                 float y = luma(c);
