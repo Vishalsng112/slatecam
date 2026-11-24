@@ -160,6 +160,8 @@ class CameraController(private val context: Context) {
     private var softFocusSettleUntilMs = 0L
     private var lastFocusLogMs = 0L
     private var softwareFocusInitialized = false
+    private var reportedFocusDiopters = 0f
+    private var softFocusSearching = false
     private var rotationDegrees = 0
     private var glRotationDegrees = 0
     private var initialized = false
@@ -454,6 +456,9 @@ class CameraController(private val context: Context) {
                 ) {
                     return@post
                 }
+                // The software focus search changes sharpness; do not also
+                // chase brightness with the AE bias during that search.
+                if (softFocusSearching) return@post
                 // P has the HAL AE and our bias in the same feedback path. At
                 // 15 Hz analysis the two loops can fight, so update the bias at
                 // 5 Hz, use a wider dead band, and move at most one step.
@@ -515,6 +520,7 @@ class CameraController(private val context: Context) {
                 softwareFocusInitialized = true
                 softwareFocus.reset(focusDiopters)
                 focusTarget = focusDiopters
+                softFocusSearching = false
                 softFocusSettleUntilMs = SystemClock.elapsedRealtime() + 150L
                 emit()
                 return@post
@@ -522,7 +528,13 @@ class CameraController(private val context: Context) {
             if (focusMode == FocusMode.OFF || maxAfRegions <= 0) return@post
             afRegion = activeRegionFor(bufferX, bufferY) ?: return@post
             applyAndEmit()
-            triggerAf()
+            // Continuous modes follow the new region themselves. Triggering a
+            // full scan on top of CAF is what makes tap-to-focus hunt.
+            if (focusMode != FocusMode.CONTINUOUS_VIDEO &&
+                focusMode != FocusMode.CONTINUOUS_PICTURE
+            ) {
+                triggerAf()
+            }
         }
     }
 
@@ -671,7 +683,10 @@ class CameraController(private val context: Context) {
             if (mode !in focusModes) return@post
             focusMode = mode
             autoFocus = FocusMode.isAutomatic(mode) && mode != FocusMode.SOFTWARE
-            if (mode == FocusMode.OFF || mode == FocusMode.SOFTWARE) afRegion = null
+            if (mode == FocusMode.OFF || mode == FocusMode.SOFTWARE) {
+                afRegion = null
+                softFocusSearching = false
+            }
             if (mode == FocusMode.OFF) focusTarget = focusDiopters
             if (mode == FocusMode.SOFTWARE) {
                 focusShiftSpeed = transitionToSpeed(focusTransitionSpeed)
@@ -741,6 +756,12 @@ class CameraController(private val context: Context) {
             if (kotlin.math.abs(focusTarget - focusDiopters) > SOFTWARE_SETTLED_DIOPTERS) {
                 return@post
             }
+            // Wait for the lens report to catch up, but do not stall forever if
+            // the HAL does not publish a useful distance.
+            val reportedClose = kotlin.math.abs(
+                focusTarget - reportedFocusDiopters,
+            ) <= SOFTWARE_REPORTED_DIOPTERS
+            if (!reportedClose && now < softFocusSettleUntilMs + 350L) return@post
             val update = softwareFocus.update(
                 score = score,
                 currentDiopters = focusDiopters,
@@ -752,6 +773,7 @@ class CameraController(private val context: Context) {
                     focusTransitionSpeed,
                 ),
             )
+            softFocusSearching = update.searching
             val changed = update.targetDiopters != focusTarget
             if (now - lastFocusLogMs >= 1_000L || changed) {
                 lastFocusLogMs = now
@@ -1375,8 +1397,9 @@ class CameraController(private val context: Context) {
                 // owns focusDiopters; letting the (lagging) lens result
                 // overwrite it would stall the request before it reaches the
                 // target.
-                if (!softwareFocusInitialized) {
-                    result.get(CaptureResult.LENS_FOCUS_DISTANCE)?.let {
+                result.get(CaptureResult.LENS_FOCUS_DISTANCE)?.let {
+                    reportedFocusDiopters = it
+                    if (!softwareFocusInitialized) {
                         softwareFocusInitialized = true
                         focusDiopters = it
                         focusTarget = it
@@ -1570,10 +1593,11 @@ class CameraController(private val context: Context) {
     companion object {
         private const val DEFAULT_METERING_SECONDS = 0.2f
         private const val SOFTWARE_SETTLED_DIOPTERS = 0.02f
+        private const val SOFTWARE_REPORTED_DIOPTERS = 0.08f
         private const val P_DEAD_BAND_EV = 0.10f
         private const val P_UPDATE_SECONDS = 0.2f
         private const val AF_REGION_WEIGHT = 1000
-        private const val AF_REGION_FRACTION = 0.12f
+        private const val AF_REGION_FRACTION = 0.20f
 
     }
 }

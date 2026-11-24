@@ -874,6 +874,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         val top = (centreY - halfY).coerceIn(1, ANALYSIS_HEIGHT - 2)
         val bottom = (centreY + halfY).coerceIn(top + 1, ANALYSIS_HEIGHT - 1)
         var sum = 0f
+        var lumaSum = 0f
         var count = 0
         for (y in top until bottom) {
             for (x in left until right) {
@@ -885,10 +886,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                     lumaFrame[index - ANALYSIS_WIDTH] -
                     lumaFrame[index + ANALYSIS_WIDTH]
                 sum += kotlin.math.abs(laplacian)
+                lumaSum += center
                 count++
             }
         }
-        return if (count > 0) sum / count else 0f
+        if (count <= 0) return 0f
+        // Normalise by mean luma so an exposure change from metering does not
+        // look like a focus change to the software AF loop.
+        val meanLuma = lumaSum / count
+        if (meanLuma < 0.01f) return 0f
+        return (sum / count) / meanLuma
     }
 
     private fun ensureAnalysisTarget(): Boolean {

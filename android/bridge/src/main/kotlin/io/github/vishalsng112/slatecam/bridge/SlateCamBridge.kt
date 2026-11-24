@@ -177,7 +177,9 @@ class SlateCamBridge private constructor(
             // Restore the software focus choice once the lens reports support.
             if (state.focusMode != FocusMode.SOFTWARE &&
                 FocusMode.SOFTWARE in state.focusModes &&
-                shootPrefs.getBoolean(KEY_FOCUS_SOFTWARE, false)
+                // Software AF is the default on lenses with a focus range; the
+                // operator can switch to the camera's CAF/AF/MF at any time.
+                shootPrefs.getBoolean(KEY_FOCUS_SOFTWARE, true)
             ) {
                 controller.setFocusMode(FocusMode.SOFTWARE)
             }

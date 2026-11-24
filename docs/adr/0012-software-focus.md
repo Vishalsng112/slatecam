@@ -23,16 +23,23 @@ that peaks when the lens is focused.
    lenses hide SAF and the scenario controls. SAF uses `AF_MODE_OFF` and drives
    `LENS_FOCUS_DISTANCE` through the existing ramp.
 2. **The GPU provides one sharpness score.** The analysis pass is 320×180 at
-   15 Hz (every second frame at 30 fps). It computes Laplacian energy over the
-   central 50% of the upright frame and adds it to `FrameAnalysis`. No second
-   camera or encoder path is added.
+   15 Hz (every second frame at 30 fps). It computes Laplacian energy over a
+   40% ROI centred on the last focus point and normalises it by mean luma, so an
+   exposure change from metering is not mistaken for a focus change. The score
+   is smoothed with an EMA before the engine compares it. No second camera or
+   encoder path is added.
 3. **Core owns the search.** `SoftwareFocusEngine` is a pure Kotlin hill-climb:
    - starts at the first reported lens position;
    - steps toward the middle of the range, continues while the score improves,
      reverses and halves the step when it falls, and locks at the best position;
    - has a contrast floor so a flat wall is not hunted;
-   - after locking, shift sensitivity sets both the score drop that counts and
-     how long it must persist before a new search starts.
+   - a 0.5% improvement is required to keep stepping, and the step halves when
+     the score falls;
+   - after locking there is an 800 ms cooldown; shift sensitivity then sets the
+     score drop that counts (8–40%) and how long it must persist (0.7–3 s)
+     before a new search starts;
+   - the controller waits for the lens report (with a timeout) after every ramp,
+     and P-mode AE compensation pauses while a focus search is running.
 4. **Two normalized controls.**
    - **Shift sensitivity** 0–1 maps to a 35%→5% score-drop trigger and a
      2000→500 ms hold.
@@ -48,8 +55,8 @@ that peaks when the lens is focused.
    | Cinematic | 0.20 | 0.15 |
 
    Selecting a scenario switches to SAF and applies both values; the sliders can
-   then be fine-tuned. Settings persist across restarts, and the SAF choice is
-   restored if the lens still reports a focus range.
+   then be fine-tuned. SAF is the default on lenses with a focus range (the
+   camera's CAF/AF/MF remain one tap away). Settings persist across restarts.
 6. **Metering and focus do not fight.** P-mode AE compensation is throttled to
    5 Hz with a 0.10 EV dead band and at most one compensation step per update,
    because the HAL AE and the bias are in the same feedback path. The analysis
@@ -71,6 +78,9 @@ that peaks when the lens is focused.
   camera's own CAF/CAF-P/AF modes remain available.
 - P metering at 100% speed is stable after the 5 Hz/one-step throttle; 50% is
   the default.
+- Pad 3: the normalised score stayed at 0.195–0.200 for 15 s while locked at
+  4.90 D, with no re-search. A tap re-ran the search and locked again; the P
+  meter stayed at 0.425 luma / compensation 1.
 
 ## Alternatives considered
 

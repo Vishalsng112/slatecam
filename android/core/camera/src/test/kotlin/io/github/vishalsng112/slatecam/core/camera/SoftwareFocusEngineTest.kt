@@ -117,11 +117,11 @@ class SoftwareFocusEngineTest {
     }
 
     @Test
-    fun `high sensitivity starts a search after a shorter hold`() {
+    fun `high sensitivity starts a search after the lock cooldown and hold`() {
         val engine = lockedAt(peak = 5f, sensitivity = 0.9f, speed = 0.5f)
-        var now = 0L
+        var now = 70_000L
         var searching = false
-        repeat(10) {
+        repeat(25) {
             now += 100L
             val update = engine.update(
                 0.4f, 5f, true, now, maxDiopters,
@@ -134,21 +134,24 @@ class SoftwareFocusEngineTest {
 
     @Test
     fun `low sensitivity holds longer than high sensitivity`() {
-        fun searchAfter(ms: Long, sensitivity: Float): Boolean {
+        fun searchTime(sensitivity: Float): Long? {
             val engine = lockedAt(peak = 5f, sensitivity = sensitivity, speed = 0.5f)
-            var now = 0L
-            while (now < ms) {
+            var now = 70_000L
+            repeat(100) {
                 now += 100L
                 val update = engine.update(
                     0.4f, 5f, true, now, maxDiopters,
                     SoftwareFocusSettings(sensitivity, 0.5f),
                 )
-                if (update.searching) return true
+                if (update.searching) return now
             }
-            return false
+            return null
         }
-        assertFalse(searchAfter(900L, 0f))
-        assertTrue(searchAfter(900L, 1f))
+        val high = searchTime(1f)
+        val low = searchTime(0f)
+        assertTrue("high sensitivity never searched", high != null)
+        assertTrue("low sensitivity never searched", low != null)
+        assertTrue("high=$high low=$low", high!! < low!!)
     }
 
     @Test

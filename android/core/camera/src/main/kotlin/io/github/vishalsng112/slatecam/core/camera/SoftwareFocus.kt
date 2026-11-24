@@ -78,6 +78,10 @@ class SoftwareFocusEngine {
     private var direction = 1
     private var stepFraction = DEFAULT_STEP_FRACTION
     private var belowSinceMs = -1L
+    private var smoothedScore = 0f
+    private var hasSmoothedScore = false
+    private var lockedAtMs = -1L
+    private var lastUpdateMs = 0L
 
     /** Start a fresh acquisition at the current lens position. */
     fun reset(diopters: Float) {
@@ -92,6 +96,10 @@ class SoftwareFocusEngine {
         direction = 1
         stepFraction = DEFAULT_STEP_FRACTION
         belowSinceMs = -1L
+        smoothedScore = 0f
+        hasSmoothedScore = false
+        lockedAtMs = -1L
+        lastUpdateMs = 0L
     }
 
     fun update(
@@ -108,9 +116,19 @@ class SoftwareFocusEngine {
         if (!settled) {
             return Update(targetDiopters, searching, locked)
         }
-        val normalizedScore = score.coerceAtLeast(0f)
+        lastUpdateMs = nowMs
+        val rawScore = score.coerceAtLeast(0f)
+        // EMA removes frame-to-frame sharpness noise; the raw score still gates
+        // the contrast floor so a flat scene locks immediately.
+        smoothedScore = if (hasSmoothedScore) {
+            smoothedScore * 0.5f + rawScore * 0.5f
+        } else {
+            rawScore
+        }
+        hasSmoothedScore = true
+        val measured = smoothedScore
 
-        if (normalizedScore < CONTRAST_FLOOR) {
+        if (rawScore < CONTRAST_FLOOR) {
             // A flat/no-texture scene cannot be focused by contrast. Hold or
             // lock at the best position instead of hunting through noise.
             return if (locked) {
@@ -122,17 +140,25 @@ class SoftwareFocusEngine {
 
         if (locked) {
             if (lockedScore <= 0f) {
-                beginSearch(normalizedScore, currentDiopters, maxDiopters, settings)
+                beginSearch(measured, currentDiopters, maxDiopters, settings)
                 return Update(targetDiopters, searching = true, locked = false)
+            }
+
+            // Do not immediately re-search after a lock; let the lens and the
+            // score settle. This is what stops visible hunting at the peak.
+            if (lockedAtMs >= 0L && nowMs - lockedAtMs < LOCK_COOLDOWN_MS) {
+                return Update(targetDiopters, searching = false, locked = true)
             }
 
             val triggerDrop = TRIGGER_MAX - (TRIGGER_MAX - TRIGGER_MIN) *
                 settings.sensitivity
-            val below = normalizedScore < lockedScore * (1f - triggerDrop)
+            val below = measured < lockedScore * (1f - triggerDrop)
             if (!below) {
                 belowSinceMs = -1L
-                if (normalizedScore > lockedScore) {
-                    lockedScore = normalizedScore
+                // Only accept a meaningfully higher score as the new lock;
+                // noise must not raise the bar and cause a later false trigger.
+                if (measured > lockedScore * 1.01f) {
+                    lockedScore = measured
                     lockedDiopters = currentDiopters
                     targetDiopters = currentDiopters
                 }
@@ -144,20 +170,20 @@ class SoftwareFocusEngine {
             if (nowMs - belowSinceMs < holdMs) {
                 return Update(targetDiopters, searching = false, locked = true)
             }
-            beginSearch(normalizedScore, currentDiopters, maxDiopters, settings)
+            beginSearch(measured, currentDiopters, maxDiopters, settings)
             return Update(targetDiopters, searching = true, locked = false)
         }
 
         // Searching. The lens has settled at the previous target, so this score
         // describes that position.
-        if (normalizedScore > bestScore) {
-            bestScore = normalizedScore
+        if (measured > bestScore) {
+            bestScore = measured
             bestDiopters = currentDiopters
         }
 
-        val improved = normalizedScore >= lastScore * SCORE_NOISE
+        val improved = measured >= lastScore * SCORE_NOISE
         if (improved) {
-            lastScore = normalizedScore
+            lastScore = measured
             val next = (currentDiopters + direction * stepFraction * maxDiopters)
                 .coerceIn(0f, maxDiopters)
             if (next == currentDiopters || stepFraction < MIN_STEP_FRACTION) {
@@ -202,6 +228,7 @@ class SoftwareFocusEngine {
     private fun lockBest(): Update {
         locked = true
         searching = false
+        lockedAtMs = lastUpdateMs
         targetDiopters = bestDiopters.coerceAtLeast(0f)
         lockedDiopters = targetDiopters
         lockedScore = bestScore
@@ -211,14 +238,15 @@ class SoftwareFocusEngine {
 
     private companion object {
         const val CONTRAST_FLOOR = 0.0025f
-        const val TRIGGER_MIN = 0.05f
-        const val TRIGGER_MAX = 0.35f
-        const val HOLD_MIN_MS = 500L
-        const val HOLD_MAX_MS = 2_000L
+        const val TRIGGER_MIN = 0.08f
+        const val TRIGGER_MAX = 0.40f
+        const val HOLD_MIN_MS = 700L
+        const val HOLD_MAX_MS = 3_000L
+        const val LOCK_COOLDOWN_MS = 800L
         const val BASE_STEP_FRACTION = 0.04f
         const val STEP_SPEED_RANGE = 0.06f
         const val MIN_STEP_FRACTION = 0.008f
         const val DEFAULT_STEP_FRACTION = 0.06f
-        const val SCORE_NOISE = 0.995f
+        const val SCORE_NOISE = 1.005f
     }
 }

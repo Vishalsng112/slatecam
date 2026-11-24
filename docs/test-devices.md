@@ -828,6 +828,20 @@ test harness can inject single taps but not multi-touch, so this pass verifies t
 tap path on hardware and the pinch path by construction; the on-screen zoom
 slider remains the precision fallback.
 
+### Software focus stability (Pad 3, build 2078)
+
+- SAF started by default (AF OFF) and locked at 4.90 D. The normalised focus
+  score stayed in 0.195–0.200 for 15 s with no re-search; P metering held at
+  0.425 luma / compensation 1.
+- Tapping the cup re-ran the search and locked again; no post-tap hunting.
+- Hardware tap-to-focus uses a 20% AF region and no AF trigger in CAF/CAF-P
+  (the continuous mode follows the region itself); one-shot triggers remain for
+  AF/Macro.
+- The Laplacian score is divided by mean luma, so the 5 Hz AE compensation no
+  longer looks like a focus change. The engine also EMA-smooths the score,
+  requires a 0.5% improvement, waits 800 ms after a lock, and uses wider
+  trigger/hold defaults.
+
 ### Software focus engine and scenarios (Pad 3, build 2075)
 
 `SlateCamFocus` logs the score, commanded diopters, target, search/locked state
