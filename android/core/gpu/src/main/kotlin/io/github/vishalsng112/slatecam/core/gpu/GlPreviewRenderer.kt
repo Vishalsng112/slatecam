@@ -87,6 +87,20 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var aPosition = 0
     private var aTexCoord = 0
     private val texMatrix = FloatArray(16)
+
+    /** Copy of the live SurfaceTexture transform for viewfinder tap mapping. */
+    @Volatile
+    private var texMatrixSnapshot: FloatArray = floatArrayOf(
+        1f, 0f, 0f, 0f,
+        0f, 1f, 0f, 0f,
+        0f, 0f, 1f, 0f,
+        0f, 0f, 0f, 1f,
+    )
+
+    /** Normalised centre of the metering focus ROI in viewfinder coordinates. */
+    @Volatile private var focusRoiX = 0.5f
+    @Volatile private var focusRoiY = 0.5f
+
     private var width = 1920
     private var height = 1080
     private var started = false
@@ -278,6 +292,34 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             height = previewHeight
             surfaceTexture?.setDefaultBufferSize(previewWidth, previewHeight)
         }
+    }
+
+    /** Moves the software-focus ROI; coordinates are viewfinder 0..1. */
+    fun setFocusRoi(x: Float, y: Float) {
+        focusRoiX = x.coerceIn(0f, 1f)
+        focusRoiY = y.coerceIn(0f, 1f)
+    }
+
+    /**
+     * Maps a viewfinder tap (0..1, displayed image) to the camera-buffer
+     * coordinate that the current frame samples. The bridge uses this for
+     * `CONTROL_AF_REGIONS`; it removes any guesswork about sensor rotation.
+     */
+    fun viewfinderToBuffer(x: Float, y: Float): FloatArray {
+        val matrix = texMatrixSnapshot
+        val tx = matrix[0] * x + matrix[4] * y + matrix[12]
+        val ty = matrix[1] * x + matrix[5] * y + matrix[13]
+        val radians = Math.toRadians(glRotation.toDouble())
+        val cos = kotlin.math.cos(radians).toFloat()
+        val sin = kotlin.math.sin(radians).toFloat()
+        val px = tx - 0.5f
+        val py = ty - 0.5f
+        val rx = px * cos - py * sin
+        val ry = px * sin + py * cos
+        return floatArrayOf(
+            (rx + 0.5f).coerceIn(0f, 1f),
+            (ry + 0.5f).coerceIn(0f, 1f),
+        )
     }
 
     fun start(target: Surface, previewWidth: Int, previewHeight: Int) {
@@ -646,6 +688,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             runCatching {
                 texture.updateTexImage()
                 texture.getTransformMatrix(texMatrix)
+                texMatrixSnapshot = texMatrix.copyOf()
             }.onFailure { return }
             timestampNs = texture.timestamp.takeIf { it > 0L }
                 ?: SystemClock.elapsedRealtimeNanos()
@@ -821,10 +864,15 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
      * disappears on a flat wall, which is exactly when contrast AF should hold.
      */
     private fun focusScore(): Float {
-        val left = ANALYSIS_WIDTH / 4
-        val right = ANALYSIS_WIDTH * 3 / 4
-        val top = ANALYSIS_HEIGHT / 4
-        val bottom = ANALYSIS_HEIGHT * 3 / 4
+        val half = FOCUS_ROI_FRACTION / 2f
+        val centreX = (focusRoiX * ANALYSIS_WIDTH).toInt()
+        val centreY = (focusRoiY * ANALYSIS_HEIGHT).toInt()
+        val halfX = (half * ANALYSIS_WIDTH).toInt().coerceAtLeast(1)
+        val halfY = (half * ANALYSIS_HEIGHT).toInt().coerceAtLeast(1)
+        val left = (centreX - halfX).coerceIn(1, ANALYSIS_WIDTH - 2)
+        val right = (centreX + halfX).coerceIn(left + 1, ANALYSIS_WIDTH - 1)
+        val top = (centreY - halfY).coerceIn(1, ANALYSIS_HEIGHT - 2)
+        val bottom = (centreY + halfY).coerceIn(top + 1, ANALYSIS_HEIGHT - 1)
         var sum = 0f
         var count = 0
         for (y in top until bottom) {
@@ -1146,6 +1194,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         const val WAVEFORM_BINS = 16
         const val LUMA_GRID_WIDTH = 32
         const val LUMA_GRID_HEIGHT = 18
+        const val FOCUS_ROI_FRACTION = 0.40f
         // 15 Hz at 30 fps: metering and software AF need a faster signal than
         // the monitoring UI does. The readback is still only 320x180.
         const val ANALYSIS_INTERVAL = 2

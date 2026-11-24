@@ -807,6 +807,27 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
+### Viewfinder tap-to-focus and zoom (Pad 3, build 2076)
+
+### Tap-to-focus
+
+- SAF active: tapping the cup moved the focus ROI; `SlateCamFocus` re-searched
+  and locked at 2.186 D (score 0.112) from 5.586 D. The reticle was captured at
+  the tapped point.
+- CAF active: the same tap produced
+  `android.control.afRegions [2882 1829 3162 2109] [1000]` and
+  `android.control.afTrigger` returned to `IDLE` after the one-shot trigger.
+- The tap is mapped through the live `SurfaceTexture` transform and the
+  stream-aspect/zoom crop, not a fixed sensor rotation.
+
+### Pinch zoom
+
+The preview uses one Flutter gesture area for tap and two-finger scale; the scale
+path clamps `startZoom × scale` to the camera range and calls `setZoom`. The ADB
+test harness can inject single taps but not multi-touch, so this pass verifies the
+tap path on hardware and the pinch path by construction; the on-screen zoom
+slider remains the precision fallback.
+
 ### Software focus engine and scenarios (Pad 3, build 2075)
 
 `SlateCamFocus` logs the score, commanded diopters, target, search/locked state

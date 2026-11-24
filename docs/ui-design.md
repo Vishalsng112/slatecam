@@ -216,6 +216,20 @@ The shoot set lists lenses as focal-length circles (`16mm`, `25mm`, `26mm`).
 Tapping a circle includes or excludes that lens from the Movie/Vlog set; the
 facing letter is prefixed only when two lenses share a focal length.
 
+### 5.3.1 Viewfinder gestures
+
+| Gesture | Action |
+|---|---|
+| Tap on the image | Focus at that point; shows a 32 lp reticle for ~900 ms |
+| Pinch with two fingers | Zoom between the camera's `zoomMin` and `zoomMax` |
+| Drag with one finger | No camera action |
+
+The gesture area is the active image (the AspectRatio box), not the black bars,
+HUD or console. In hardware AF modes the tap sets `CONTROL_AF_REGIONS` and sends a
+one-shot AF trigger; in **SAF** it moves the software focus ROI and restarts the
+search. In **MF** the tap is ignored because there is no depth information for a
+manual diopter value.
+
 ### 5.4 Exposure card
 
 | Element | Native call | Status |

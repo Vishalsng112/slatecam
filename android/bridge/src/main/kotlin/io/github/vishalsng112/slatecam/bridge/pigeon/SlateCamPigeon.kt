@@ -943,6 +943,8 @@ interface SlateCamHostApi {
   fun selectLens(id: String)
   /** Applies a zoom ratio to the active camera (optical or digital). */
   fun setZoom(ratio: Double)
+  /** Taps to focus at a viewfinder position (0..1 in the displayed frame). */
+  fun setFocusPoint(x: Double, y: Double)
   /** Switches recording mode: size, frame rate and bit depth. */
   fun selectRecordingMode(id: String)
   /** Selects single-camera or movie/vlog multi-camera mode. */
@@ -1252,6 +1254,25 @@ interface SlateCamHostApi {
             val ratioArg = args[0] as Double
             val wrapped: List<Any?> = try {
               api.setZoom(ratioArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.setFocusPoint$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val xArg = args[0] as Double
+            val yArg = args[1] as Double
+            val wrapped: List<Any?> = try {
+              api.setFocusPoint(xArg, yArg)
               listOf(null)
             } catch (exception: Throwable) {
               SlateCamPigeonPigeonUtils.wrapError(exception)

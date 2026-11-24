@@ -11,6 +11,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.DynamicRangeProfiles
+import android.hardware.camera2.params.MeteringRectangle
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.os.Handler
@@ -194,6 +195,10 @@ class CameraController(private val context: Context) {
     private var zoomMax = 1f
     private var zoomByRatioControl = false
     private var activeArray: Rect? = null
+    private var sensorOrientation = 0
+    private var lensFacing = CameraCharacteristics.LENS_FACING_BACK
+    private var maxAfRegions = 0
+    private var afRegion: Rect? = null
 
     private var targetFps = 30
 
@@ -498,11 +503,97 @@ class CameraController(private val context: Context) {
         }
     }
 
+    /**
+     * Focuses at a point. Coordinates are camera-buffer normalised (from the
+     * renderer's viewfinder-to-buffer transform). Hardware AF gets an AF region
+     * and a trigger; SAF resets the search around the new ROI.
+     */
+    fun setFocusPoint(bufferX: Float, bufferY: Float) {
+        handler.post {
+            lastMeteringNs = 0L
+            if (focusMode == FocusMode.SOFTWARE) {
+                softwareFocusInitialized = true
+                softwareFocus.reset(focusDiopters)
+                focusTarget = focusDiopters
+                softFocusSettleUntilMs = SystemClock.elapsedRealtime() + 150L
+                emit()
+                return@post
+            }
+            if (focusMode == FocusMode.OFF || maxAfRegions <= 0) return@post
+            afRegion = activeRegionFor(bufferX, bufferY) ?: return@post
+            applyAndEmit()
+            triggerAf()
+        }
+    }
+
+    /**
+     * Converts buffer coordinates to the active-array AF rectangle. The stream
+     * is a centred crop of the active array (16:9 from a 4:3 sensor, for
+     * example), shrunk by the current zoom.
+     */
+    private fun activeRegionFor(bufferX: Float, bufferY: Float): Rect? {
+        val array = activeArray ?: return null
+        if (previewSize.width <= 0 || previewSize.height <= 0) return null
+        val streamAspect = previewSize.width.toFloat() / previewSize.height
+        val activeAspect = array.width().toFloat() / array.height()
+        val base = if (streamAspect > activeAspect) {
+            val height = (array.width() / streamAspect).roundToInt().coerceAtLeast(1)
+            Rect(
+                array.left,
+                array.centerY() - height / 2,
+                array.right,
+                array.centerY() + height / 2,
+            )
+        } else {
+            val width = (array.height() * streamAspect).roundToInt().coerceAtLeast(1)
+            Rect(
+                array.centerX() - width / 2,
+                array.top,
+                array.centerX() + width / 2,
+                array.bottom,
+            )
+        }
+        val zoom = zoomRatio.coerceAtLeast(1f)
+        val cropWidth = (base.width() / zoom).roundToInt().coerceAtLeast(1)
+        val cropHeight = (base.height() / zoom).roundToInt().coerceAtLeast(1)
+        val crop = Rect(
+            base.centerX() - cropWidth / 2,
+            base.centerY() - cropHeight / 2,
+            base.centerX() + cropWidth / 2,
+            base.centerY() + cropHeight / 2,
+        )
+        // Camera buffer texture coordinates are GL-style (origin bottom-left).
+        val x = (crop.left + bufferX.coerceIn(0f, 1f) * crop.width()).roundToInt()
+        val y = (crop.top + (1f - bufferY.coerceIn(0f, 1f)) * crop.height()).roundToInt()
+        val half = (kotlin.math.min(crop.width(), crop.height()) * AF_REGION_FRACTION / 2f)
+            .roundToInt()
+            .coerceAtLeast(4)
+        return Rect(
+            (x - half).coerceIn(array.left, array.right),
+            (y - half).coerceIn(array.top, array.bottom),
+            (x + half).coerceIn(array.left, array.right),
+            (y + half).coerceIn(array.top, array.bottom),
+        )
+    }
+
+    /** One-shot AF trigger without disturbing the repeating request. */
+    private fun triggerAf() {
+        val request = builder ?: return
+        val captureSession = session ?: return
+        runCatching {
+            request.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START)
+            captureSession.capture(request.build(), null, handler)
+            request.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_IDLE)
+            captureSession.setRepeatingRequest(request.build(), captureCallback, handler)
+        }
+    }
+
     fun setFocusDiopters(value: Float) {
         handler.post {
             focusMode = FocusMode.OFF
             autoFocus = false
             softwareFocusInitialized = false
+            afRegion = null
             focusTarget = value.coerceIn(0f, focusMax)
             startFocusRamp()
         }
@@ -580,6 +671,7 @@ class CameraController(private val context: Context) {
             if (mode !in focusModes) return@post
             focusMode = mode
             autoFocus = FocusMode.isAutomatic(mode) && mode != FocusMode.SOFTWARE
+            if (mode == FocusMode.OFF || mode == FocusMode.SOFTWARE) afRegion = null
             if (mode == FocusMode.OFF) focusTarget = focusDiopters
             if (mode == FocusMode.SOFTWARE) {
                 focusShiftSpeed = transitionToSpeed(focusTransitionSpeed)
@@ -862,6 +954,11 @@ class CameraController(private val context: Context) {
         zoomMax = zoomRange?.upper
             ?: (characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1f)
         activeArray = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+        sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING)
+            ?: CameraCharacteristics.LENS_FACING_BACK
+        maxAfRegions = characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
+        afRegion = null
         zoomRatio = zoomRatio.coerceIn(zoomMin, zoomMax)
 
         edgeModes = characteristics.get(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES)
@@ -1060,6 +1157,14 @@ class CameraController(private val context: Context) {
             focusMode != FocusMode.SOFTWARE
         ) {
             request.set(CaptureRequest.CONTROL_AF_MODE, afModeValue(focusMode))
+            val region = afRegion
+            if (region != null && maxAfRegions > 0) {
+                request.set(
+                    CaptureRequest.CONTROL_AF_REGIONS,
+                    arrayOf(MeteringRectangle(region, AF_REGION_WEIGHT)),
+                )
+            }
+            request.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_IDLE)
         } else {
             // Manual focus and the software engine both own the lens distance.
             request.set(CaptureRequest.CONTROL_AF_MODE, CameraCharacteristics.CONTROL_AF_MODE_OFF)
@@ -1467,6 +1572,8 @@ class CameraController(private val context: Context) {
         private const val SOFTWARE_SETTLED_DIOPTERS = 0.02f
         private const val P_DEAD_BAND_EV = 0.10f
         private const val P_UPDATE_SECONDS = 0.2f
+        private const val AF_REGION_WEIGHT = 1000
+        private const val AF_REGION_FRACTION = 0.12f
 
     }
 }

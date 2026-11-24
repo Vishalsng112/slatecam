@@ -96,6 +96,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   that set both values and activate SAF. Settings and the SAF choice persist
   across restarts. P-mode AE compensation is throttled to 5 Hz with one step per
   update so it cannot fight the focus search. No face or eye tracking.
+- Viewfinder gestures: **tap to focus** at any point with a short reticle, and
+  **pinch to zoom** within the lens zoom range. Taps are mapped through the live
+  GL texture transform, not a guessed sensor rotation; hardware AF gets a
+  weighted AF region plus a one-shot trigger, and SAF moves its contrast ROI.
+  The existing zoom slider remains as a precise fallback.
 - Exposure mode uses circular **P / S / M** buttons.
 - The Focus card and the bottom-dock focus chip are removed for now; the camera
   keeps continuous autofocus. Manual focus returns with the tap-to-focus/AF-lock

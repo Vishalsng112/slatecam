@@ -326,6 +326,9 @@ abstract class SlateCamHostApi {
   /// Applies a zoom ratio to the active camera (optical or digital).
   void setZoom(double ratio);
 
+  /// Taps to focus at a viewfinder position (0..1 in the displayed frame).
+  void setFocusPoint(double x, double y);
+
   /// Switches recording mode: size, frame rate and bit depth.
   void selectRecordingMode(String id);
 

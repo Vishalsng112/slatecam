@@ -61,6 +61,7 @@ root is `android/`, not the repository root.
 | Focus mode policy | `:core:camera` | `FocusMode.kt` |
 | Software focus engine / scenarios | `:core:camera` | `SoftwareFocus.kt`, `CameraController.submitFocus` |
 | Focus sharpness score | `:core:gpu` | `FrameAnalysis.focusScore`, `GlPreviewRenderer.focusScore` |
+| Viewfinder tap-to-focus / pinch | `lib/src/ui/capture_screen.dart`, `:core:gpu` transform, `:core:camera` AF region | `GlPreviewRenderer.viewfinderToBuffer`, `CameraController.setFocusPoint` |
 | OIS / EIS requests | `:core:camera` | `CameraController.readCapabilities/applyControls` |
 | Frame rendering, shader, overlays | `:core:gpu` | `GlPreviewRenderer.kt` |
 | Recording/mux/audio | `:core:codec` | `ClipRecorder.kt`, `GyroRecorder.kt` |
@@ -123,6 +124,7 @@ on camera change`
 - **Stabilisation and focus modes:** ADR 0010.
 - **Exposure metering and response speed:** ADR 0011.
 - **Software focus engine and scenarios:** ADR 0012.
+- **Viewfinder gestures and tap-to-focus:** ADR 0013.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current

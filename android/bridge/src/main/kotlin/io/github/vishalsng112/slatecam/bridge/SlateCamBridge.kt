@@ -172,6 +172,7 @@ class SlateCamBridge private constructor(
                 controller.setShadingCorrection(shadingEnabledFor(state.cameraId))
                 controller.setOis(enabledFor(KEY_OIS_OFF, state.cameraId))
                 controller.setEis(enabledFor(KEY_EIS_OFF, state.cameraId))
+                renderer.setFocusRoi(0.5f, 0.5f)
             }
             // Restore the software focus choice once the lens reports support.
             if (state.focusMode != FocusMode.SOFTWARE &&
@@ -419,6 +420,14 @@ class SlateCamBridge private constructor(
 
     override fun setZoom(ratio: Double) {
         controller.setZoomRatio(ratio.toFloat())
+    }
+
+    override fun setFocusPoint(x: Double, y: Double) {
+        val nx = x.toFloat().coerceIn(0f, 1f)
+        val ny = y.toFloat().coerceIn(0f, 1f)
+        renderer.setFocusRoi(nx, ny)
+        val buffer = renderer.viewfinderToBuffer(nx, ny)
+        controller.setFocusPoint(buffer[0], buffer[1])
     }
 
     override fun setFocusMode(mode: String) {

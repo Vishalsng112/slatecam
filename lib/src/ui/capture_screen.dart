@@ -35,6 +35,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
   String? _lastClipPath;
   String? _lastError;
 
+  Offset? _focusReticle;
+  Timer? _focusReticleTimer;
+  double _scaleStartZoom = 1;
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +58,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
   @override
   void dispose() {
     _autoOpenTimer?.cancel();
+    _focusReticleTimer?.cancel();
     super.dispose();
   }
 
@@ -321,13 +326,65 @@ class _CaptureScreenState extends State<CaptureScreen> {
     return Center(
       child: AspectRatio(
         aspectRatio: state.previewWidth / state.previewHeight,
-        child: FittedBox(
-          fit: BoxFit.contain,
-          clipBehavior: Clip.hardEdge,
-          child: texture,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = constraints.biggest;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (details) => _focusAt(details.localPosition, size),
+              onScaleStart: (_) => _scaleStartZoom = state.zoomRatio,
+              onScaleUpdate: (details) {
+                if (details.pointerCount < 2) return;
+                final zoom = (_scaleStartZoom * details.scale)
+                    .clamp(state.zoomMin, state.zoomMax)
+                    .toDouble();
+                _host.setZoom(zoom);
+              },
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.contain,
+                    clipBehavior: Clip.hardEdge,
+                    child: texture,
+                  ),
+                  if (_focusReticle != null)
+                    Positioned(
+                      left: _focusReticle!.dx - 16,
+                      top: _focusReticle!.dy - 16,
+                      child: IgnorePointer(
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: UiTokens.accent,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
+  }
+
+  void _focusAt(Offset point, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    final x = (point.dx / size.width).clamp(0.0, 1.0);
+    final y = (point.dy / size.height).clamp(0.0, 1.0);
+    _host.setFocusPoint(x, y);
+    setState(() => _focusReticle = point);
+    _focusReticleTimer?.cancel();
+    _focusReticleTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _focusReticle = null);
+    });
   }
 
   Widget _topHud(CameraState state) {
