@@ -197,6 +197,13 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   duration and lens pose/intrinsics.
 
 ### Fixed
+- Manual and shutter-priority exposure now snap to a flicker-safe grid because
+  Camera2 ignores `CONTROL_AE_ANTIBANDING_MODE` once AE is off: 10 ms multiples
+  at 50 Hz, 1/120 s multiples at 60 Hz, and the device region's mains period
+  for `auto` (50 Hz fallback). The shutter slider is quantised to that grid,
+  angle presets are snapped to the nearest safe exposure, and switching
+  anti-banding re-snaps the held shutter. The Exposure card shows the active
+  grid and resulting angle. `CameraState.shutterStepNs` exposes the step.
 - Fresh install on a device with no probe report no longer crashes on the first
   state push: `activeProfileId()` handles an empty eligible-lens set instead of
   calling `.first()`.

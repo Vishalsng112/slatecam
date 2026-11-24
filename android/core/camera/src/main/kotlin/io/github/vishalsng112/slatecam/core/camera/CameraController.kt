@@ -21,6 +21,7 @@ import android.os.SystemClock
 import android.util.Range
 import android.util.Size
 import android.view.Surface
+import io.github.vishalsng112.slatecam.core.common.FlickerGrid
 import io.github.vishalsng112.slatecam.core.common.ShutterAngle
 import java.util.concurrent.Executor
 import kotlin.math.roundToInt
@@ -38,6 +39,11 @@ data class CameraUiState(
     val shutterNs: Long,
     val shutterMinNs: Long,
     val shutterMaxNs: Long,
+    /**
+     * Flicker-safe exposure step in nanoseconds for the active anti-banding
+     * mode, or `null` when it is off and the shutter may move continuously.
+     */
+    val shutterStepNs: Long? = null,
     val focusDiopters: Float,
     val focusMin: Float,
     val focusMax: Float,
@@ -286,9 +292,24 @@ class CameraController(private val context: Context) {
         }
     }
 
+    /**
+     * Exposure grid for the active anti-banding mode. Manual exposure ignores
+     * Camera2's anti-banding control, so the app must keep whole flicker
+     * periods itself.
+     */
+    private fun shutterStepNs(): Long? = FlickerGrid.stepNs(antibanding)
+
+    private fun snapShutter(ns: Long): Long =
+        FlickerGrid.snap(ns, shutterStepNs(), shutterMinNs, shutterMaxNs)
+
     fun setShutterNs(value: Long) {
         handler.post {
-            shutterNs = value.coerceIn(shutterMinNs, shutterMaxNs)
+            shutterNs = snapShutter(value)
+            android.util.Log.i(
+                "SlateCamExposure",
+                "shutter requested=$value applied=$shutterNs " +
+                    "antibanding=$antibanding stepNs=${shutterStepNs()}",
+            )
             // S keeps the shutter fixed and lets the ISO loop do the work;
             // changing the shutter elsewhere is a manual exposure change.
             if (exposureMode != ExposureMode.SHUTTER_PRIORITY) {
@@ -301,9 +322,8 @@ class CameraController(private val context: Context) {
     }
 
     fun setShutterAngle(degrees: Float) {
-        val exposure = ShutterAngle.exposureNs(degrees, frameRate)
         handler.post {
-            shutterNs = exposure.coerceIn(shutterMinNs, shutterMaxNs)
+            shutterNs = snapShutter(ShutterAngle.exposureNs(degrees, frameRate))
             if (exposureMode != ExposureMode.SHUTTER_PRIORITY) {
                 exposureMode = ExposureMode.MANUAL
             }
@@ -322,6 +342,9 @@ class CameraController(private val context: Context) {
             exposureMode = selected
             autoExposure = selected == ExposureMode.PROGRAM
             lastMeteringNs = 0L
+            // The HAL's last automatic exposure was not grid-aligned; snap it
+            // before S or M starts holding it.
+            if (!autoExposure) shutterNs = snapShutter(shutterNs)
             if (selected == ExposureMode.PROGRAM) {
                 // Start from a neutral bias; the meter takes over from there.
                 aeCompensationSteps = 0
@@ -832,6 +855,14 @@ class CameraController(private val context: Context) {
         handler.post {
             if (mode !in antibandingModes) return@post
             antibanding = mode
+            // Moving to another mains frequency must not leave a now-unsafe
+            // shutter in place. In P the HAL owns exposure, so leave the
+            // readback untouched.
+            if (!autoExposure) shutterNs = snapShutter(shutterNs)
+            android.util.Log.i(
+                "SlateCamExposure",
+                "antibanding=$mode stepNs=${shutterStepNs()} shutterNs=$shutterNs",
+            )
             applyAndEmit()
         }
     }
@@ -1016,6 +1047,10 @@ class CameraController(private val context: Context) {
                 else -> antibandingModes.firstOrNull() ?: "auto"
             }
         }
+
+        // Anti-banding is known only after the mode list above, so the
+        // flicker-safe snap happens here rather than with the range clamping.
+        if (!autoExposure) shutterNs = snapShutter(shutterNs)
 
         rotationDegrees = displayRotationDegrees(characteristics)
         val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
@@ -1300,6 +1335,7 @@ class CameraController(private val context: Context) {
             shutterNs = shutterNs,
             shutterMinNs = shutterMinNs,
             shutterMaxNs = shutterMaxNs,
+            shutterStepNs = shutterStepNs(),
             focusDiopters = focusDiopters,
             focusMin = 0f,
             focusMax = focusMax,

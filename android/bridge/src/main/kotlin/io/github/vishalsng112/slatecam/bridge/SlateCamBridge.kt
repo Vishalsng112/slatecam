@@ -1624,6 +1624,7 @@ class SlateCamBridge private constructor(
         shutterNs = shutterNs,
         shutterMinNs = shutterMinNs,
         shutterMaxNs = shutterMaxNs,
+        shutterStepNs = shutterStepNs,
         focusDiopters = focusDiopters.toDouble(),
         focusMin = focusMin.toDouble(),
         focusMax = focusMax.toDouble(),

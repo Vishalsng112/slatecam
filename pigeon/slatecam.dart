@@ -99,6 +99,7 @@ class CameraState {
     required this.shutterNs,
     required this.shutterMinNs,
     required this.shutterMaxNs,
+    required this.shutterStepNs,
     required this.focusDiopters,
     required this.focusMin,
     required this.focusMax,
@@ -195,6 +196,10 @@ class CameraState {
   int shutterNs;
   int shutterMinNs;
   int shutterMaxNs;
+
+  /// Flicker-safe exposure step for the active anti-banding mode, or null when
+  /// anti-banding is off and the shutter is continuous.
+  int? shutterStepNs;
   double focusDiopters;
   double focusMin;
   double focusMax;

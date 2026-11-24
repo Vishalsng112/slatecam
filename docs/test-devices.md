@@ -1128,3 +1128,24 @@ scaling. Preview and encoded framing now agree in every offered aspect.
   display-referred capture on the test bench was not reliable enough to claim a
   ColorChecker measurement. The next step is a physical 24-patch target per
   lens; the solver accepts the patch means directly.
+
+## Flicker-safe shutter grid (Pad 3 + Pad 6, build 2088)
+
+Camera2 ignores `CONTROL_AE_ANTIBANDING_MODE` when AE is off, so M/S now snap
+`SENSOR_EXPOSURE_TIME` to whole flicker periods itself. `SlateCamExposure`
+reports every applied value.
+
+| Mode | Pad 6 (`71f186d3`) | Pad 3 (`ef9be99a`) |
+|---|---|---|
+| 50 Hz (`stepNs=10000000`) | 10 / 30 / 40 ms | 10 / 20 / 40 ms |
+| 60 Hz (`stepNs=8333333`) | 8.33 / 25 / 33.33 ms | 8.33 / 16.67 / 25 / 33.33 ms |
+| auto (`stepNs=10000000`, region IN) | 20 ms | 10 / 20 ms |
+| 180° at 30 fps on the 50 Hz grid | — | 20 ms (216°), not 16.67 ms |
+| Switching 50 → 60 Hz | 30 ms re-snapped to 33.33 ms | 40 ms re-snapped to 41.67 ms |
+| Slider | discrete ticks, hint `Flicker-safe 50 Hz · 1/100 · 10.00 ms steps` | same; hint also shows the resulting angle |
+
+Both devices keep `Changelog`-level stability: no session restart, no exposure
+errors, and the label matches the applied exposure (`1/100 · 10.00 ms`,
+`1/120 · 8.33 ms`, `1/24 · 41.67 ms`). `auto` falls back to the region's mains
+frequency because the detected 50/60 Hz value is not readable once AE is off;
+both test devices report region `IN`, so auto uses the 50 Hz grid.

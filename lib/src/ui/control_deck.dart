@@ -1085,6 +1085,15 @@ class _ControlDeckState extends State<ControlDeck> {
     final shutterValueLabel = state.exposureMode == 'P'
         ? 'auto · ${formatShutterSummary(state.shutterNs)}'
         : formatShutterSummary(state.shutterNs);
+    final shutterRange = _shutterRange(state);
+    final bandLabel = state.antibanding == 'auto'
+        ? 'auto'
+        : state.antibanding.replaceAll('hz', ' Hz');
+    final shutterGridHint = !manualShutter || state.shutterStepNs == null
+        ? null
+        : 'Flicker-safe $bandLabel · '
+              '${formatShutterSummary(state.shutterStepNs!)} steps · '
+              '${state.shutterAngle.round()}°';
 
     return DeckCard(
       title: 'Exposure',
@@ -1136,12 +1145,23 @@ class _ControlDeckState extends State<ControlDeck> {
             label: 'Shutter',
             valueLabel: shutterValueLabel,
             value: _shutter,
-            min: state.shutterMinNs.toDouble(),
-            max: _shutterCeiling(state),
+            min: shutterRange.min,
+            max: shutterRange.max,
+            divisions: shutterRange.divisions,
             enabled: manualShutter,
             onChanged: (value) => setState(() => _shutterDraft = value),
             onChangeEnd: (value) => widget.host.setShutterNs(value.round()),
           ),
+          if (shutterGridHint != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                shutterGridHint,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: UiTokens.muted),
+              ),
+            ),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -2029,6 +2049,38 @@ class _ControlDeckState extends State<ControlDeck> {
     return state.shutterMaxNs < oneFrameAt24
         ? state.shutterMaxNs.toDouble()
         : oneFrameAt24.toDouble();
+  }
+
+  /// Aligns the slider to the flicker-safe exposure grid Kotlin applies, so the
+  /// handle lands on real values instead of a continuous range that would snap
+  /// on release.
+  ({double min, double max, int? divisions}) _shutterRange(CameraState state) {
+    final ceilingNs = _shutterCeiling(state).round();
+    // In P the HAL owns exposure; the disabled slider keeps its continuous
+    // range and simply shows the readback.
+    final step = state.exposureMode == 'P' ? null : state.shutterStepNs;
+    if (step == null || step <= 0) {
+      return (
+        min: state.shutterMinNs.toDouble(),
+        max: ceilingNs.toDouble(),
+        divisions: null,
+      );
+    }
+    final minNs = ((state.shutterMinNs + step - 1) ~/ step) * step;
+    final maxNs = (ceilingNs ~/ step) * step;
+    if (maxNs <= minNs) {
+      return (
+        min: state.shutterMinNs.toDouble(),
+        max: ceilingNs.toDouble(),
+        divisions: null,
+      );
+    }
+    final count = (maxNs - minNs) ~/ step;
+    return (
+      min: minNs.toDouble(),
+      max: maxNs.toDouble(),
+      divisions: count < 1 ? null : count,
+    );
   }
 }
 
