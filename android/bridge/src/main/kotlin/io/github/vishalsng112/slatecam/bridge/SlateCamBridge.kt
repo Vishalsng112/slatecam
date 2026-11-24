@@ -39,6 +39,7 @@ import io.github.vishalsng112.slatecam.core.device.FeatureGate
 import io.github.vishalsng112.slatecam.core.device.QuirkActions
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
 import io.github.vishalsng112.slatecam.core.profile.BuiltInLuts
+import io.github.vishalsng112.slatecam.core.profile.ColorScienceTuning
 import io.github.vishalsng112.slatecam.core.profile.InputProfile
 import io.github.vishalsng112.slatecam.core.profile.LutLibrary
 import io.github.vishalsng112.slatecam.core.profile.PictureProfile
@@ -91,6 +92,16 @@ class SlateCamBridge private constructor(
     /** single | movie. Movie uses the common mode across a set of lenses. */
     private var shootMode: String = SHOOT_SINGLE
     private val shootPrefs = context.getSharedPreferences(PREFS_SHOOT, Context.MODE_PRIVATE)
+    private var previewQuality = shootPrefs.getString(KEY_PREVIEW_QUALITY, "full") ?: "full"
+    private var previewOutputWidth = 0
+    private var previewOutputHeight = 0
+    private var colorTuning = ColorScienceTuning(
+        exposureEv = shootPrefs.getFloat(KEY_COLOR_EV, 0f),
+        contrast = shootPrefs.getFloat(KEY_COLOR_CONTRAST, 1f),
+        saturation = shootPrefs.getFloat(KEY_COLOR_SATURATION, 1f),
+        temperature = shootPrefs.getFloat(KEY_COLOR_TEMPERATURE, 0f),
+        tint = shootPrefs.getFloat(KEY_COLOR_TINT, 0f),
+    ).normalized()
     private var modesCacheKey: String? = null
     private var modesCache: List<RecordingMode> = emptyList()
 
@@ -233,8 +244,17 @@ class SlateCamBridge private constructor(
             controller.setFrameRate(mode.fps.toInt())
             val width = mode.width.toInt()
             val height = mode.height.toInt()
-            producer.setSize(width, height)
-            renderer.start(freshSurface(), width, height)
+            val (previewWidth, previewHeight) = previewOutputFor(width, height)
+            previewOutputWidth = previewWidth
+            previewOutputHeight = previewHeight
+            producer.setSize(previewWidth, previewHeight)
+            renderer.start(
+                freshSurface(),
+                width,
+                height,
+                previewWidth,
+                previewHeight,
+            )
             val cameraSurface = renderer.cameraSurface
                 ?: throw IllegalStateException("GL pipeline did not expose a camera surface")
             controller.open(
@@ -424,6 +444,21 @@ class SlateCamBridge private constructor(
         controller.setZoomRatio(ratio.toFloat())
     }
 
+    override fun setPreviewQuality(quality: String) {
+        val normalized = when (quality) {
+            "1080", "720" -> quality
+            else -> "full"
+        }
+        if (previewQuality == normalized) return
+        previewQuality = normalized
+        shootPrefs.edit().putString(KEY_PREVIEW_QUALITY, normalized).apply()
+        val state = lastState
+        if (state != null && state.isOpen) {
+            resizePreview(state.previewWidth, state.previewHeight)
+        }
+        pushState()
+    }
+
     override fun setFocusPoint(x: Double, y: Double) {
         val nx = x.toFloat().coerceIn(0f, 1f)
         val ny = y.toFloat().coerceIn(0f, 1f)
@@ -440,6 +475,43 @@ class SlateCamBridge private constructor(
     }
 
     override fun setProfile(profileId: String) {
+        applyProfileById(profileId)
+        pushState()
+    }
+
+    override fun setColorExposure(ev: Double) {
+        updateColorTuning(colorTuning.copy(exposureEv = ev.toFloat()))
+    }
+
+    override fun setColorContrast(value: Double) {
+        updateColorTuning(colorTuning.copy(contrast = value.toFloat()))
+    }
+
+    override fun setColorSaturation(value: Double) {
+        updateColorTuning(colorTuning.copy(saturation = value.toFloat()))
+    }
+
+    override fun setColorTemperature(value: Double) {
+        updateColorTuning(colorTuning.copy(temperature = value.toFloat()))
+    }
+
+    override fun setColorTint(value: Double) {
+        updateColorTuning(colorTuning.copy(tint = value.toFloat()))
+    }
+
+    override fun resetColorScience() {
+        updateColorTuning(ColorScienceTuning.IDENTITY)
+    }
+
+    private fun updateColorTuning(value: ColorScienceTuning) {
+        colorTuning = value.normalized()
+        shootPrefs.edit()
+            .putFloat(KEY_COLOR_EV, colorTuning.exposureEv)
+            .putFloat(KEY_COLOR_CONTRAST, colorTuning.contrast)
+            .putFloat(KEY_COLOR_SATURATION, colorTuning.saturation)
+            .putFloat(KEY_COLOR_TEMPERATURE, colorTuning.temperature)
+            .putFloat(KEY_COLOR_TINT, colorTuning.tint)
+            .apply()
         applyProfileById(profileId)
         pushState()
     }
@@ -586,7 +658,15 @@ class SlateCamBridge private constructor(
             val entry = lutEntries.firstOrNull { it.id == id }
             if (entry != null) {
                 profileId = id
-                renderer.applyProfile(1f, 1f, 1f, false, false)
+                val tuning = colorTuning
+                renderer.applyProfile(
+                    tuning.exposureMultiplier(),
+                    tuning.contrast,
+                    tuning.saturation,
+                    false,
+                    false,
+                )
+                renderer.setWhiteBalanceTuning(tuning.temperature, tuning.tint)
                 renderer.setLut(entry.lut.size, entry.lut.copyData())
                 return
             }
@@ -622,13 +702,15 @@ class SlateCamBridge private constructor(
 
     private fun applyProfile(profile: PictureProfile) {
         profileId = profile.id
+        val tuning = colorTuning
         renderer.applyProfile(
-            exposure = profile.exposure,
-            contrast = profile.contrast,
-            saturation = profile.saturation,
+            exposure = profile.exposure * tuning.exposureMultiplier(),
+            contrast = profile.contrast * tuning.contrast,
+            saturation = profile.saturation * tuning.saturation,
             logEnabled = profile.logEnabled,
             monochrome = profile.monochrome,
         )
+        renderer.setWhiteBalanceTuning(tuning.temperature, tuning.tint)
         val lut = profile.lutId?.let(BuiltInLuts::byId)
         if (lut != null) {
             renderer.setLut(lut.size, lut.copyData())
@@ -1135,9 +1217,30 @@ class SlateCamBridge private constructor(
      * camera session are updated separately.
      */
     private fun resizePreview(width: Int, height: Int) {
-        producer.setSize(width, height)
+        val (previewWidth, previewHeight) = previewOutputFor(width, height)
+        previewOutputWidth = previewWidth
+        previewOutputHeight = previewHeight
+        renderer.setCaptureSize(width, height)
+        renderer.setPreviewSize(previewWidth, previewHeight)
+        producer.setSize(previewWidth, previewHeight)
         renderer.updateTarget(freshSurface())
-        renderer.setPreviewSize(width, height)
+    }
+
+    /**
+     * Viewfind resolution limit. The camera stream and encoder stay at the
+     * recording size; only the preview surface is downsampled.
+     */
+    private fun previewOutputFor(width: Int, height: Int): Pair<Int, Int> {
+        val limit = when (previewQuality) {
+            "1080" -> 1080
+            "720" -> 720
+            else -> height
+        }
+        if (limit <= 0 || limit >= height) return width to height
+        val scale = limit.toFloat() / height
+        val rawWidth = (width * scale).roundToInt().coerceAtLeast(2)
+        val rawHeight = limit.coerceAtLeast(2)
+        return (rawWidth - rawWidth % 2) to (rawHeight - rawHeight % 2)
     }
 
     /**
@@ -1507,6 +1610,9 @@ class SlateCamBridge private constructor(
         focusTransitionSpeed = focusTransitionSpeed.toDouble(),
         previewWidth = previewWidth.toLong(),
         previewHeight = previewHeight.toLong(),
+        previewOutputWidth = this@SlateCamBridge.previewOutputWidth.toLong(),
+        previewOutputHeight = this@SlateCamBridge.previewOutputHeight.toLong(),
+        previewQuality = this@SlateCamBridge.previewQuality,
         previewRotationDegrees = previewRotationDegrees.toLong(),
         zoomRatio = zoomRatio.toDouble(),
         zoomMin = zoomMin.toDouble(),
@@ -1530,6 +1636,11 @@ class SlateCamBridge private constructor(
         gyroSampleCount = gyroSampleCount.toLong(),
         profile = profileId,
         profileNames = PictureProfile.all.map { it.id } + lutEntries.map { it.id },
+        colorExposureEv = colorTuning.exposureEv.toDouble(),
+        colorContrast = colorTuning.contrast.toDouble(),
+        colorSaturation = colorTuning.saturation.toDouble(),
+        colorTemperature = colorTuning.temperature.toDouble(),
+        colorTint = colorTuning.tint.toDouble(),
         zebra = zebraEnabled,
         falseColor = falseColorEnabled,
         peaking = peakingEnabled,
@@ -1583,6 +1694,12 @@ class SlateCamBridge private constructor(
         private const val KEY_FOCUS_SENSITIVITY = "focus_shift_sensitivity"
         private const val KEY_FOCUS_SPEED = "focus_transition_speed"
         private const val KEY_FOCUS_SOFTWARE = "focus_software"
+        private const val KEY_PREVIEW_QUALITY = "preview_quality"
+        private const val KEY_COLOR_EV = "color_exposure_ev"
+        private const val KEY_COLOR_CONTRAST = "color_contrast"
+        private const val KEY_COLOR_SATURATION = "color_saturation"
+        private const val KEY_COLOR_TEMPERATURE = "color_temperature"
+        private const val KEY_COLOR_TINT = "color_tint"
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")

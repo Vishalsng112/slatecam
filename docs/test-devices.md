@@ -828,6 +828,21 @@ test harness can inject single taps but not multi-touch, so this pass verifies t
 tap path on hardware and the pinch path by construction; the on-screen zoom
 slider remains the precision fallback.
 
+### Colour science and viewfinder resolution (Pad 3, build 2079)
+
+| Check | Result |
+|---|---|
+| Colour science card | Exposure, Contrast, Saturation, Temperature, Tint and Reset render in the console |
+| Warm trim | dragging Temperature persisted 0.636 and visibly warmed the preview; reset returned it to neutral |
+| Trim scope | applied through the shared shader, so preview and recording match |
+| Preview 720 | selecting 720 on a 1920×1080 mode logged `output retargeted 1280x720`; the viewfinder showed `Preview 1280×720 · stream 1920×1080` |
+| Recording after preview resize | 1920×1080 Main10 HLG clip recorded while the preview was 1280×720 |
+| Persistence | `preview_quality`, colour trim values restored after restart; restored to Full/neutral for hand-off |
+
+The preview output is a GL downsample of the capture stream; the camera session
+and encoder are not reopened. Colour tuning is unit-tested in `ColorScienceTuning`
+(exposure stops, neutral white balance, warm/magenta direction, clamping).
+
 ### Software focus stability (Pad 3, build 2078)
 
 - SAF started by default (AF OFF) and locked at 4.90 D. The normalised focus

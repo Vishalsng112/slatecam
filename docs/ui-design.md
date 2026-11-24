@@ -299,6 +299,32 @@ restarts. There is no face or eye tracking.
 | Transfer/gamma selection | needs 10-bit path | Future |
 | ColorChecker capture workflow | `ColorCalibration` solver; capture tooling | Solver current, workflow Future |
 
+### 5.6.1 Colour science card
+
+| Element | Native call | Status |
+|---|---|---|
+| Exposure trim (-2…+2 EV) | `setColorExposure` | Current |
+| Contrast (0.25…2.00) | `setColorContrast` | Current |
+| Saturation (0…2) | `setColorSaturation` | Current |
+| Temperature (cool…warm) | `setColorTemperature` | Current |
+| Tint (green…magenta) | `setColorTint` | Current |
+| Reset | `resetColorScience` | Current |
+
+The trim is composed with the active picture profile and LUT, applies to the
+preview and the recording through the same shader, and persists across restarts.
+Named profile saving/editing remains a separate feature.
+
+### 5.6.2 Viewfinder card
+
+| Element | Native call | Status |
+|---|---|---|
+| Preview quality Full / 1080 / 720 | `setPreviewQuality` | Current |
+| Preview output / stream readout | `previewOutputWidth/Height` + `previewWidth/Height` | Current |
+
+The quality is a height cap that preserves the recording aspect. The camera
+stream and encoder stay at the recording mode; only the preview EGL surface and
+viewport change.
+
 ### 5.7 Monitoring card and left rail
 
 | Element | Native call | Status |

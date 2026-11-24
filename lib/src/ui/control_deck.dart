@@ -48,6 +48,11 @@ class _ControlDeckState extends State<ControlDeck> {
   double? _meterSpeedDraft;
   double? _focusSensitivityDraft;
   double? _focusTransitionDraft;
+  double? _colorEvDraft;
+  double? _colorContrastDraft;
+  double? _colorSaturationDraft;
+  double? _colorTemperatureDraft;
+  double? _colorTintDraft;
   double? _peakingSensitivityDraft;
   double? _peakingStrengthDraft;
 
@@ -67,6 +72,21 @@ class _ControlDeckState extends State<ControlDeck> {
     if (oldWidget.state.focusTransitionSpeed != state.focusTransitionSpeed) {
       _focusTransitionDraft = null;
     }
+    if (oldWidget.state.colorExposureEv != state.colorExposureEv) {
+      _colorEvDraft = null;
+    }
+    if (oldWidget.state.colorContrast != state.colorContrast) {
+      _colorContrastDraft = null;
+    }
+    if (oldWidget.state.colorSaturation != state.colorSaturation) {
+      _colorSaturationDraft = null;
+    }
+    if (oldWidget.state.colorTemperature != state.colorTemperature) {
+      _colorTemperatureDraft = null;
+    }
+    if (oldWidget.state.colorTint != state.colorTint) {
+      _colorTintDraft = null;
+    }
     if (oldWidget.state.peakingSensitivity != state.peakingSensitivity) {
       _peakingSensitivityDraft = null;
     }
@@ -82,6 +102,13 @@ class _ControlDeckState extends State<ControlDeck> {
       _focusSensitivityDraft ?? state.focusShiftSensitivity;
   double get _focusTransition =>
       _focusTransitionDraft ?? state.focusTransitionSpeed;
+  double get _colorEv => _colorEvDraft ?? state.colorExposureEv;
+  double get _colorContrast => _colorContrastDraft ?? state.colorContrast;
+  double get _colorSaturation =>
+      _colorSaturationDraft ?? state.colorSaturation;
+  double get _colorTemperature =>
+      _colorTemperatureDraft ?? state.colorTemperature;
+  double get _colorTint => _colorTintDraft ?? state.colorTint;
   double get _peakingSensitivity =>
       _peakingSensitivityDraft ?? state.peakingSensitivity;
   double get _peakingStrength => _peakingStrengthDraft ?? state.peakingStrength;
@@ -117,8 +144,10 @@ class _ControlDeckState extends State<ControlDeck> {
                   final secondary = <Widget>[
                     _shootSetCard(context),
                     _colourCard(context),
+                    _colourScienceCard(context),
                   ];
                   final tertiary = <Widget>[
+                    _viewfinderCard(context),
                     _monitorCard(context),
                     _processingCard(context),
                     _clipCard(context),
@@ -157,7 +186,13 @@ class _ControlDeckState extends State<ControlDeck> {
                       children: [
                         SizedBox(
                           width: width,
-                          child: Column(children: [...primary, _processingCard(context)]),
+                          child: Column(
+                            children: [
+                              ...primary,
+                              _processingCard(context),
+                              _viewfinderCard(context),
+                            ],
+                          ),
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
@@ -1622,6 +1657,141 @@ class _ControlDeckState extends State<ControlDeck> {
         ),
       ],
     );
+  }
+
+  Widget _viewfinderCard(BuildContext context) {
+    final output = state.previewOutputWidth > 0
+        ? '${state.previewOutputWidth}×${state.previewOutputHeight}'
+        : '—';
+    return DeckCard(
+      title: 'Viewfinder',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _modeRow(
+            'Preview',
+            [
+              _modeChip(
+                label: 'Full',
+                tooltip: 'Preview at the recording resolution',
+                selected: state.previewQuality == 'full',
+                onTap: () => widget.host.setPreviewQuality('full'),
+              ),
+              _modeChip(
+                label: '1080',
+                tooltip: 'Limit the viewfinder to 1080-high',
+                selected: state.previewQuality == '1080',
+                onTap: () => widget.host.setPreviewQuality('1080'),
+              ),
+              _modeChip(
+                label: '720',
+                tooltip: 'Limit the viewfinder to 720-high',
+                selected: state.previewQuality == '720',
+                onTap: () => widget.host.setPreviewQuality('720'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Preview $output · stream ${state.previewWidth}×${state.previewHeight}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          Text(
+            'Recording and encoder stay at the mode resolution.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _colourScienceCard(BuildContext context) {
+    return DeckCard(
+      title: 'Colour science',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LabeledSlider(
+            label: 'Exposure',
+            valueLabel:
+                '${_colorEv >= 0 ? '+' : ''}${_colorEv.toStringAsFixed(1)} EV',
+            value: _colorEv,
+            min: -2,
+            max: 2,
+            onChanged: (value) => setState(() => _colorEvDraft = value),
+            onChangeEnd: widget.host.setColorExposure,
+          ),
+          LabeledSlider(
+            label: 'Contrast',
+            valueLabel: _colorContrast.toStringAsFixed(2),
+            value: _colorContrast,
+            min: 0.25,
+            max: 2,
+            onChanged: (value) =>
+                setState(() => _colorContrastDraft = value),
+            onChangeEnd: widget.host.setColorContrast,
+          ),
+          LabeledSlider(
+            label: 'Saturation',
+            valueLabel: _colorSaturation.toStringAsFixed(2),
+            value: _colorSaturation,
+            min: 0,
+            max: 2,
+            onChanged: (value) =>
+                setState(() => _colorSaturationDraft = value),
+            onChangeEnd: widget.host.setColorSaturation,
+          ),
+          LabeledSlider(
+            label: 'Temperature',
+            valueLabel: _temperatureLabel(_colorTemperature),
+            value: _colorTemperature,
+            min: -1,
+            max: 1,
+            onChanged: (value) =>
+                setState(() => _colorTemperatureDraft = value),
+            onChangeEnd: widget.host.setColorTemperature,
+          ),
+          LabeledSlider(
+            label: 'Tint',
+            valueLabel: _tintLabel(_colorTint),
+            value: _colorTint,
+            min: -1,
+            max: 1,
+            onChanged: (value) => setState(() => _colorTintDraft = value),
+            onChangeEnd: widget.host.setColorTint,
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+              onPressed: widget.host.resetColorScience,
+              icon: const Icon(Icons.restart_alt, size: 15),
+              label: const Text(
+                'Reset colour science',
+                style: TextStyle(fontSize: 11),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _temperatureLabel(double value) {
+    final amount = (value.abs() * 100).round();
+    if (amount < 1) return 'neutral';
+    return value > 0 ? 'warm $amount%' : 'cool $amount%';
+  }
+
+  String _tintLabel(double value) {
+    final amount = (value.abs() * 100).round();
+    if (amount < 1) return 'neutral';
+    return value > 0 ? 'magenta $amount%' : 'green $amount%';
   }
 
   Widget _deviceCard(BuildContext context) {

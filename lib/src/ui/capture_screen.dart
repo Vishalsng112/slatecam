@@ -317,15 +317,21 @@ class _CaptureScreenState extends State<CaptureScreen> {
     // The GL pipeline already applies the camera/display rotation, so Flutter
     // must not rotate again. Keep the exact pixel aspect and let the frame
     // letterbox rather than stretch.
+    final outputWidth = state.previewOutputWidth > 0
+        ? state.previewOutputWidth
+        : state.previewWidth;
+    final outputHeight = state.previewOutputHeight > 0
+        ? state.previewOutputHeight
+        : state.previewHeight;
     final texture = SizedBox(
-      width: state.previewWidth.toDouble(),
-      height: state.previewHeight.toDouble(),
+      width: outputWidth.toDouble(),
+      height: outputHeight.toDouble(),
       child: Texture(textureId: _textureId!),
     );
 
     return Center(
       child: AspectRatio(
-        aspectRatio: state.previewWidth / state.previewHeight,
+        aspectRatio: outputWidth / outputHeight,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final size = constraints.biggest;

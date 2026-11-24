@@ -24,7 +24,7 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 | Item | Notes |
 |---|---|
 | SAF LUT picker | Folder scan exists (`files/luts`); picker needs a plugin or native SAF |
-| Profile editor UI | Profiles are data already; editing needs persistence |
+| Profile editor UI | Live colour-science trim ships; saving a named custom profile still needs persistence |
 | 10-bit 4K 4:3 verification | `dci43_*` / `uhd43_*` / `qhd43_*` presets exist but current reports pre-date them; run the device report to enable 10-bit at 4096×3072 / 3840×2880 / 2880×2160 |
 | Creative vignette | Shader effect, distinct from lens-shading correction (correction toggle is current) |
 | Colour calibration data | Model, shader stage and loader exist; measured ColorChecker matrices are data to add |

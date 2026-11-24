@@ -101,6 +101,15 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   GL texture transform, not a guessed sensor rotation; hardware AF gets a
   weighted AF region plus a one-shot trigger, and SAF moves its contrast ROI.
   The existing zoom slider remains as a precise fallback.
+- Colour science tuning: a live Colour science card with **Exposure**,
+  **Contrast**, **Saturation**, **Temperature** and **Tint** sliders plus reset.
+  The trim is applied on top of the active picture profile (including LUT
+  profiles), baked into preview and recording, persisted, and unit-tested in
+  `ColorScienceTuning`.
+- Viewfinder resolution changer: **Full / 1080 / 720** caps the preview height
+  while the camera stream and encoder stay at the recording mode size. Changing
+  it retargets only the preview surface and is safe while recording. The
+  Viewfinder card shows the preview output and the stream size.
 - Software focus is now the default on lenses with a focus range, and hunting
   is suppressed: the Laplacian score is normalised by mean luma, smoothed with
   an EMA, searched with a 0.5% improvement threshold, and guarded by a lock

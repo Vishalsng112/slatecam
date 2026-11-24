@@ -116,6 +116,9 @@ class CameraState {
     required this.focusTransitionSpeed,
     required this.previewWidth,
     required this.previewHeight,
+    required this.previewOutputWidth,
+    required this.previewOutputHeight,
+    required this.previewQuality,
     required this.previewRotationDegrees,
     required this.zoomRatio,
     required this.zoomMin,
@@ -139,6 +142,11 @@ class CameraState {
     required this.gyroSampleCount,
     required this.profile,
     required this.profileNames,
+    required this.colorExposureEv,
+    required this.colorContrast,
+    required this.colorSaturation,
+    required this.colorTemperature,
+    required this.colorTint,
     required this.zebra,
     required this.falseColor,
     required this.peaking,
@@ -209,6 +217,11 @@ class CameraState {
   double focusTransitionSpeed;
   int previewWidth;
   int previewHeight;
+  /// Actual preview surface size; may be a downsampled viewfinder.
+  int previewOutputWidth;
+  int previewOutputHeight;
+  /// full | 1080 | 720
+  String previewQuality;
   int previewRotationDegrees;
   /// Current optical/digital zoom ratio applied to the active camera.
   double zoomRatio;
@@ -242,6 +255,12 @@ class CameraState {
   int gyroSampleCount;
   String profile;
   List<String> profileNames;
+  /// Manual colour-science trim on top of the active profile.
+  double colorExposureEv;
+  double colorContrast;
+  double colorSaturation;
+  double colorTemperature;
+  double colorTint;
   bool zebra;
   bool falseColor;
   bool peaking;
@@ -329,6 +348,9 @@ abstract class SlateCamHostApi {
   /// Taps to focus at a viewfinder position (0..1 in the displayed frame).
   void setFocusPoint(double x, double y);
 
+  /// full | 1080 | 720. The recording stream stays at its mode size.
+  void setPreviewQuality(String quality);
+
   /// Switches recording mode: size, frame rate and bit depth.
   void selectRecordingMode(String id);
 
@@ -364,6 +386,18 @@ abstract class SlateCamHostApi {
   void stopRecording();
 
   void setProfile(String profileId);
+
+  void setColorExposure(double ev);
+
+  void setColorContrast(double value);
+
+  void setColorSaturation(double value);
+
+  void setColorTemperature(double value);
+
+  void setColorTint(double value);
+
+  void resetColorScience();
 
   void setZebra(bool enabled);
 

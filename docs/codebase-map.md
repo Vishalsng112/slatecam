@@ -62,6 +62,8 @@ root is `android/`, not the repository root.
 | Software focus engine / scenarios | `:core:camera` | `SoftwareFocus.kt`, `CameraController.submitFocus` |
 | Focus sharpness score | `:core:gpu` | `FrameAnalysis.focusScore`, `GlPreviewRenderer.focusScore` |
 | Viewfinder tap-to-focus / pinch | `lib/src/ui/capture_screen.dart`, `:core:gpu` transform, `:core:camera` AF region | `GlPreviewRenderer.viewfinderToBuffer`, `CameraController.setFocusPoint` |
+| Colour-science trim | `:core:profile` | `ColorScience.kt`, `SlateCamBridge.applyProfile` |
+| Independent viewfinder resolution | `:core:gpu`, `:bridge`, Flutter | `GlPreviewRenderer` capture/preview sizes, `SlateCamBridge.previewOutputFor` |
 | OIS / EIS requests | `:core:camera` | `CameraController.readCapabilities/applyControls` |
 | Frame rendering, shader, overlays | `:core:gpu` | `GlPreviewRenderer.kt` |
 | Recording/mux/audio | `:core:codec` | `ClipRecorder.kt`, `GyroRecorder.kt` |
@@ -125,6 +127,8 @@ on camera change`
 - **Exposure metering and response speed:** ADR 0011.
 - **Software focus engine and scenarios:** ADR 0012.
 - **Viewfinder gestures and tap-to-focus:** ADR 0013.
+- **Colour-science trim:** ADR 0014.
+- **Independent viewfinder resolution:** ADR 0015.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current

@@ -59,6 +59,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uInputMatrix = 0
     private var uInputExposure = 0
     private var uInputSaturation = 0
+    private var uWhiteBalance = 0
     private var uPeaking = 0
     private var uPeakingThreshold = 0
     private var uPeakingStrength = 0
@@ -101,8 +102,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var focusRoiX = 0.5f
     @Volatile private var focusRoiY = 0.5f
 
-    private var width = 1920
-    private var height = 1080
+    private var captureWidth = 1920
+    private var captureHeight = 1080
+    private var previewWidth = 1920
+    private var previewHeight = 1080
     private var started = false
 
     @Volatile
@@ -140,6 +143,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var inputMatrix = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
     @Volatile private var inputExposure = 1f
     @Volatile private var inputSaturation = 1f
+    @Volatile private var whiteBalance = floatArrayOf(1f, 1f, 1f)
     @Volatile private var peaking = false
     @Volatile private var peakingThreshold = 0.12f
     @Volatile private var peakingStrength = 0.8f
@@ -160,6 +164,17 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         inputMatrix = matrix.copyOf()
         inputExposure = exposure
         inputSaturation = saturation
+    }
+
+    /** Warm/cool and green/magenta trim applied after sensor calibration. */
+    fun setWhiteBalanceTuning(temperature: Float, tint: Float) {
+        val t = temperature.coerceIn(-1f, 1f)
+        val g = tint.coerceIn(-1f, 1f)
+        val red = (1f + 0.18f * t + 0.06f * g).coerceAtLeast(0.05f)
+        val green = (1f - 0.10f * g).coerceAtLeast(0.05f)
+        val blue = (1f - 0.18f * t + 0.06f * g).coerceAtLeast(0.05f)
+        val mean = (red + green + blue) / 3f
+        whiteBalance = floatArrayOf(red / mean, green / mean, blue / mean)
     }
 
     fun applyProfile(
@@ -285,12 +300,23 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     var cameraSurface: Surface? = null
         private set
 
-    /** Changes the camera/output size without recreating the EGL context. */
-    fun setPreviewSize(previewWidth: Int, previewHeight: Int) {
+    /** Changes the camera stream size (the encoder follows this size). */
+    fun setCaptureSize(width: Int, height: Int) {
         handler.post {
-            width = previewWidth
-            height = previewHeight
-            surfaceTexture?.setDefaultBufferSize(previewWidth, previewHeight)
+            captureWidth = width
+            captureHeight = height
+            surfaceTexture?.setDefaultBufferSize(width, height)
+        }
+    }
+
+    /**
+     * Changes only the preview output size. The camera stream and encoder keep
+     * the capture size; the preview is a GL downsample of the same frame.
+     */
+    fun setPreviewSize(width: Int, height: Int) {
+        handler.post {
+            previewWidth = width
+            previewHeight = height
         }
     }
 
@@ -322,21 +348,30 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         )
     }
 
-    fun start(target: Surface, previewWidth: Int, previewHeight: Int) {
+    fun start(
+        target: Surface,
+        captureWidth: Int,
+        captureHeight: Int,
+        previewWidth: Int,
+        previewHeight: Int,
+    ) {
         val latch = CountDownLatch(1)
         var failure: Throwable? = null
 
         handler.post {
             try {
-                width = previewWidth
-                height = previewHeight
+                this.captureWidth = captureWidth
+                this.captureHeight = captureHeight
+                this.previewWidth = previewWidth
+                this.previewHeight = previewHeight
                 setupEgl(target)
                 setupProgram()
                 setupTexture()
                 started = true
                 Log.i(
                     TAG,
-                    "started camera=${previewWidth}x$previewHeight " +
+                    "started camera=${captureWidth}x$captureHeight " +
+                        "preview=${previewWidth}x$previewHeight " +
                         "previewSurface=${eglSurfaceSize(outputEglSurface)}",
                 )
                 pendingLutData?.let { data ->
@@ -424,7 +459,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 Log.i(
                     TAG,
                     "encoder surface attached (tenBit=$tenBitHlg) " +
-                        "size=${eglSurfaceSize(encoderEglSurface)} camera=${width}x$height",
+                        "size=${eglSurfaceSize(encoderEglSurface)} camera=${captureWidth}x$captureHeight",
                 )
             }
         }
@@ -620,6 +655,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uInputMatrix = GLES20.glGetUniformLocation(program, "uInputMatrix")
         uInputExposure = GLES20.glGetUniformLocation(program, "uInputExposure")
         uInputSaturation = GLES20.glGetUniformLocation(program, "uInputSaturation")
+        uWhiteBalance = GLES20.glGetUniformLocation(program, "uWhiteBalance")
         uPeaking = GLES20.glGetUniformLocation(program, "uPeaking")
         uPeakingThreshold = GLES20.glGetUniformLocation(program, "uPeakingThreshold")
         uPeakingStrength = GLES20.glGetUniformLocation(program, "uPeakingStrength")
@@ -659,7 +695,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         )
 
         val texture = SurfaceTexture(oesTextureId)
-        texture.setDefaultBufferSize(width, height)
+        texture.setDefaultBufferSize(captureWidth, captureHeight)
         texture.setOnFrameAvailableListener { handler.post { drawFrame() } }
         surfaceTexture = texture
         cameraSurface = Surface(texture)
@@ -763,10 +799,15 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniformMatrix3fv(uInputMatrix, 1, false, inputMatrix, 0)
         GLES20.glUniform1f(uInputExposure, inputExposure)
         GLES20.glUniform1f(uInputSaturation, inputSaturation)
+        GLES20.glUniform3fv(uWhiteBalance, 1, whiteBalance, 0)
         GLES20.glUniform1i(uPeaking, if (overlay && peaking) 1 else 0)
         GLES20.glUniform1f(uPeakingThreshold, peakingThreshold)
         GLES20.glUniform1f(uPeakingStrength, peakingStrength)
-        GLES20.glUniform2f(uTexelSize, 1f / width.coerceAtLeast(1), 1f / height.coerceAtLeast(1))
+        GLES20.glUniform2f(
+            uTexelSize,
+            1f / captureWidth.coerceAtLeast(1),
+            1f / captureHeight.coerceAtLeast(1),
+        )
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
         GLES20.glUniform1f(uRotation, glRotation.toFloat())
 
@@ -957,7 +998,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         if (surface == EGL14.EGL_NO_SURFACE) return
         EGL14.eglMakeCurrent(display, surface, surface, context)
 
-        GLES20.glViewport(0, 0, width, height)
+        val targetWidth = if (surface == encoderEglSurface) captureWidth else previewWidth
+        val targetHeight = if (surface == encoderEglSurface) captureHeight else previewHeight
+        GLES20.glViewport(0, 0, targetWidth, targetHeight)
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
@@ -1079,6 +1122,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform mat3 uInputMatrix;
             uniform float uInputExposure;
             uniform float uInputSaturation;
+            uniform vec3 uWhiteBalance;
             uniform int uPeaking;
             uniform float uPeakingThreshold;
             uniform float uPeakingStrength;
@@ -1124,6 +1168,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 // Device normalisation runs before any creative transform.
                 c = uInputMatrix * c;
                 c *= uInputExposure;
+                c *= uWhiteBalance;
                 float inputLuma = luma(c);
                 c = mix(vec3(inputLuma), c, uInputSaturation);
 
