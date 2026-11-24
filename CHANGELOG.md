@@ -112,6 +112,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Pad 3 probe evidence: schema 1.11.0 reports `contrast_curve`/`fast`/
   `high_quality`, 512 curve points and `transform_matrix`/`fast`/`high_quality`
   for both cameras; `gamma_value` is not advertised.
+- FP16 encoder intermediate: when the GL driver supports half-float render
+  targets, the camera + look are rendered into RGBA16F at capture size and
+  copied to the encoder with an ordered dither before the 8-bit surface. The
+  preview/analysis path is unchanged. Falls back to the direct encoder draw when
+  unsupported. Pad 2081 recorded 1080p and 4K HLG Main10 with the FP16 path.
 - Colour science tuning: a live Colour science card with **Exposure**,
   **Contrast**, **Saturation**, **Temperature** and **Tint** sliders plus reset.
   The trim is applied on top of the active picture profile (including LUT

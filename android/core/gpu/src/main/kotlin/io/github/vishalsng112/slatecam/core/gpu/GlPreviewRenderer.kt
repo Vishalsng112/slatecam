@@ -76,6 +76,17 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var pendingLutSize = 0
     private var pendingLutData: FloatArray? = null
 
+    private var intermediateFbo = 0
+    private var intermediateTexture = 0
+    private var intermediateWidth = 0
+    private var intermediateHeight = 0
+    private var intermediateEnabled = false
+    private var intermediateAttempted = false
+    private var copyProgram = 0
+    private var copyPosition = 0
+    private var copyTexCoord = 0
+    private var copyTexture = 0
+
     private var analysisFbo = 0
     private var analysisTexture = 0
     private var frameCounter = 0
@@ -321,6 +332,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             captureWidth = width
             captureHeight = height
             surfaceTexture?.setDefaultBufferSize(width, height)
+            releaseIntermediate()
+            intermediateAttempted = false
         }
     }
 
@@ -381,6 +394,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 this.previewHeight = previewHeight
                 setupEgl(target)
                 setupProgram()
+                setupCopyProgram()
                 setupTexture()
                 started = true
                 Log.i(
@@ -778,13 +792,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 (frameTimestampNs - encoderBaseTimestampNs).coerceAtLeast(0L)
             }
         }
-        renderTo(
-            encoderEglSurface,
-            encoderTimestampNs,
-            tonemap = false,
-            overlay = false,
-            frameTimestampNs = frameTimestampNs,
-        )
+        renderEncoder(encoderTimestampNs, frameTimestampNs)
 
         frameCounter++
         if (analysisEnabled && frameCounter % ANALYSIS_INTERVAL == 0) {
@@ -1007,6 +1015,201 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         return complete
     }
 
+    private fun setupCopyProgram() {
+        val vertex = compile(COPY_VERTEX, GLES20.GL_VERTEX_SHADER)
+        val fragment = compile(COPY_FRAGMENT, GLES20.GL_FRAGMENT_SHADER)
+        copyProgram = GLES20.glCreateProgram()
+        GLES20.glAttachShader(copyProgram, vertex)
+        GLES20.glAttachShader(copyProgram, fragment)
+        GLES20.glLinkProgram(copyProgram)
+        val status = IntArray(1)
+        GLES20.glGetProgramiv(copyProgram, GLES20.GL_LINK_STATUS, status, 0)
+        check(status[0] == GLES20.GL_TRUE) {
+            "copy program link failed: ${GLES20.glGetProgramInfoLog(copyProgram)}"
+        }
+        copyPosition = GLES20.glGetAttribLocation(copyProgram, "aPosition")
+        copyTexCoord = GLES20.glGetAttribLocation(copyProgram, "aTexCoord")
+        copyTexture = GLES20.glGetUniformLocation(copyProgram, "uTexture")
+        GLES20.glDeleteShader(vertex)
+        GLES20.glDeleteShader(fragment)
+    }
+
+    /**
+     * Renders the camera frame through the creative look into an FP16 FBO and
+     * copies that to the encoder. The preview stays on the direct path so HLG
+     * preview tone-mapping and overlays keep their existing semantics.
+     *
+     * The encoder input surface is still RGBA8888 on the test devices; this is a
+     * processing-precision step, not true 10-bit delivery. The copy dithers the
+     * final 8-bit write to reduce banding.
+     */
+    private fun renderEncoder(timestampNs: Long, frameTimestampNs: Long) {
+        if (encoderEglSurface == EGL14.EGL_NO_SURFACE) return
+        if (!ensureIntermediate()) {
+            renderTo(
+                encoderEglSurface,
+                timestampNs,
+                tonemap = false,
+                overlay = false,
+                frameTimestampNs = frameTimestampNs,
+            )
+            return
+        }
+
+        // Render the camera + look into FP16. The output surface is only the
+        // context owner here; the FBO is the actual draw target.
+        val contextSurface = if (outputEglSurface != EGL14.EGL_NO_SURFACE) {
+            outputEglSurface
+        } else {
+            encoderEglSurface
+        }
+        EGL14.eglMakeCurrent(display, contextSurface, contextSurface, context)
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, intermediateFbo)
+        GLES20.glViewport(0, 0, captureWidth, captureHeight)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        drawQuad(tonemap = false, overlay = false)
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+
+        // Copy the FP16 result to the encoder surface at 1:1.
+        EGL14.eglMakeCurrent(display, encoderEglSurface, encoderEglSurface, context)
+        GLES20.glViewport(0, 0, captureWidth, captureHeight)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        drawCopy()
+
+        if (captureEncoderTimestamps) {
+            synchronized(encoderTimestamps) { encoderTimestamps += frameTimestampNs }
+        }
+        EGLExt.eglPresentationTimeANDROID(display, encoderEglSurface, timestampNs)
+        if (!EGL14.eglSwapBuffers(display, encoderEglSurface)) {
+            Log.w(
+                TAG,
+                "eglSwapBuffers failed (encoder): 0x${Integer.toHexString(EGL14.eglGetError())}",
+            )
+        }
+        encoderFrames++
+        if (encoderFrames % 60 == 0) Log.i(TAG, "encoder frames=$encoderFrames")
+    }
+
+    private fun drawCopy() {
+        GLES20.glUseProgram(copyProgram)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, intermediateTexture)
+        GLES20.glUniform1i(copyTexture, 0)
+        GLES20.glEnableVertexAttribArray(copyPosition)
+        GLES20.glVertexAttribPointer(copyPosition, 2, GLES20.GL_FLOAT, false, 0, QUAD_VERTICES)
+        GLES20.glEnableVertexAttribArray(copyTexCoord)
+        GLES20.glVertexAttribPointer(copyTexCoord, 2, GLES20.GL_FLOAT, false, 0, QUAD_TEX_COORDS)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+    }
+
+    private fun ensureIntermediate(): Boolean {
+        if (intermediateEnabled &&
+            intermediateWidth == captureWidth &&
+            intermediateHeight == captureHeight
+        ) {
+            return true
+        }
+        if (intermediateAttempted &&
+            intermediateWidth == captureWidth &&
+            intermediateHeight == captureHeight
+        ) {
+            return intermediateEnabled
+        }
+        releaseIntermediate()
+        intermediateAttempted = true
+        intermediateWidth = captureWidth
+        intermediateHeight = captureHeight
+
+        val extensions = GLES20.glGetString(GLES20.GL_EXTENSIONS) ?: ""
+        if (!extensions.contains("GL_EXT_color_buffer_half_float") ||
+            !extensions.contains("GL_OES_texture_half_float")
+        ) {
+            Log.i(TAG, "FP16 intermediate unavailable; using direct encoder path")
+            return false
+        }
+
+        val textures = IntArray(1)
+        GLES20.glGenTextures(1, textures, 0)
+        intermediateTexture = textures[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, intermediateTexture)
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_MIN_FILTER,
+            GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_MAG_FILTER,
+            GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_WRAP_S,
+            GLES20.GL_CLAMP_TO_EDGE,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_WRAP_T,
+            GLES20.GL_CLAMP_TO_EDGE,
+        )
+        GLES20.glTexImage2D(
+            GLES20.GL_TEXTURE_2D,
+            0,
+            GL_RGBA16F_EXT,
+            captureWidth,
+            captureHeight,
+            0,
+            GLES20.GL_RGBA,
+            GL_HALF_FLOAT_OES,
+            null,
+        )
+        if (GLES20.glGetError() != GLES20.GL_NO_ERROR) {
+            Log.w(TAG, "FP16 texture allocation failed; using direct encoder path")
+            releaseIntermediate()
+            return false
+        }
+
+        val framebuffers = IntArray(1)
+        GLES20.glGenFramebuffers(1, framebuffers, 0)
+        intermediateFbo = framebuffers[0]
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, intermediateFbo)
+        GLES20.glFramebufferTexture2D(
+            GLES20.GL_FRAMEBUFFER,
+            GLES20.GL_COLOR_ATTACHMENT0,
+            GLES20.GL_TEXTURE_2D,
+            intermediateTexture,
+            0,
+        )
+        val complete = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) ==
+            GLES20.GL_FRAMEBUFFER_COMPLETE
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        if (!complete) {
+            Log.w(TAG, "FP16 framebuffer incomplete; using direct encoder path")
+            releaseIntermediate()
+            return false
+        }
+        intermediateEnabled = true
+        Log.i(
+            TAG,
+            "FP16 encoder intermediate ${captureWidth}x$captureHeight (RGBA16F)",
+        )
+        return true
+    }
+
+    private fun releaseIntermediate() {
+        if (intermediateFbo != 0) {
+            GLES20.glDeleteFramebuffers(1, intArrayOf(intermediateFbo), 0)
+            intermediateFbo = 0
+        }
+        if (intermediateTexture != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(intermediateTexture), 0)
+            intermediateTexture = 0
+        }
+        intermediateEnabled = false
+    }
+
     private fun renderTo(
         surface: EGLSurface,
         timestampNs: Long,
@@ -1059,6 +1262,11 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             GLES20.glDeleteProgram(program)
             program = 0
         }
+        if (copyProgram != 0) {
+            GLES20.glDeleteProgram(copyProgram)
+            copyProgram = 0
+        }
+        releaseIntermediate()
         if (lutTexture != 0) {
             GLES20.glDeleteTextures(1, intArrayOf(lutTexture), 0)
             lutTexture = 0
@@ -1281,6 +1489,31 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         // Not exposed by android.opengl.EGL14.
         const val EGL_GL_COLORSPACE_KHR = 0x309D
         const val EGL_GL_COLORSPACE_BT2020_HLG_EXT = 0x3540
+        const val GL_RGBA16F_EXT = 0x881A
+        const val GL_HALF_FLOAT_OES = 0x8D61
+
+        const val COPY_VERTEX = """
+            attribute vec4 aPosition;
+            attribute vec4 aTexCoord;
+            varying vec2 vTexCoord;
+            void main() {
+                gl_Position = aPosition;
+                vTexCoord = aTexCoord.xy;
+            }
+        """
+
+        const val COPY_FRAGMENT = """
+            precision highp float;
+            varying vec2 vTexCoord;
+            uniform sampler2D uTexture;
+            void main() {
+                vec3 c = texture2D(uTexture, vTexCoord).rgb;
+                // Ordered 2x2 dither before the 8-bit encoder surface.
+                float d = mod(gl_FragCoord.x + gl_FragCoord.y, 2.0);
+                c += (d - 0.5) * (1.0 / 255.0);
+                gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+            }
+        """
 
         val QUAD_VERTICES: FloatBuffer = floatBuffer(
             floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f),

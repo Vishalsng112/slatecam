@@ -828,6 +828,21 @@ test harness can inject single taps but not multi-touch, so this pass verifies t
 tap path on hardware and the pinch path by construction; the on-screen zoom
 slider remains the precision fallback.
 
+### FP16 encoder intermediate (Pad 3, build 2081)
+
+| Check | Result |
+|---|---|
+| Driver support | `GL_EXT_color_buffer_half_float` + `GL_OES_texture_half_float`; `RGBA16F` FBO complete |
+| 1080p HLG | `FP16 encoder intermediate 1920x1080 (RGBA16F)`, 120 frames, clip `1920x1080 Main 10 yuv420p10le` |
+| 4K HLG | `FP16 encoder intermediate 3840x2160 (RGBA16F)`, 120 frames, clip `3840x2160 Main 10 yuv420p10le` |
+| Frame cadence | 60 frames per ~2 s at 30 fps during both clips; no swap errors |
+| Orientation | recorded 4K frame upright and matching the viewfinder |
+| Fallback | direct encoder path retained when FP16 is unavailable or the FBO is incomplete |
+
+The encoder surface remains RGBA8888, so this is a processing-precision and
+dithering step, not true 10-bit delivery. True 10-bit still needs a 10-bit/P010
+encoder input path.
+
 ### Colour architecture foundation (Pad 3, build 2080)
 
 - Probe report re-run on the Pad: **schema 1.11.0 / prober 1.10.0**.

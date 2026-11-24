@@ -48,7 +48,9 @@ WB/tone-map path.
 
 ## Deferred decisions
 
-- 10-bit/FP16 GL intermediate before the full scene-linear shader.
+- True 10-bit encoder input. An FP16 encoder intermediate and dither now ship
+  (ADR 0017); the encoder surface is still RGBA8888, so true 10-bit delivery is
+  still pending.
 - Working space (recommended linear Rec.2020) and SDR/HDR delivery conversion.
 - White-balance ownership (recommended camera AWB locked/neutral + GPU
   per-lens CCM/WB) and a Kelvin/tint target model.

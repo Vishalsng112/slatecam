@@ -37,8 +37,9 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 |---|---|
 | Phase-detect/hybrid AF | Software contrast AF ships; Camera2 exposes no PDAF controls for a hybrid pass |
 | Scene-referred metering | Metering shares the analysis frame with the histogram/waveform, so a strong LUT or log profile can bias the target; add a pre-look metering pass |
-| 10-bit / FP16 GL intermediate | Required before the full scene-linear colour shader; the encoder stream is Main10 but the current GL intermediate is RGBA8888 |
-| Scene-linear colour shader | Pending the 10-bit intermediate and delivery/working-space decision (ADR 0016) |
+| True 10-bit encoder input | FP16 intermediate + dither ships; the encoder surface is still RGBA8888. A 10-bit/P010 surface or buffer-input path is still required for true 10-bit source |
+| Scene-linear colour shader | FP16 intermediate is available; the scene-linear/working-space shader is still pending the delivery and working-space decisions |
+
 | Per-lens CCM/WB measurement | Schema and lookup ship; the database still has no measured ColorChecker data |
 | 65³ LUT support | The 2D atlas `n*n × n` exceeds common texture limits at 65; needs tiling or GLES3 3D textures |
 | Hybrid contrast-detect AF | Laplacian variance from the analysis FBO + HAL coarse acquisition; fall back to HAL AF |

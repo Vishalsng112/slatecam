@@ -14,7 +14,7 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | 1 | Prober | Done (schema 1.11.0, prober 1.10.0) |
 | 2 | Camera core + preview | Done |
 | 3 | Recording | Done on Pad 3 and POCO X6 Pro |
-| 4 | GPU + profiles | Done |
+| 4 | GPU + profiles | Done; FP16 encoder intermediate and dither shipped |
 | 5 | Advanced capture | Mostly done: shutter angle, gyro, focus shift, concurrent verification, metering patterns, AE response speed and software focus with scenarios. Phase-detect/hybrid AF has no Camera2 control |
 | **5.5** | **Shoot profiles / Movie-Vlog** | **Complete except measured colour data: verification, shoot set, profiles, console and seamless switch done** |
 | 6 | AI (optional) | Contract only |
