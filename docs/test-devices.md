@@ -828,6 +828,22 @@ test harness can inject single taps but not multi-touch, so this pass verifies t
 tap path on hardware and the pinch path by construction; the on-screen zoom
 slider remains the precision fallback.
 
+### Scene-linear colour shader and routing (Pad 3, build 2084)
+
+| Check | Result |
+|---|---|
+| HLG 1080p | Main 10, `arib-std-b67`, BT.2020, 120 frames / ~4 s with FP16 intermediate |
+| HLG 4K | 3840×2160 Main 10, `arib-std-b67`, BT.2020, 120 frames / ~4 s |
+| SDR 1080p | Main, `bt709`, BT.709 primaries, 120 frames / ~4 s |
+| Preview | normal SDR image; HLG preview uses HLG inverse + BT.2020→BT.709 |
+| SlateLog | preview visibly flat/log; encoded clip remained standard HLG Main10 |
+| Analysis/metering | focus locked, meter stable (0.424 luma, compensation 1) |
+| FP16 | encoder intermediate 1920×1080 / 3840×2160 RGBA16F |
+| Diagnostics | `profile … log=true`, `preview log route=true`; no shader compile errors |
+
+True 10-bit source is still gated by the RGBA8888 encoder surface; the FP16
+intermediate is present and dithered.
+
 ### FP16 encoder intermediate (Pad 3, build 2081)
 
 | Check | Result |

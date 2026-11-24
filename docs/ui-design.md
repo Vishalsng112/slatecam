@@ -312,7 +312,10 @@ restarts. There is no face or eye tracking.
 
 The trim is composed with the active picture profile and LUT, applies to the
 preview and the recording through the same shader, and persists across restarts.
-Named profile saving/editing remains a separate feature.
+SlateLog is a monitoring view: selecting it shows a flat log preview while the
+encoder still receives HLG or Rec.709. The Colour card states this explicitly.
+Named profile saving/editing and a separate monitoring-only LUT remain future
+work.
 
 ### 5.6.2 Viewfinder card
 

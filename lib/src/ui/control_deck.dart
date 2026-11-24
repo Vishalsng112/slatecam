@@ -1209,6 +1209,13 @@ class _ControlDeckState extends State<ControlDeck> {
                 ),
             ],
           ),
+          if (state.profile == 'slatelog')
+            Text(
+              'Monitoring view only; clips are delivered HLG/Rec.709.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+            ),
           TextButton.icon(
             style: TextButton.styleFrom(
               visualDensity: VisualDensity.compact,

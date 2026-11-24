@@ -48,7 +48,8 @@ data class InputProfile(
         var outB = mb * exposureTrim
 
         if (saturationTrim != 1f) {
-            val luma = 0.2126f * outR + 0.7152f * outG + 0.0722f * outB
+            // Working space is linear Rec.2020.
+            val luma = 0.2627f * outR + 0.6780f * outG + 0.0593f * outB
             outR = luma + (outR - luma) * saturationTrim
             outG = luma + (outG - luma) * saturationTrim
             outB = luma + (outB - luma) * saturationTrim

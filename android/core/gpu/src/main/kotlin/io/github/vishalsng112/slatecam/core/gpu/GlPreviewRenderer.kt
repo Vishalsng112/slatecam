@@ -47,11 +47,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uTexMatrix = 0
     private var uRotation = 0
     private var uTexture = 0
-    private var uHlgToSdr = 0
+    private var uInputHlg = 0
+    private var uOutputHlg = 0
+    private var uIsPreview = 0
     private var uExposure = 0
     private var uContrast = 0
     private var uSaturation = 0
-    private var uLog = 0
+    private var uPivot = 0
+    private var uKnee = 0
+    private var uToe = 0
+    private var uLogPreview = 0
     private var uMono = 0
     private var uZebra = 0
     private var uZebraThreshold = 0
@@ -120,6 +125,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var previewWidth = 1920
     private var previewHeight = 1080
     private var started = false
+    private var lastPreviewLogRoute = false
 
     @Volatile
     private var tenBitSource = false
@@ -148,6 +154,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var saturation = 1f
     @Volatile private var logEnabled = false
     @Volatile private var monochrome = false
+    @Volatile private var profilePivot = 0.18f
+    @Volatile private var profileKnee = 0.8f
+    @Volatile private var profileToe = 0f
     @Volatile private var zebra = false
     @Volatile private var zebraThreshold = 0.9f
     @Volatile private var falseColor = false
@@ -209,12 +218,23 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         saturation: Float,
         logEnabled: Boolean,
         monochrome: Boolean,
+        pivot: Float = 0.18f,
+        highlightRolloffKnee: Float = 0.8f,
+        shadowToe: Float = 0f,
     ) {
         this.exposure = exposure
         this.contrast = contrast
         this.saturation = saturation
         this.logEnabled = logEnabled
         this.monochrome = monochrome
+        Log.i(
+            TAG,
+            "profile exp=$exposure contrast=$contrast sat=$saturation " +
+                "log=$logEnabled mono=$monochrome pivot=$pivot knee=$highlightRolloffKnee",
+        )
+        this.profilePivot = pivot
+        this.profileKnee = highlightRolloffKnee
+        this.profileToe = shadowToe
     }
 
     fun setZebra(enabled: Boolean, threshold: Float) {
@@ -672,11 +692,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uTexMatrix = GLES20.glGetUniformLocation(program, "uTexMatrix")
         uRotation = GLES20.glGetUniformLocation(program, "uRotation")
         uTexture = GLES20.glGetUniformLocation(program, "uTexture")
-        uHlgToSdr = GLES20.glGetUniformLocation(program, "uHlgToSdr")
+        uInputHlg = GLES20.glGetUniformLocation(program, "uInputHlg")
+        uOutputHlg = GLES20.glGetUniformLocation(program, "uOutputHlg")
+        uIsPreview = GLES20.glGetUniformLocation(program, "uIsPreview")
         uExposure = GLES20.glGetUniformLocation(program, "uExposure")
         uContrast = GLES20.glGetUniformLocation(program, "uContrast")
         uSaturation = GLES20.glGetUniformLocation(program, "uSaturation")
-        uLog = GLES20.glGetUniformLocation(program, "uLog")
+        uPivot = GLES20.glGetUniformLocation(program, "uPivot")
+        uKnee = GLES20.glGetUniformLocation(program, "uKnee")
+        uToe = GLES20.glGetUniformLocation(program, "uToe")
+        uLogPreview = GLES20.glGetUniformLocation(program, "uLogPreview")
         uMono = GLES20.glGetUniformLocation(program, "uMono")
         uZebra = GLES20.glGetUniformLocation(program, "uZebra")
         uZebraThreshold = GLES20.glGetUniformLocation(program, "uZebraThreshold")
@@ -780,7 +805,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         renderTo(
             outputEglSurface,
             frameTimestampNs,
-            tonemap = tenBitSource,
+            isPreview = true,
             overlay = true,
             frameTimestampNs = frameTimestampNs,
         )
@@ -802,7 +827,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         onFrameRendered()
     }
 
-    private fun drawQuad(tonemap: Boolean, overlay: Boolean) {
+    private fun drawQuad(isPreview: Boolean, overlay: Boolean) {
         GLES20.glUseProgram(program)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
@@ -812,11 +837,21 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform1i(uLut, 1)
         GLES20.glUniform1i(uLutEnabled, if (lutEnabled) 1 else 0)
         GLES20.glUniform1f(uLutSize, if (lutSize > 0f) lutSize else 2f)
-        GLES20.glUniform1i(uHlgToSdr, if (tonemap) 1 else 0)
+        GLES20.glUniform1i(uInputHlg, if (tenBitSource) 1 else 0)
+        GLES20.glUniform1i(uOutputHlg, if (!isPreview && tenBitSource) 1 else 0)
+        GLES20.glUniform1i(uIsPreview, if (isPreview) 1 else 0)
         GLES20.glUniform1f(uExposure, exposure)
         GLES20.glUniform1f(uContrast, contrast)
         GLES20.glUniform1f(uSaturation, saturation)
-        GLES20.glUniform1i(uLog, if (logEnabled) 1 else 0)
+        GLES20.glUniform1f(uPivot, profilePivot)
+        GLES20.glUniform1f(uKnee, profileKnee)
+        GLES20.glUniform1f(uToe, profileToe)
+        val previewLog = isPreview && logEnabled
+        GLES20.glUniform1i(uLogPreview, if (previewLog) 1 else 0)
+        if (isPreview && previewLog != lastPreviewLogRoute) {
+            lastPreviewLogRoute = previewLog
+            Log.i(TAG, "preview log route=$previewLog (uniform=$uLogPreview)")
+        }
         GLES20.glUniform1i(uMono, if (monochrome) 1 else 0)
         GLES20.glUniform1i(uZebra, if (overlay && zebra) 1 else 0)
         GLES20.glUniform1f(uZebraThreshold, zebraThreshold)
@@ -854,7 +889,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glViewport(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT)
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        drawQuad(tonemap = false, overlay = false)
+        drawQuad(isPreview = false, overlay = false)
 
         val byteCount = ANALYSIS_WIDTH * ANALYSIS_HEIGHT * 4
         val buffer = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder())
@@ -1049,7 +1084,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             renderTo(
                 encoderEglSurface,
                 timestampNs,
-                tonemap = false,
+                isPreview = false,
                 overlay = false,
                 frameTimestampNs = frameTimestampNs,
             )
@@ -1068,7 +1103,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glViewport(0, 0, captureWidth, captureHeight)
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        drawQuad(tonemap = false, overlay = false)
+        drawQuad(isPreview = false, overlay = false)
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
 
         // Copy the FP16 result to the encoder surface at 1:1.
@@ -1213,7 +1248,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private fun renderTo(
         surface: EGLSurface,
         timestampNs: Long,
-        tonemap: Boolean,
+        isPreview: Boolean,
         overlay: Boolean,
         frameTimestampNs: Long = timestampNs,
     ) {
@@ -1226,7 +1261,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
-        drawQuad(tonemap, overlay)
+        drawQuad(isPreview, overlay)
 
         if (surface == encoderEglSurface) {
             if (captureEncoderTimestamps) {
@@ -1337,11 +1372,17 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             precision highp float;
             varying vec2 vTexCoord;
             uniform samplerExternalOES uTexture;
-            uniform int uHlgToSdr;
+
+            uniform int uInputHlg;
+            uniform int uOutputHlg;
+            uniform int uIsPreview;
             uniform float uExposure;
             uniform float uContrast;
             uniform float uSaturation;
-            uniform int uLog;
+            uniform float uPivot;
+            uniform float uKnee;
+            uniform float uToe;
+            uniform int uLogPreview;
             uniform int uMono;
             uniform int uZebra;
             uniform float uZebraThreshold;
@@ -1360,8 +1401,90 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform int uLutEnabled;
             uniform float uLutSize;
 
-            float luma(vec3 c) {
+            float luma2020(vec3 c) {
+                return dot(c, vec3(0.2627, 0.6780, 0.0593));
+            }
+
+            float luma709(vec3 c) {
                 return dot(c, vec3(0.2126, 0.7152, 0.0722));
+            }
+
+            vec3 bt709ToLinear(vec3 v) {
+                vec3 x = max(v, vec3(0.0));
+                vec3 low = x / 4.5;
+                vec3 high = pow(max((x + 0.099) / 1.099, vec3(0.0)),
+                                vec3(1.0 / 0.45));
+                return mix(low, high, step(vec3(0.081), x));
+            }
+
+            vec3 linearToBt709(vec3 v) {
+                vec3 x = max(v, vec3(0.0));
+                vec3 low = 4.5 * x;
+                vec3 high = 1.099 * pow(x, vec3(0.45)) - 0.099;
+                return mix(low, high, step(vec3(0.018), x));
+            }
+
+            vec3 hlgToLinear(vec3 e) {
+                vec3 x = clamp(e, 0.0, 1.0);
+                vec3 low = (x * x) / 3.0;
+                vec3 high = (exp((x - 0.55991073) / 0.17883277) + 0.28466892) / 12.0;
+                return mix(low, high, step(vec3(0.5), x));
+            }
+
+            vec3 linearToHlg(vec3 v) {
+                vec3 x = clamp(v, 0.0, 1.0);
+                vec3 low = sqrt(3.0 * x);
+                vec3 high = 0.17883277 * log(max(12.0 * x - 0.28466892, vec3(1e-5)))
+                    + 0.55991073;
+                return mix(low, high, step(vec3(1.0 / 12.0), x));
+            }
+
+            vec3 bt709To2020(vec3 c) {
+                return vec3(
+                    dot(c, vec3(0.6274, 0.3293, 0.0433)),
+                    dot(c, vec3(0.0691, 0.9195, 0.0114)),
+                    dot(c, vec3(0.0164, 0.0880, 0.8956))
+                );
+            }
+
+            vec3 bt2020To709(vec3 c) {
+                return vec3(
+                    dot(c, vec3(1.6605, -0.5876, -0.0728)),
+                    dot(c, vec3(-0.1246, 1.1329, -0.0083)),
+                    dot(c, vec3(-0.0182, -0.1006, 1.1187))
+                );
+            }
+
+            float shapeChannel(float v) {
+                float p = clamp(uPivot, 0.001, 1.0);
+                float c = max(uContrast, 0.01);
+                float x = max(v, 0.0);
+                if (x > 0.0) {
+                    x = p * pow(x / p, c);
+                }
+                if (uToe > 0.0 && x < p) {
+                    float t = clamp(x / p, 0.0, 1.0);
+                    x += clamp(uToe, 0.0, 1.0) * 0.05 * (1.0 - t) * (1.0 - t);
+                }
+                float k = clamp(uKnee, 0.1, 1.0);
+                if (x > k && k < 1.0) {
+                    float range = max(1.0 - k, 0.001);
+                    x = k + range * (1.0 - exp(-(x - k) / range));
+                }
+                return clamp(x, 0.0, 1.0);
+            }
+
+            vec3 shape(vec3 c) {
+                return vec3(
+                    shapeChannel(c.r),
+                    shapeChannel(c.g),
+                    shapeChannel(c.b)
+                );
+            }
+
+            vec3 slateLog(vec3 c) {
+                return clamp(0.738 + 0.169 * log2(max(c, vec3(0.0)) + 0.07),
+                             0.0, 1.0);
             }
 
             vec3 applyLut(vec3 c) {
@@ -1377,61 +1500,64 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 return mix(texture2D(uLut, uv0).rgb, texture2D(uLut, uv1).rgb, blend);
             }
 
-            // Approximate HLG -> SDR for the preview only. The encoder receives
-            // the untouched HLG signal.
-            vec3 hlgToSdr(vec3 e) {
-                vec3 low = (e * e) / 3.0;
-                vec3 high = (exp((e - 0.55991073) / 0.17883277) + 0.28466892) / 12.0;
-                vec3 x = mix(low, high, step(vec3(0.5), e));
-                return pow(clamp(x * 2.5, 0.0, 1.0), vec3(1.0 / 2.2));
-            }
-
             void main() {
                 vec4 src = texture2D(uTexture, vTexCoord);
-                vec3 c = src.rgb;
 
-                if (uHlgToSdr == 1) {
-                    c = hlgToSdr(c);
+                // 1. Input EOTF to scene-linear. HLG is BT.2020; SDR is BT.709
+                // and is converted into the BT.2020 working space.
+                vec3 c;
+                if (uInputHlg == 1) {
+                    c = hlgToLinear(src.rgb);
+                } else {
+                    c = bt709To2020(bt709ToLinear(src.rgb));
                 }
 
-                // Device normalisation runs before any creative transform.
+                // 2. Per-lens normalisation in linear working space.
                 c.r *= uInputWb.x;
                 c.b *= uInputWb.y;
                 c = uInputMatrix * c;
                 c *= uInputExposure;
-                c *= uWhiteBalance;
-                float inputLuma = luma(c);
-                c = mix(vec3(inputLuma), c, uInputSaturation);
                 c += vec3(uInputShadowLift);
+                float inputLuma = luma2020(c);
+                c = mix(vec3(inputLuma), c, uInputSaturation);
 
+                // 3. Creative trim and profile tone shaping in linear.
+                c *= uWhiteBalance;
                 c *= uExposure;
-                float y = luma(c);
-                c = mix(vec3(y), c, uSaturation);
-                c = (c - 0.5) * uContrast + 0.5;
+                c = shape(c);
+                float shapedLuma = luma2020(c);
+                c = mix(vec3(shapedLuma), c, uSaturation);
 
                 if (uMono == 1) {
-                    c = vec3(luma(c));
+                    c = vec3(luma2020(c));
                 }
 
-                if (uLog == 1) {
-                    vec3 linear = pow(max(c, vec3(0.0)), vec3(2.2));
-                    vec3 encoded = 0.738 + 0.169 * log2(linear + 0.07);
-                    c = clamp(encoded, 0.0, 1.0);
+                // 4/5. Output routing and creative LUT in the delivery domain.
+                if (uIsPreview == 1) {
+                    vec3 displayLinear = bt2020To709(c);
+                    if (uLogPreview == 1) {
+                        c = slateLog(clamp(displayLinear, 0.0, 1.0));
+                    } else {
+                        c = linearToBt709(clamp(displayLinear, 0.0, 1.0));
+                    }
+                } else if (uOutputHlg == 1) {
+                    c = linearToHlg(clamp(c, 0.0, 1.0));
+                } else {
+                    c = linearToBt709(clamp(bt2020To709(c), 0.0, 1.0));
                 }
-
                 c = clamp(c, 0.0, 1.0);
 
                 if (uLutEnabled == 1) {
                     c = applyLut(c);
                 }
 
-                if (uZebra == 1 && luma(c) >= uZebraThreshold) {
+                if (uZebra == 1 && luma709(c) >= uZebraThreshold) {
                     float stripe = step(0.5, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.06));
                     c = mix(c, vec3(1.0, 0.1, 0.1), stripe * 0.8);
                 }
 
                 if (uFalseColor == 1) {
-                    float level = luma(c);
+                    float level = luma709(c);
                     if (level < 0.02) {
                         c = vec3(0.35, 0.0, 0.5);
                     } else if (level < 0.15) {
@@ -1452,10 +1578,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                     vec2 uvR = vTexCoord + vec2(uTexelSize.x, 0.0);
                     vec2 uvT = vTexCoord + vec2(0.0, uTexelSize.y);
                     vec2 uvB = vTexCoord + vec2(0.0, -uTexelSize.y);
-                    float l = luma(texture2D(uTexture, uvL).rgb);
-                    float r = luma(texture2D(uTexture, uvR).rgb);
-                    float t = luma(texture2D(uTexture, uvT).rgb);
-                    float b = luma(texture2D(uTexture, uvB).rgb);
+                    float l = luma709(texture2D(uTexture, uvL).rgb);
+                    float r = luma709(texture2D(uTexture, uvR).rgb);
+                    float t = luma709(texture2D(uTexture, uvT).rgb);
+                    float b = luma709(texture2D(uTexture, uvB).rgb);
                     float edge = abs(l - r) + abs(t - b);
                     if (edge > uPeakingThreshold) {
                         c = mix(c, vec3(1.0, 0.15, 0.15), uPeakingStrength);

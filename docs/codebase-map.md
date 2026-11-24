@@ -62,6 +62,7 @@ root is `android/`, not the repository root.
 | Software focus engine / scenarios | `:core:camera` | `SoftwareFocus.kt`, `CameraController.submitFocus` |
 | Focus sharpness score | `:core:gpu` | `FrameAnalysis.focusScore`, `GlPreviewRenderer.focusScore` |
 | FP16 encoder intermediate | `:core:gpu` | `GlPreviewRenderer.renderEncoder`, `ensureIntermediate` |
+| Scene-linear shader / output routing | `:core:gpu` | `GlPreviewRenderer.ShaderSource.FRAGMENT` |
 | Viewfinder tap-to-focus / pinch | `lib/src/ui/capture_screen.dart`, `:core:gpu` transform, `:core:camera` AF region | `GlPreviewRenderer.viewfinderToBuffer`, `CameraController.setFocusPoint` |
 | Colour-science trim | `:core:profile` | `ColorScience.kt`, `SlateCamBridge.applyProfile` |
 | Linear tone math (pivot/knee/toe) | `:core:profile` | `ToneShaper.kt`, `PictureProfile.kt` |
@@ -134,6 +135,7 @@ on camera change`
 - **Independent viewfinder resolution:** ADR 0015.
 - **Staged colour architecture:** ADR 0016.
 - **FP16 encoder intermediate:** ADR 0017.
+- **Scene-linear shader and routing:** ADR 0018.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current

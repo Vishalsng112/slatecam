@@ -38,7 +38,9 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 | Phase-detect/hybrid AF | Software contrast AF ships; Camera2 exposes no PDAF controls for a hybrid pass |
 | Scene-referred metering | Metering shares the analysis frame with the histogram/waveform, so a strong LUT or log profile can bias the target; add a pre-look metering pass |
 | True 10-bit encoder input | FP16 intermediate + dither ships; the encoder surface is still RGBA8888. A 10-bit/P010 surface or buffer-input path is still required for true 10-bit source |
-| Scene-linear colour shader | FP16 intermediate is available; the scene-linear/working-space shader is still pending the delivery and working-space decisions |
+| Recordable SlateLog | Scene-linear routing is current; SlateLog is preview-only because a custom log cannot be tagged honestly in an HLG/Rec.709 container |
+| Monitoring-only LUT | Creative LUT is baked into both outputs; a separate preview-only LUT is not implemented |
+| Manual white balance | Kelvin/tint + per-lens offsets are schema/probe only; no UI or Camera2 gain path |
 
 | Per-lens CCM/WB measurement | Schema and lookup ship; the database still has no measured ColorChecker data |
 | 65³ LUT support | The 2D atlas `n*n × n` exceeds common texture limits at 65; needs tiling or GLES3 3D textures |

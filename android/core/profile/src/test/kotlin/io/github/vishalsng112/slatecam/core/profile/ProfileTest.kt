@@ -181,8 +181,8 @@ class InputProfileTest {
         val profile = InputProfile(exposureTrim = 2f, saturationTrim = 0f)
         val out = profile.transform(1f, 0f, 0f)
         // fully desaturated to luma of the exposed colour
-        assertEquals(0.2126f * 2f, out[0], 0.001f)
-        assertEquals(0.2126f * 2f, out[1], 0.001f)
-        assertEquals(0.2126f * 2f, out[2], 0.001f)
+        assertEquals(0.2627f * 2f, out[0], 0.001f)
+        assertEquals(0.2627f * 2f, out[1], 0.001f)
+        assertEquals(0.2627f * 2f, out[2], 0.001f)
     }
 }

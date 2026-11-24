@@ -665,6 +665,9 @@ class SlateCamBridge private constructor(
                     tuning.saturation,
                     false,
                     false,
+                    0.18f,
+                    1f,
+                    0f,
                 )
                 renderer.setWhiteBalanceTuning(tuning.temperature, tuning.tint)
                 renderer.setLut(entry.lut.size, entry.lut.copyData())
@@ -709,6 +712,9 @@ class SlateCamBridge private constructor(
             saturation = profile.saturation * tuning.saturation,
             logEnabled = profile.logEnabled,
             monochrome = profile.monochrome,
+            pivot = profile.pivot,
+            highlightRolloffKnee = profile.highlightRolloffKnee,
+            shadowToe = profile.shadowToe,
         )
         renderer.setWhiteBalanceTuning(tuning.temperature, tuning.tint)
         val lut = profile.lutId?.let(BuiltInLuts::byId)

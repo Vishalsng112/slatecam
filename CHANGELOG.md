@@ -112,6 +112,12 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Pad 3 probe evidence: schema 1.11.0 reports `contrast_curve`/`fast`/
   `high_quality`, 512 curve points and `transform_matrix`/`fast`/`high_quality`
   for both cameras; `gamma_value` is not advertised.
+- Scene-linear colour shader: HLG/BT.709 input EOTF → linear Rec.2020 →
+  per-lens WB/CCM/shadow → profile contrast/pivot/knee/toe/saturation → creative
+  LUT → output routing. Encoder gets HLG or BT.709; analysis gets the delivery
+  signal without monitoring transforms; preview gets BT.709 or SlateLog plus
+  LUT/overlays. SlateLog is now a monitoring view only, so containers no longer
+  carry a baked log signal under HLG/Rec.709 metadata.
 - FP16 encoder intermediate: when the GL driver supports half-float render
   targets, the camera + look are rendered into RGBA16F at capture size and
   copied to the encoder with an ordered dither before the 8-bit surface. The
