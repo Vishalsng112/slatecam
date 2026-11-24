@@ -525,8 +525,7 @@ class CameraSource(private val context: Context) {
             toneMapModes = c.get(CameraCharacteristics.TONEMAP_AVAILABLE_TONE_MAP_MODES)
                 ?.map(::toneMapName) ?: emptyList(),
             maxToneMapCurvePoints = c.get(CameraCharacteristics.TONEMAP_MAX_CURVE_POINTS),
-            colorCorrectionModes = c.get(CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_MODES)
-                ?.map(::colorCorrectionName) ?: emptyList(),
+            colorCorrectionModes = colorCorrectionModesFor(c),
         )
     }
 
@@ -648,6 +647,20 @@ class CameraSource(private val context: Context) {
         CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION -> "preview"
         else -> "mode_$mode"
     }
+
+    /**
+     * The public field is not present in every supported Android release even
+     * though it exists in the compile SDK. Read it reflectively and report an
+     * empty list rather than failing the whole camera probe on older builds.
+     */
+    private fun colorCorrectionModesFor(c: CameraCharacteristics): List<String> =
+        runCatching {
+            val field = CameraCharacteristics::class.java
+                .getField("COLOR_CORRECTION_AVAILABLE_MODES")
+            @Suppress("UNCHECKED_CAST")
+            val key = field.get(null) as CameraCharacteristics.Key<IntArray>
+            c.get(key)?.map(::colorCorrectionName) ?: emptyList()
+        }.getOrDefault(emptyList())
 
     private fun toneMapName(value: Int): String = when (value) {
         CameraCharacteristics.TONEMAP_MODE_CONTRAST_CURVE -> "contrast_curve"

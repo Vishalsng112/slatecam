@@ -1380,8 +1380,14 @@ class SlateCamBridge private constructor(
         }
     }
 
-    private fun activeProfileId(): String =
-        profileStore.activeId() ?: ensureProfiles().first().id
+    private fun activeProfileId(): String {
+        val profiles = ensureProfiles()
+        val active = profileStore.activeId()
+        return when {
+            active != null && profiles.any { it.id == active } -> active
+            else -> profiles.firstOrNull()?.id ?: ""
+        }
+    }
 
     private fun updateActiveProfile(selectedIds: Set<String>) {
         ensureProfiles()

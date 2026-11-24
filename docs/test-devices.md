@@ -16,6 +16,7 @@ capabilities are trusted.
 |---|---|---|---|
 | POCO X6 Pro 5G | MediaTek Dimensity 8300-Ultra | **Adversarial device** | Xiaomi/MediaTek HALs are the classic case of advertised capability that does not survive a real encode. If the prober is too trusting, this device proves it. |
 | OnePlus Pad 3 | Qualcomm Snapdragon 8 Gen 3 | **Reference device** | Cleaner HAL behaviour and a different vendor stack (Qualcomm `c2.*` encoders) from the MediaTek path. Also catches tablet-specific layout and camera-set assumptions. |
+| Xiaomi Pad 6 | Qualcomm Snapdragon 870 | **Second tablet / 8-bit-only** | HyperOS/MIUI stack with no `DYNAMIC_RANGE_TEN_BIT` and no 4K 4:3 stream; proves the probe gates legacy/8-bit tablets without device branches. |
 
 ### What each device must prove
 
@@ -827,6 +828,41 @@ path clamps `startZoom × scale` to the camera range and calls `setZoom`. The AD
 test harness can inject single taps but not multi-touch, so this pass verifies the
 tap path on hardware and the pinch path by construction; the on-screen zoom
 slider remains the precision fallback.
+
+### Xiaomi Pad 6 — new test device (2026-11-24, build 2086)
+
+- Device: Xiaomi Pad 6 (`23043RP34I`, `pipa`), Android 14 / SDK 34,
+  Snapdragon 870 (SM8250), 1800×2880 at 400 dpi.
+- Probe: **schema 1.11.0 / prober 1.10.0**, 381–445 ms. Tier **standard**,
+  missing `dynamic_range_ten_bit`.
+- Back camera 0 (4208×3120):
+  - UHD 16:9 8-bit 24/25/30 supported; UHD 16:9 10-bit rejected because the
+    camera does not advertise `DYNAMIC_RANGE_TEN_BIT`.
+  - 1080p 16:9 and 1080p 4:3 (1440×1080) 8-bit at 24/25/30.
+  - 4K 4:3 (3840×2880), 4096×3072 and 2880×2160 are **not offered**; the
+    corresponding presets are correctly `supported=false`, so the 4:3 chip is
+    inert at 4K and active at 1080p without a device branch.
+- Recorded and bitstream-checked:
+  - 4K 16:9: `3840×2160 Main yuv420p bt709/bt709`, 30 fps, 5 s, FP16
+    intermediate `RGBA16F`.
+  - 1080p 4:3: `1440×1080 Main yuv420p bt709/bt709`, 30 fps, FP16
+    intermediate `RGBA16F`.
+  - 1080p 16:9: `Main yuv420p bt709/bt709`.
+- Focus/metering stable at the delivery analysis signal (`SlateCamFocus`
+  locked, meter within ~0.01 EV of target).
+
+#### Bugs this device exposed
+
+1. **Fresh-install crash before the first probe.** With no probe report there
+   are no eligible lenses, so `activeProfileId()` called `.first()` on an empty
+   list and the app died on the first state push. It now returns the stored
+   active profile only when it still exists, otherwise the first available
+   profile or an empty id.
+2. **Probe aborted on Android 14.** `CameraCharacteristics
+   .COLOR_CORRECTION_AVAILABLE_MODES` is in the compile SDK but absent from the
+   Android 14 framework, so every camera probe threw `NoSuchFieldError`. The
+   key is now read reflectively and an absent key reports an empty list instead
+   of failing the whole camera.
 
 ### Scene-linear colour shader and routing (Pad 3, build 2084)
 

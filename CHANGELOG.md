@@ -197,6 +197,12 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   duration and lens pose/intrinsics.
 
 ### Fixed
+- Fresh install on a device with no probe report no longer crashes on the first
+  state push: `activeProfileId()` handles an empty eligible-lens set instead of
+  calling `.first()`.
+- Probing on Android 14 no longer aborts every camera when
+  `COLOR_CORRECTION_AVAILABLE_MODES` is absent from the platform framework; the
+  key is read reflectively and reports an empty list when missing.
 - Pad 3 front/back 10-bit configuration no longer fails the session; the mode
   falls back only where the target lens is not verified.
 - Preview/recording framing now match; 4:3 no longer stretches.
