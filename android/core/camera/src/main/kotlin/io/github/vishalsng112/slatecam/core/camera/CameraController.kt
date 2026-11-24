@@ -48,6 +48,12 @@ data class CameraUiState(
     val autoFocusSupported: Boolean = true,
     val focusMode: String = "continuous_video",
     val focusModes: List<String> = emptyList(),
+    val focusScenario: String = FocusScenario.WEDDING.wireValue,
+    val focusScenarios: List<String> = FocusScenario.wireValues,
+    /** 0 = sticky, 1 = quick to refocus when the scene changes. */
+    val focusShiftSensitivity: Float = 0.5f,
+    /** 0 = slow cinematic rack, 1 = quick rack. */
+    val focusTransitionSpeed: Float = 0.5f,
     val previewWidth: Int,
     val previewHeight: Int,
     val previewRotationDegrees: Int,
@@ -141,10 +147,18 @@ class CameraController(private val context: Context) {
     private var aeCompensationMax = 0
     private var aeCompensationStepEv = 0f
     private var aeCompensationAccumulator = 0f
+    private var lastPCompensationMs = 0L
     private var autoFocus = true
     private var autoFocusSupported = true
     private var focusModes: List<String> = emptyList()
     private var focusMode = "continuous_video"
+    private val softwareFocus = SoftwareFocusEngine()
+    private var focusScenario = FocusScenario.WEDDING
+    private var focusShiftSensitivity = 0.5f
+    private var focusTransitionSpeed = 0.5f
+    private var softFocusSettleUntilMs = 0L
+    private var lastFocusLogMs = 0L
+    private var softwareFocusInitialized = false
     private var rotationDegrees = 0
     private var glRotationDegrees = 0
     private var initialized = false
@@ -435,14 +449,26 @@ class CameraController(private val context: Context) {
                 ) {
                     return@post
                 }
+                // P has the HAL AE and our bias in the same feedback path. At
+                // 15 Hz analysis the two loops can fight, so update the bias at
+                // 5 Hz, use a wider dead band, and move at most one step.
+                val nowMs = SystemClock.elapsedRealtime()
+                if (nowMs - lastPCompensationMs < 200L) return@post
+                lastPCompensationMs = nowMs
+                if (kotlin.math.abs(sample.errorEv) < P_DEAD_BAND_EV) {
+                    aeCompensationAccumulator = 0f
+                    return@post
+                }
                 val correctionEv = exposureController.correctionEv(
                     sample,
-                    elapsed,
+                    P_UPDATE_SECONDS,
                     meteringSpeed,
                 )
                 if (correctionEv == 0f) return@post
                 aeCompensationAccumulator += correctionEv / aeCompensationStepEv
-                val deltaSteps = aeCompensationAccumulator.roundToInt()
+                val deltaSteps = aeCompensationAccumulator
+                    .roundToInt()
+                    .coerceIn(-1, 1)
                 if (deltaSteps == 0) return@post
                 val next = (aeCompensationSteps + deltaSteps)
                     .coerceIn(aeCompensationMin, aeCompensationMax)
@@ -476,6 +502,7 @@ class CameraController(private val context: Context) {
         handler.post {
             focusMode = FocusMode.OFF
             autoFocus = false
+            softwareFocusInitialized = false
             focusTarget = value.coerceIn(0f, focusMax)
             startFocusRamp()
         }
@@ -495,6 +522,9 @@ class CameraController(private val context: Context) {
                 if (kotlin.math.abs(delta) <= maxStep) {
                     focusDiopters = focusTarget
                     focusRampActive = false
+                    // Give the lens a moment to settle before the next score is
+                    // treated as valid. Contrast AF samples are position-sensitive.
+                    softFocusSettleUntilMs = SystemClock.elapsedRealtime() + 120L
                     applyAndEmit()
                 } else {
                     focusDiopters += if (delta > 0f) maxStep else -maxStep
@@ -549,11 +579,108 @@ class CameraController(private val context: Context) {
         handler.post {
             if (mode !in focusModes) return@post
             focusMode = mode
-            autoFocus = FocusMode.isAutomatic(mode)
+            autoFocus = FocusMode.isAutomatic(mode) && mode != FocusMode.SOFTWARE
             if (mode == FocusMode.OFF) focusTarget = focusDiopters
+            if (mode == FocusMode.SOFTWARE) {
+                focusShiftSpeed = transitionToSpeed(focusTransitionSpeed)
+                softwareFocusInitialized = false
+                softwareFocus.reset(focusDiopters)
+                focusTarget = focusDiopters
+                softFocusSettleUntilMs = SystemClock.elapsedRealtime() + 150L
+            }
             applyAndEmit()
         }
     }
+
+    fun setFocusScenario(scenario: String) {
+        val selected = FocusScenario.fromWire(scenario)
+        handler.post {
+            focusScenario = selected
+            focusShiftSensitivity = selected.shiftSensitivity
+            focusTransitionSpeed = selected.transitionSpeed
+            focusShiftSpeed = transitionToSpeed(focusTransitionSpeed)
+            if (focusMax > 0f && FocusMode.SOFTWARE in focusModes) {
+                focusMode = FocusMode.SOFTWARE
+                autoFocus = false
+                softwareFocus.reset(focusDiopters)
+                focusTarget = focusDiopters
+            }
+            applyAndEmit()
+        }
+    }
+
+    /** Restores persisted settings without switching the active focus mode. */
+    fun restoreFocusSettings(scenario: String, sensitivity: Float, speed: Float) {
+        handler.post {
+            focusScenario = FocusScenario.fromWire(scenario)
+            focusShiftSensitivity = sensitivity.coerceIn(0f, 1f)
+            focusTransitionSpeed = speed.coerceIn(0f, 1f)
+            focusShiftSpeed = transitionToSpeed(focusTransitionSpeed)
+            emit()
+        }
+    }
+
+    fun setFocusShiftSensitivity(value: Float) {
+        handler.post {
+            val clamped = value.coerceIn(0f, 1f)
+            if (focusShiftSensitivity == clamped) return@post
+            focusShiftSensitivity = clamped
+            emit()
+        }
+    }
+
+    fun setFocusTransitionSpeed(value: Float) {
+        handler.post {
+            val clamped = value.coerceIn(0f, 1f)
+            if (focusTransitionSpeed == clamped) return@post
+            focusTransitionSpeed = clamped
+            focusShiftSpeed = transitionToSpeed(clamped)
+            emit()
+        }
+    }
+
+    /** Feeds the GPU sharpness score into the software focus engine. */
+    fun submitFocus(score: Float) {
+        handler.post {
+            if (focusMode != FocusMode.SOFTWARE) return@post
+            if (session == null || builder == null) return@post
+            val now = SystemClock.elapsedRealtime()
+            if (now < softFocusSettleUntilMs) return@post
+            if (kotlin.math.abs(focusTarget - focusDiopters) > SOFTWARE_SETTLED_DIOPTERS) {
+                return@post
+            }
+            val update = softwareFocus.update(
+                score = score,
+                currentDiopters = focusDiopters,
+                settled = true,
+                nowMs = now,
+                maxDiopters = focusMax,
+                settings = SoftwareFocusSettings(
+                    focusShiftSensitivity,
+                    focusTransitionSpeed,
+                ),
+            )
+            val changed = update.targetDiopters != focusTarget
+            if (now - lastFocusLogMs >= 1_000L || changed) {
+                lastFocusLogMs = now
+                android.util.Log.i(
+                    "SlateCamFocus",
+                    "score=$score diopters=$focusDiopters " +
+                        "target=${update.targetDiopters} search=${update.searching} " +
+                        "locked=${update.locked} sens=$focusShiftSensitivity " +
+                        "speed=$focusTransitionSpeed",
+                )
+            }
+            if (changed) {
+                focusTarget = update.targetDiopters
+                focusShiftSpeed = transitionToSpeed(focusTransitionSpeed)
+                startFocusRamp()
+            }
+        }
+    }
+
+    private fun transitionToSpeed(value: Float): Float =
+        0.5f + 11.5f * value.coerceIn(0f, 1f)
 
     fun setOis(enabled: Boolean) {
         handler.post {
@@ -674,15 +801,24 @@ class CameraController(private val context: Context) {
         aeCompensationAccumulator = 0f
 
         focusMax = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
-        focusModes = characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
+        val cameraFocusModes = characteristics.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES)
             ?.map(::afModeName)
             ?.distinct()
             ?: emptyList()
-        autoFocusSupported = focusModes.any { it != "off" }
+        focusModes = if (focusMax > 0f) {
+            cameraFocusModes + FocusMode.SOFTWARE
+        } else {
+            cameraFocusModes
+        }
+        autoFocusSupported = cameraFocusModes.any { it != "off" }
         if (focusMode !in focusModes) {
             focusMode = FocusMode.defaultFor(focusModes)
         }
-        autoFocus = FocusMode.isAutomatic(focusMode)
+        autoFocus = FocusMode.isAutomatic(focusMode) && focusMode != FocusMode.SOFTWARE
+        if (focusMode == FocusMode.SOFTWARE) {
+            focusShiftSpeed = transitionToSpeed(focusTransitionSpeed)
+            softwareFocusInitialized = false
+        }
 
         oisModes = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
             ?.map(::oisModeName)
@@ -920,9 +1056,12 @@ class CameraController(private val context: Context) {
         }
         fpsRange?.let { request.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
 
-        if (focusMode in focusModes && FocusMode.isAutomatic(focusMode)) {
+        if (focusMode in focusModes && FocusMode.isAutomatic(focusMode) &&
+            focusMode != FocusMode.SOFTWARE
+        ) {
             request.set(CaptureRequest.CONTROL_AF_MODE, afModeValue(focusMode))
         } else {
+            // Manual focus and the software engine both own the lens distance.
             request.set(CaptureRequest.CONTROL_AF_MODE, CameraCharacteristics.CONTROL_AF_MODE_OFF)
             request.set(CaptureRequest.LENS_FOCUS_DISTANCE, focusDiopters)
         }
@@ -1045,6 +1184,10 @@ class CameraController(private val context: Context) {
             autoFocusSupported = autoFocusSupported,
             focusMode = focusMode,
             focusModes = focusModes,
+            focusScenario = focusScenario.wireValue,
+            focusScenarios = FocusScenario.wireValues,
+            focusShiftSensitivity = focusShiftSensitivity,
+            focusTransitionSpeed = focusTransitionSpeed,
             previewWidth = previewSize.width,
             previewHeight = previewSize.height,
             previewRotationDegrees = rotationDegrees,
@@ -1122,7 +1265,21 @@ class CameraController(private val context: Context) {
             // Track the HAL's current focus distance so a manual take-over starts
             // from the converged lens position. Do not disable AF here: continuous
             // video AF must keep running until the user moves the focus slider.
-            if (autoFocus) {
+            if (focusMode == FocusMode.SOFTWARE) {
+                // Only the first result seeds the engine. After that the ramp
+                // owns focusDiopters; letting the (lagging) lens result
+                // overwrite it would stall the request before it reaches the
+                // target.
+                if (!softwareFocusInitialized) {
+                    result.get(CaptureResult.LENS_FOCUS_DISTANCE)?.let {
+                        softwareFocusInitialized = true
+                        focusDiopters = it
+                        focusTarget = it
+                        softwareFocus.reset(it)
+                        softFocusSettleUntilMs = SystemClock.elapsedRealtime() + 150L
+                    }
+                }
+            } else if (autoFocus) {
                 result.get(CaptureResult.LENS_FOCUS_DISTANCE)?.let {
                     focusDiopters = it
                     focusTarget = it
@@ -1307,6 +1464,9 @@ class CameraController(private val context: Context) {
 
     companion object {
         private const val DEFAULT_METERING_SECONDS = 0.2f
+        private const val SOFTWARE_SETTLED_DIOPTERS = 0.02f
+        private const val P_DEAD_BAND_EV = 0.10f
+        private const val P_UPDATE_SECONDS = 0.2f
 
     }
 }

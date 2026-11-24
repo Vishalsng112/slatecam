@@ -77,6 +77,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var analysisTexture = 0
     private var frameCounter = 0
     private var firstFrameLogged = false
+    private val lumaFrame = FloatArray(ANALYSIS_WIDTH * ANALYSIS_HEIGHT)
 
     @Volatile
     private var analysisEnabled = false
@@ -772,6 +773,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             val g = pixels[offset + 1].toInt() and 0xFF
             val b = pixels[offset + 2].toInt() and 0xFF
             val luma = (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255f
+            lumaFrame[pixel] = luma
 
             histogram[(luma * (HISTOGRAM_BINS - 1)).toInt().coerceIn(0, HISTOGRAM_BINS - 1)]++
 
@@ -808,8 +810,37 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 lumaGrid = grid,
                 gridWidth = LUMA_GRID_WIDTH,
                 gridHeight = LUMA_GRID_HEIGHT,
+                focusScore = focusScore(),
             ),
         )
+    }
+
+    /**
+     * Laplacian energy in the central 50% of the analysis frame. This is the
+     * software-AF sharpness signal: it peaks when the lens is focused and
+     * disappears on a flat wall, which is exactly when contrast AF should hold.
+     */
+    private fun focusScore(): Float {
+        val left = ANALYSIS_WIDTH / 4
+        val right = ANALYSIS_WIDTH * 3 / 4
+        val top = ANALYSIS_HEIGHT / 4
+        val bottom = ANALYSIS_HEIGHT * 3 / 4
+        var sum = 0f
+        var count = 0
+        for (y in top until bottom) {
+            for (x in left until right) {
+                val index = y * ANALYSIS_WIDTH + x
+                val center = lumaFrame[index]
+                val laplacian = 4f * center -
+                    lumaFrame[index - 1] -
+                    lumaFrame[index + 1] -
+                    lumaFrame[index - ANALYSIS_WIDTH] -
+                    lumaFrame[index + ANALYSIS_WIDTH]
+                sum += kotlin.math.abs(laplacian)
+                count++
+            }
+        }
+        return if (count > 0) sum / count else 0f
     }
 
     private fun ensureAnalysisTarget(): Boolean {
@@ -1108,14 +1139,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         const val START_TIMEOUT_SECONDS = 5L
         const val TAG = "SlateCamGl"
 
-        const val ANALYSIS_WIDTH = 160
-        const val ANALYSIS_HEIGHT = 90
+        const val ANALYSIS_WIDTH = 320
+        const val ANALYSIS_HEIGHT = 180
         const val HISTOGRAM_BINS = 64
         const val WAVEFORM_COLUMNS = 64
         const val WAVEFORM_BINS = 16
         const val LUMA_GRID_WIDTH = 32
         const val LUMA_GRID_HEIGHT = 18
-        const val ANALYSIS_INTERVAL = 5
+        // 15 Hz at 30 fps: metering and software AF need a faster signal than
+        // the monitoring UI does. The readback is still only 320x180.
+        const val ANALYSIS_INTERVAL = 2
 
         // Android EGL extension: marks a config usable as a MediaCodec input.
         const val EGL_RECORDABLE_ANDROID = 0x3142

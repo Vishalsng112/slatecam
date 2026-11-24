@@ -59,6 +59,8 @@ root is `android/`, not the repository root.
 | Luma grid for metering | `:core:gpu` | `FrameAnalysis.kt`, `GlPreviewRenderer.runAnalysis` |
 | Lens-shading / vignette correction | `:core:camera` | `ShadingCorrection.kt`, `CameraController.applyControls` |
 | Focus mode policy | `:core:camera` | `FocusMode.kt` |
+| Software focus engine / scenarios | `:core:camera` | `SoftwareFocus.kt`, `CameraController.submitFocus` |
+| Focus sharpness score | `:core:gpu` | `FrameAnalysis.focusScore`, `GlPreviewRenderer.focusScore` |
 | OIS / EIS requests | `:core:camera` | `CameraController.readCapabilities/applyControls` |
 | Frame rendering, shader, overlays | `:core:gpu` | `GlPreviewRenderer.kt` |
 | Recording/mux/audio | `:core:codec` | `ClipRecorder.kt`, `GyroRecorder.kt` |
@@ -120,6 +122,7 @@ on camera change`
 - **Lens-shading (vignette) correction:** ADR 0009.
 - **Stabilisation and focus modes:** ADR 0010.
 - **Exposure metering and response speed:** ADR 0011.
+- **Software focus engine and scenarios:** ADR 0012.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current

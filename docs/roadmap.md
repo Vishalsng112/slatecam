@@ -15,7 +15,7 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | 2 | Camera core + preview | Done |
 | 3 | Recording | Done on Pad 3 and POCO X6 Pro |
 | 4 | GPU + profiles | Done |
-| 5 | Advanced capture | Mostly done: shutter angle, gyro, focus shift, concurrent verification, metering patterns and AE response speed. Hybrid AF remains |
+| 5 | Advanced capture | Mostly done: shutter angle, gyro, focus shift, concurrent verification, metering patterns, AE response speed and software focus with scenarios. Phase-detect/hybrid AF has no Camera2 control |
 | **5.5** | **Shoot profiles / Movie-Vlog** | **Complete except measured colour data: verification, shoot set, profiles, console and seamless switch done** |
 | 6 | AI (optional) | Contract only |
 | 7 | Device database | Done |
@@ -32,7 +32,7 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | 2 | Camera2 session, Pigeon bridge, texture preview, manual ISO/shutter/focus/WB, P/S/M |
 | 3 | 8-bit and 10-bit HLG HEVC with audio, MediaStore, recording modes, thermal guard |
 | 4 | SlateLog, LUTs, picture profiles, shader histogram/zebra/false colour/waveform/peaking/guides |
-| 5 | RAW burst, shutter angle, gyro metadata/alignment, focus shift, metering/AE response, hybrid contrast AF |
+| 5 | RAW burst, shutter angle, gyro metadata/alignment, focus shift, metering/AE response, software contrast AF with scenarios |
 | 5.5 | Per-camera capability modes, Movie/Vlog common mode, switch while recording, per-camera colour matching |
 | 6 | LiteRT subject tracking and focus assist; optional local assistant |
 | 7 | Opt-in reports, device table, quirks, calibration data |

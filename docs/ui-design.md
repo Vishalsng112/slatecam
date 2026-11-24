@@ -242,18 +242,28 @@ The card sits after Exposure in the primary column.
 
 | Element | Native call | Status |
 |---|---|---|
-| Focus mode (`MF`, `AF`, `CAF`, `CAF-P`, `MACRO`, `EDOF`) | `setFocusMode` | Current |
+| Focus mode (`MF`, `AF`, `CAF`, `CAF-P`, `MACRO`, `EDOF`, `SAF`) | `setFocusMode` | Current |
 | Manual focus slider (only when `MF`) | `setFocusDiopters` | Current |
+| Shooting scenario (`Interview`, `Vlogging`, `Wedding`, `Cinematic`) | `setFocusScenario` | Current |
+| Shift sensitivity (0–100%) | `setFocusShiftSensitivity` | Current |
+| Transition speed (0–100%) | `setFocusTransitionSpeed` | Current |
 | OIS on/off (only when the sensor advertises `on`) | `setOis` | Current |
 | EIS on/off | `setEis` | Current |
-| Focus shift speed | `setFocusShiftSpeed` | API exists, no UI |
-| Focus distance readout | `focusDiopters` / `focusMax` | Current (in MF) |
+| Focus distance readout | `focusDiopters` / `focusMax` | Current (in MF/SAF) |
 
 Focus modes, OIS and EIS are per sensor: `focusModes`, `oisSupported` and
 `eisSupported` come from live `CameraCharacteristics`; the bridge persists the
 operator's choice per camera ID. A lens that only offers `off` (for example a
 fixed-focus front camera) shows `MF` alone. Continuous-video AF is the default
 when available.
+
+**SAF** is the software contrast autofocus. It is shown only when the lens
+reports a focus range (`LENS_INFO_MINIMUM_FOCUS_DISTANCE > 0`). Selecting a
+scenario activates SAF and applies the scenario's two normalized values; the
+sliders can then be fine-tuned. The card shows a hint when a hardware focus mode
+is active, because shift sensitivity and transition speed only affect SAF. The
+scenario/settings and the SAF choice persist across restarts. There is no face
+or eye tracking.
 | Tap to focus | needs metering region API | Future |
 | AF lock / AE lock buttons | probe has lock flags, not wired | Future |
 | Hybrid CDAF | hill-climb focus engine | Future |

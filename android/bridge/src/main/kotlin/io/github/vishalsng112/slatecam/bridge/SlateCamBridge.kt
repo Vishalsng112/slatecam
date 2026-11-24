@@ -26,6 +26,8 @@ import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamHostApi
 import io.github.vishalsng112.slatecam.core.camera.CameraCapabilitiesReader
 import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
+import io.github.vishalsng112.slatecam.core.camera.FocusMode
+import io.github.vishalsng112.slatecam.core.camera.FocusScenario
 import io.github.vishalsng112.slatecam.core.camera.MeteringMode
 import io.github.vishalsng112.slatecam.core.camera.RecordingModeCatalog
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
@@ -140,6 +142,21 @@ class SlateCamBridge private constructor(
                 ?: MeteringMode.MULTI.wireValue,
         )
         controller.setMeteringSpeed(shootPrefs.getFloat(KEY_METERING_SPEED, 0.5f))
+        val savedScenario = FocusScenario.fromWire(
+            shootPrefs.getString(KEY_FOCUS_SCENARIO, FocusScenario.WEDDING.wireValue)
+                ?: FocusScenario.WEDDING.wireValue,
+        )
+        controller.restoreFocusSettings(
+            savedScenario.wireValue,
+            shootPrefs.getFloat(
+                KEY_FOCUS_SENSITIVITY,
+                savedScenario.shiftSensitivity,
+            ),
+            shootPrefs.getFloat(
+                KEY_FOCUS_SPEED,
+                savedScenario.transitionSpeed,
+            ),
+        )
         applyDeviceSnapshot(deviceSnapshot)
         controller.listener = CameraController.Listener { state ->
             lastState = state
@@ -155,6 +172,13 @@ class SlateCamBridge private constructor(
                 controller.setShadingCorrection(shadingEnabledFor(state.cameraId))
                 controller.setOis(enabledFor(KEY_OIS_OFF, state.cameraId))
                 controller.setEis(enabledFor(KEY_EIS_OFF, state.cameraId))
+            }
+            // Restore the software focus choice once the lens reports support.
+            if (state.focusMode != FocusMode.SOFTWARE &&
+                FocusMode.SOFTWARE in state.focusModes &&
+                shootPrefs.getBoolean(KEY_FOCUS_SOFTWARE, false)
+            ) {
+                controller.setFocusMode(FocusMode.SOFTWARE)
             }
             renderer.setTenBitSource(state.isTenBit)
             renderer.setDisplayRotation(state.previewRotationDegrees)
@@ -172,6 +196,7 @@ class SlateCamBridge private constructor(
                 analysis.gridWidth,
                 analysis.gridHeight,
             )
+            controller.submitFocus(analysis.focusScore)
             val now = SystemClock.elapsedRealtime()
             if (now - lastAnalysisPublishMs >= 200L) {
                 lastAnalysisPublishMs = now
@@ -240,6 +265,9 @@ class SlateCamBridge private constructor(
     }
 
     override fun setFocusDiopters(diopters: Double) {
+        // Dragging the manual slider leaves SAF; remember that choice so a
+        // restart/camera switch does not silently restore software focus.
+        shootPrefs.edit().putBoolean(KEY_FOCUS_SOFTWARE, false).apply()
         controller.setFocusDiopters(diopters.toFloat())
     }
 
@@ -265,6 +293,29 @@ class SlateCamBridge private constructor(
         val clamped = speed.toFloat().coerceIn(0f, 1f)
         shootPrefs.edit().putFloat(KEY_METERING_SPEED, clamped).apply()
         controller.setMeteringSpeed(clamped)
+    }
+
+    override fun setFocusScenario(scenario: String) {
+        val selected = FocusScenario.fromWire(scenario)
+        shootPrefs.edit()
+            .putString(KEY_FOCUS_SCENARIO, selected.wireValue)
+            .putFloat(KEY_FOCUS_SENSITIVITY, selected.shiftSensitivity)
+            .putFloat(KEY_FOCUS_SPEED, selected.transitionSpeed)
+            .apply()
+        shootPrefs.edit().putBoolean(KEY_FOCUS_SOFTWARE, true).apply()
+        controller.setFocusScenario(selected.wireValue)
+    }
+
+    override fun setFocusShiftSensitivity(value: Double) {
+        val clamped = value.toFloat().coerceIn(0f, 1f)
+        shootPrefs.edit().putFloat(KEY_FOCUS_SENSITIVITY, clamped).apply()
+        controller.setFocusShiftSensitivity(clamped)
+    }
+
+    override fun setFocusTransitionSpeed(value: Double) {
+        val clamped = value.toFloat().coerceIn(0f, 1f)
+        shootPrefs.edit().putFloat(KEY_FOCUS_SPEED, clamped).apply()
+        controller.setFocusTransitionSpeed(clamped)
     }
 
     override fun setExposureMode(mode: String) {
@@ -371,6 +422,9 @@ class SlateCamBridge private constructor(
     }
 
     override fun setFocusMode(mode: String) {
+        shootPrefs.edit()
+            .putBoolean(KEY_FOCUS_SOFTWARE, mode == FocusMode.SOFTWARE)
+            .apply()
         controller.setFocusMode(mode)
     }
 
@@ -1436,6 +1490,10 @@ class SlateCamBridge private constructor(
         autoFocusSupported = autoFocusSupported,
         focusMode = focusMode,
         focusModes = focusModes,
+        focusScenario = focusScenario,
+        focusScenarios = focusScenarios,
+        focusShiftSensitivity = focusShiftSensitivity.toDouble(),
+        focusTransitionSpeed = focusTransitionSpeed.toDouble(),
         previewWidth = previewWidth.toLong(),
         previewHeight = previewHeight.toLong(),
         previewRotationDegrees = previewRotationDegrees.toLong(),
@@ -1510,6 +1568,10 @@ class SlateCamBridge private constructor(
         private const val KEY_EIS_OFF = "eis_off_cameras"
         private const val KEY_METERING_MODE = "metering_mode"
         private const val KEY_METERING_SPEED = "metering_speed"
+        private const val KEY_FOCUS_SCENARIO = "focus_scenario"
+        private const val KEY_FOCUS_SENSITIVITY = "focus_shift_sensitivity"
+        private const val KEY_FOCUS_SPEED = "focus_transition_speed"
+        private const val KEY_FOCUS_SOFTWARE = "focus_software"
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")

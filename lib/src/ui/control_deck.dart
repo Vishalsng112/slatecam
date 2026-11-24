@@ -46,6 +46,8 @@ class _ControlDeckState extends State<ControlDeck> {
   double? _isoDraft;
   double? _shutterDraft;
   double? _meterSpeedDraft;
+  double? _focusSensitivityDraft;
+  double? _focusTransitionDraft;
   double? _peakingSensitivityDraft;
   double? _peakingStrengthDraft;
 
@@ -59,6 +61,12 @@ class _ControlDeckState extends State<ControlDeck> {
     if (oldWidget.state.meteringSpeed != state.meteringSpeed) {
       _meterSpeedDraft = null;
     }
+    if (oldWidget.state.focusShiftSensitivity != state.focusShiftSensitivity) {
+      _focusSensitivityDraft = null;
+    }
+    if (oldWidget.state.focusTransitionSpeed != state.focusTransitionSpeed) {
+      _focusTransitionDraft = null;
+    }
     if (oldWidget.state.peakingSensitivity != state.peakingSensitivity) {
       _peakingSensitivityDraft = null;
     }
@@ -70,6 +78,10 @@ class _ControlDeckState extends State<ControlDeck> {
   double get _iso => _isoDraft ?? state.iso.toDouble();
   double get _shutter => _shutterDraft ?? state.shutterNs.toDouble();
   double get _meterSpeed => _meterSpeedDraft ?? state.meteringSpeed;
+  double get _focusSensitivity =>
+      _focusSensitivityDraft ?? state.focusShiftSensitivity;
+  double get _focusTransition =>
+      _focusTransitionDraft ?? state.focusTransitionSpeed;
   double get _peakingSensitivity =>
       _peakingSensitivityDraft ?? state.peakingSensitivity;
   double get _peakingStrength => _peakingStrengthDraft ?? state.peakingStrength;
@@ -1347,6 +1359,54 @@ class _ControlDeckState extends State<ControlDeck> {
               ],
             ),
           ],
+          if (state.focusModes.contains('software')) ...[
+            const SizedBox(height: 2),
+            Text(
+              'SHOOTING SCENARIO',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                for (final scenario in state.focusScenarios)
+                  _modeChip(
+                    label: _scenarioLabel(scenario),
+                    tooltip: _scenarioTooltip(scenario),
+                    selected: state.focusScenario == scenario,
+                    onTap: () => widget.host.setFocusScenario(scenario),
+                  ),
+              ],
+            ),
+            LabeledSlider(
+              label: 'Shift sensitivity',
+              valueLabel: '${(_focusSensitivity * 100).round()}%',
+              value: _focusSensitivity,
+              min: 0,
+              max: 1,
+              onChanged: (value) =>
+                  setState(() => _focusSensitivityDraft = value),
+              onChangeEnd: widget.host.setFocusShiftSensitivity,
+            ),
+            LabeledSlider(
+              label: 'Transition speed',
+              valueLabel: '${(_focusTransition * 100).round()}%',
+              value: _focusTransition,
+              min: 0,
+              max: 1,
+              onChanged: (value) =>
+                  setState(() => _focusTransitionDraft = value),
+              onChangeEnd: widget.host.setFocusTransitionSpeed,
+            ),
+            if (state.focusMode != 'software')
+              Text(
+                'Choose a scenario or SAF to run the software focus engine.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+              ),
+          ],
           if (state.oisSupported || state.eisSupported) ...[
             const Divider(height: 14, color: UiTokens.border),
             Text(
@@ -1413,6 +1473,22 @@ class _ControlDeckState extends State<ControlDeck> {
     _ => humanizeWireValue(mode),
   };
 
+  String _scenarioLabel(String scenario) => switch (scenario) {
+    'interview' => 'Interview',
+    'vlogging' => 'Vlogging',
+    'wedding' => 'Wedding',
+    'cinematic' => 'Cinematic',
+    _ => humanizeWireValue(scenario),
+  };
+
+  String _scenarioTooltip(String scenario) => switch (scenario) {
+    'interview' => 'Sticky focus, slow transitions, long hold',
+    'vlogging' => 'Quick to follow a moving subject',
+    'wedding' => 'Balanced sensitivity and transition speed',
+    'cinematic' => 'Very sticky and deliberately slow racks',
+    _ => humanizeWireValue(scenario),
+  };
+
   String _focusModeLabel(String mode) => switch (mode) {
     'off' => 'MF',
     'auto' => 'AF',
@@ -1420,6 +1496,7 @@ class _ControlDeckState extends State<ControlDeck> {
     'continuous_picture' => 'CAF-P',
     'macro' => 'MACRO',
     'edof' => 'EDOF',
+    'software' => 'SAF',
     _ => humanizeWireValue(mode).toUpperCase(),
   };
 
@@ -1430,6 +1507,7 @@ class _ControlDeckState extends State<ControlDeck> {
     'continuous_picture' => 'Continuous autofocus for stills',
     'macro' => 'Macro autofocus',
     'edof' => 'Extended depth of field',
+    'software' => 'Software autofocus with shift sensitivity and transition speed',
     _ => humanizeWireValue(mode),
   };
 

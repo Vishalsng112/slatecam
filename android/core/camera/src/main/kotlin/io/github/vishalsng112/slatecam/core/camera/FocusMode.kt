@@ -15,12 +15,20 @@ object FocusMode {
     const val CONTINUOUS_PICTURE = "continuous_picture"
     const val EDOF = "edof"
 
-    fun defaultFor(available: List<String>): String = when {
-        CONTINUOUS_VIDEO in available -> CONTINUOUS_VIDEO
-        CONTINUOUS_PICTURE in available -> CONTINUOUS_PICTURE
-        AUTO in available -> AUTO
-        else -> available.firstOrNull { it != OFF } ?: OFF
+    /** Software contrast autofocus implemented in the app, not a Camera2 mode. */
+    const val SOFTWARE = "software"
+
+    fun defaultFor(available: List<String>): String {
+        val cameraModes = available.filter { it != SOFTWARE }
+        return when {
+            CONTINUOUS_VIDEO in cameraModes -> CONTINUOUS_VIDEO
+            CONTINUOUS_PICTURE in cameraModes -> CONTINUOUS_PICTURE
+            AUTO in cameraModes -> AUTO
+            else -> cameraModes.firstOrNull { it != OFF } ?: OFF
+        }
     }
 
     fun isAutomatic(mode: String): Boolean = mode != OFF
+
+    fun isSoftware(mode: String): Boolean = mode == SOFTWARE
 }

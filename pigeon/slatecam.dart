@@ -110,6 +110,10 @@ class CameraState {
     required this.autoFocusSupported,
     required this.focusMode,
     required this.focusModes,
+    required this.focusScenario,
+    required this.focusScenarios,
+    required this.focusShiftSensitivity,
+    required this.focusTransitionSpeed,
     required this.previewWidth,
     required this.previewHeight,
     required this.previewRotationDegrees,
@@ -196,6 +200,13 @@ class CameraState {
   String focusMode;
   /// Focus modes reported by the active camera, excluding unsupported values.
   List<String> focusModes;
+  /// interview | vlogging | wedding | cinematic
+  String focusScenario;
+  List<String> focusScenarios;
+  /// Software focus subject-shift sensitivity, 0..1.
+  double focusShiftSensitivity;
+  /// Software focus transition speed, 0..1.
+  double focusTransitionSpeed;
   int previewWidth;
   int previewHeight;
   int previewRotationDegrees;
@@ -337,6 +348,13 @@ abstract class SlateCamHostApi {
   void deleteShootProfile(String id);
 
   void setFocusMode(String mode);
+
+  /// Applies a scenario preset and switches to the software focus engine.
+  void setFocusScenario(String scenario);
+
+  void setFocusShiftSensitivity(double value);
+
+  void setFocusTransitionSpeed(double value);
 
   void startRecording();
 

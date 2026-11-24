@@ -807,6 +807,32 @@ one encoded clip alive.
   The same sequence is repeatable from a fixed screen position, which was not
   possible with the tab + dropdown layout.
 
+### Software focus engine and scenarios (Pad 3, build 2075)
+
+`SlateCamFocus` logs the score, commanded diopters, target, search/locked state
+and the two normalized settings.
+
+| Check | Result |
+|---|---|
+| SAF availability | back lens reports `minimumFocusDistance=10.0`, SAF shown |
+| Startup restore | SAF restored from prefs; `CONTROL_AF_MODE [OFF]` |
+| Initial acquisition | lens seeded at its reported 4.217 D, stepped to 4.430 (score 0.0915), reversed to 4.111 (0.0847), locked at 4.217 (0.0880) |
+| Transition speed effect | Vlogging (0.75) used 0.65 D steps and locked in ~2.5 s; Cinematic (0.15) used 0.49 D steps about 3-4 s apart |
+| Scenario defaults | Interview 25/35, Vlogging 80/75, Wedding 50/50, Cinematic 20/15 |
+| Persistence | Vlogging 80/75 and SAF survived force-stop/restart |
+| Focus lock | `android.lens.focusDistance` matched the commanded 4.217 D |
+| Metering interaction | P meter stable at 0.463 luma / compensation 0 while SAF was locked; 100% speed no longer oscillates after the 5 Hz/one-step P throttle |
+| Fixed-focus lens | SAF/scenario section hidden when no focus range is reported |
+
+The focus search and the lens ramp are both time-driven; the controller waits
+for the ramp to settle (plus 120 ms) before treating a sharpness sample as valid.
+Without that, the lens result lag stalled the request at an intermediate
+position. The final controller no longer lets the reported lens distance
+overwrite the commanded distance after the first sample. The first result seeds
+the engine at the real lens position; the manual focus slider and the hardware
+focus modes clear the persisted SAF flag so a later restart does not override
+the operator's choice.
+
 ### Exposure metering patterns and speed (Pad 3 + POCO, build 2068)
 
 The meter uses the GPU luma grid, not Camera2 AE regions. Logcat tag

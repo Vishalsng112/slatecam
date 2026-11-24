@@ -35,7 +35,7 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 
 | Item | Notes |
 |---|---|
-| Hybrid contrast AF | Metering/focus modes shipped; contrast-detect refinement remains |
+| Phase-detect/hybrid AF | Software contrast AF ships; Camera2 exposes no PDAF controls for a hybrid pass |
 | Scene-referred metering | Metering shares the analysis frame with the histogram/waveform, so a strong LUT or log profile can bias the target; add a pre-look metering pass |
 | Hybrid contrast-detect AF | Laplacian variance from the analysis FBO + HAL coarse acquisition; fall back to HAL AF |
 | RAW burst → DNG sequence | Camera2 has no RAW video; expect low fps and large files |

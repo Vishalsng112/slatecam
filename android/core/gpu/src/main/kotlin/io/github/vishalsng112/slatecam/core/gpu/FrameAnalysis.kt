@@ -13,4 +13,6 @@ data class FrameAnalysis(
     val lumaGrid: FloatArray,
     val gridWidth: Int,
     val gridHeight: Int,
+    /** Normalised Laplacian energy in the central focus ROI. */
+    val focusScore: Float,
 )

@@ -35,6 +35,24 @@ class FocusModeTest {
     }
 
     @Test
+    fun `software focus is never the hardware default`() {
+        assertEquals(
+            FocusMode.OFF,
+            FocusMode.defaultFor(listOf("off", FocusMode.SOFTWARE)),
+        )
+        assertEquals(
+            FocusMode.CONTINUOUS_VIDEO,
+            FocusMode.defaultFor(listOf("off", "continuous_video", FocusMode.SOFTWARE)),
+        )
+    }
+
+    @Test
+    fun `software focus is recognized`() {
+        assertTrue(FocusMode.isSoftware(FocusMode.SOFTWARE))
+        assertFalse(FocusMode.isSoftware(FocusMode.CONTINUOUS_VIDEO))
+    }
+
+    @Test
     fun `manual is not automatic`() {
         assertFalse(FocusMode.isAutomatic(FocusMode.OFF))
         assertTrue(FocusMode.isAutomatic(FocusMode.CONTINUOUS_VIDEO))

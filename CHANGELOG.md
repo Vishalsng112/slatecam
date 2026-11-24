@@ -88,6 +88,14 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   analysis pass. P applies the error as AE compensation on top of the HAL AE; S
   applies it to ISO; M stays manual. Highlight is protect-only, so a flat scene
   is not pushed up to 0.85. The mode and speed persist across restarts.
+- Software focus engine (**SAF**) for lenses with a real focus range: a pure
+  contrast-detect hill-climb over `LENS_FOCUS_DISTANCE`, fed by a Laplacian
+  sharpness score from the 320×180 analysis frame at 15 Hz. Adds normalized
+  **Shift sensitivity** and **Transition speed** controls (0–1) and four
+  shooting scenarios — **Interview**, **Vlogging**, **Wedding**, **Cinematic** —
+  that set both values and activate SAF. Settings and the SAF choice persist
+  across restarts. P-mode AE compensation is throttled to 5 Hz with one step per
+  update so it cannot fight the focus search. No face or eye tracking.
 - Exposure mode uses circular **P / S / M** buttons.
 - The Focus card and the bottom-dock focus chip are removed for now; the camera
   keeps continuous autofocus. Manual focus returns with the tap-to-focus/AF-lock
