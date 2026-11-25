@@ -9,6 +9,20 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Added — Logical zoom handoff discovery (build 2150)
+- The probe now detects logical multi-cameras whose `CONTROL_ZOOM_RATIO` range
+  reaches below 1.0 and records the reachable physical lens stops in
+  `cameras[].logical_zoom`: `handoff_eligible`, `ratio_range`, `stops`,
+  `uncovered_ratios` and a reason when rejected.
+- Stops come from each physical camera's intrinsic ratio (default 1.0 if
+  metadata is missing); lenses outside the logical range stay explicit fallback
+  candidates. This is discovery only — the controller path stays gated on the
+  future `logicalZoomHandoff` recording verdict.
+- POCO X6 Pro probe: logical camera `4` (physical `0`, `2`) reports stops at
+  `0.621` (ultra-wide) and `1.0`, eligible; logical camera `5` is rejected
+  because its range starts at 1.0.
+- Probe schema 1.12.0; see ADR 0029.
+
 ### Fixed — HLG preview brightness (build 2149)
 - The HLG preview now applies the BT.2100 OOTF and normalises the 1000-nit
   reference to a 100-nit SDR display before BT.709 encoding, with a soft

@@ -1,7 +1,7 @@
 # Probe report schema
 
 - **Schema id:** `slatecam.probe`
-- **Version:** `1.11.0`
+- **Version:** `1.12.0`
 - **Status:** draft for Phase 1
 - **Owner:** `:core:probe`
 
@@ -224,7 +224,17 @@ logical camera IDs are not guaranteed contiguous.
   "zoom": {
     "max_digital": 30.0,
     "available_focal_lengths_mm": [2.2, 6.9, 14.0],
-    "ratio_range": { "min": 1.0, "max": 10.0 }
+    "ratio_range": { "min": 0.6, "max": 10.0 }
+  },
+  "logical_zoom": {
+    "handoff_eligible": true,
+    "ratio_range": { "min": 0.6, "max": 10.0 },
+    "stops": [
+      { "physical_id": "2", "role": "ultrawide", "ratio": 0.621, "basis": "physical_intrinsic", "role_confidence": "high" },
+      { "physical_id": "0", "role": "default", "ratio": 1.0, "basis": "physical_intrinsic", "role_confidence": "high" }
+    ],
+    "uncovered_ratios": [],
+    "reason": ""
   },
   "controls": {
     "ae_modes": ["on", "off", "on_auto_flash", "precapture"],
@@ -335,6 +345,7 @@ These exist to drive the UI, not to gate features:
 | `controls.max_tone_map_curve_points` | `TONEMAP_MAX_CURVE_POINTS` | Curve resolution ceiling (1.11.0) |
 | `controls.color_correction_modes` | `COLOR_CORRECTION_AVAILABLE_MODES` | Whether a manual CCM/WB path is offered (1.11.0) |
 | `zoom.ratio_range` | `CONTROL_ZOOM_RATIO_RANGE` | Zoom slider in ratio units, not digital factor |
+| `logical_zoom` | logical multi-camera + physical IDs + intrinsic ratios | Candidate lens stops for one-session handoff (1.12.0); not a verified verdict |
 | `dynamic_range.recommended_profile` | `REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE` | HLG10 vs HDR10 preference |
 
 `scaler_rotate_and_crop` modes are the documented values `none`, `90`, `180`,
@@ -690,6 +701,14 @@ from a device name or a fixed camera ID. All additions are optional.
 Schema 1.11.0 adds the tone-map and colour-correction control lists used by the
 staged manual-colour pipeline (ADR 0016). They are probes, not promises: a mode
 being advertised does not mean the HAL applies it to video or HLG10.
+
+Schema 1.12.0 adds `cameras[].logical_zoom`: discovery for driving lens
+handoff through `CONTROL_ZOOM_RATIO` on a logical multi-camera (ADR 0029).
+`handoff_eligible` only means the session shape, range and physical ratios look
+usable; a recorded `logicalZoomHandoff` verdict is still required before the
+controller enables it. `stops` are reachable physical ratios, `uncovered_ratios`
+are physical lenses outside the logical range, and `reason` is empty only when
+eligible.
 
 Schema 1.10.0 adds 4:3 presets (`fhd43_24/25/30_8bit/10bit`) and verifies the
 HLG10 session per lens. The extra checks use

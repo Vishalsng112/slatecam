@@ -1360,3 +1360,21 @@ The mapping uses the BT.2100 OOTF and a 203-nit-to-100-nit SDR reference
 (K≈4.93). Preview mean now matches SDR; HLG highlights sit slightly higher,
 which is expected headroom. A 2.7 s 10-bit take after the fix still probes as
 HEVC Main 10, BT.2020, arib-std-b67; the test clip was removed.
+
+
+## Logical zoom discovery (POCO X6 Pro 5G, build 2150)
+
+POCO X6 Pro (`2311DRK48I`, device key `xiaomi/duchamp`), probe schema 1.12.0.
+
+| Camera | Logical | Physical ids | Zoom range | Discovery |
+|---|---|---|---|---|
+| `4` | yes | `0`, `2` | 0.6–10.0 | **eligible**; stops 0.621 (ultra-wide) and 1.0 (default) |
+| `5` | yes | `0`, `2` | 1.0–10.0 | rejected: `zoom_range_does_not_cover_ultrawide` |
+
+The probe report carries `logical_zoom` with `handoff_eligible`, sorted stops,
+uncovered ratios and the rejection reason. This is discovery only: no controller
+or recording path is enabled yet, and the `logicalZoomHandoff` verdict has not
+run. The physical front camera and the non-logical cameras are unchanged.
+
+`LogicalZoomTest` covers eligible, non-logical, range-above-1.0, uncovered,
+duplicate-ratio, missing-metadata and missing-range cases (8 tests).

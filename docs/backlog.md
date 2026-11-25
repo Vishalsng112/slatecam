@@ -64,6 +64,10 @@ AF handling). Remaining:
 |---|---|
 | Manual focus UI | The MF slider, tap-to-focus and pinch zoom ship in the Focus card; **focus/AE lock** remains and is not implemented |
 | Measured colour matrices | `ColorCalibration` solves a 3×3 matrix + trim; capture 24 patches per lens and add the result to the device database |
+| Logical zoom handoff controller | Use the probe's `logical_zoom.stops` through `CONTROL_ZOOM_RATIO`; keep `SwitchFramePump` for front/back, macro and uncovered lenses; never tear down the recorder |
+| `logicalZoomHandoff` verdict | Record while sweeping across handoff stops; reject on timestamp gaps or exposure/WB jumps before enabling the controller path |
+| Active physical lens telemetry | Surface `LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID` in state and use it for the lens badge |
+| Dual-session switch | ADR/design only after the logical-zoom path is verified; no concurrent-session code yet |
 | Dual-session seamless switch | The frame pump hides the session gap; a true no-freeze switch needs concurrent sessions and a probe verdict |
 
 ## Audio

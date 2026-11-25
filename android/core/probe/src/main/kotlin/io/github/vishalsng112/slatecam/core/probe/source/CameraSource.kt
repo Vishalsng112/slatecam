@@ -11,6 +11,7 @@ import android.os.HandlerThread
 import android.util.Range
 import io.github.vishalsng112.slatecam.core.probe.eval.CameraRoles
 import io.github.vishalsng112.slatecam.core.probe.eval.HighSpeedEntry
+import io.github.vishalsng112.slatecam.core.probe.eval.LogicalZoom
 import io.github.vishalsng112.slatecam.core.probe.eval.PresetCatalog
 import io.github.vishalsng112.slatecam.core.probe.eval.PresetEvaluator
 import io.github.vishalsng112.slatecam.core.probe.eval.StreamEntry
@@ -134,6 +135,22 @@ class CameraSource(private val context: Context) {
             ?: FloatArray(0)
         val hyperfocal = c.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE) ?: 0f
         val minFocus = c.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
+        val physicalCameras = readPhysicalCameras(manager, physicalIds)
+        val zoomRange = c.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
+            ?.let { FloatRange(it.lower, it.upper) }
+        val logicalZoom = LogicalZoom.evaluate(
+            logicalMultiCamera = capabilityNames.contains("logical_multi_camera"),
+            physicalIds = physicalIds,
+            lenses = physicalCameras.map {
+                LogicalZoom.PhysicalLens(
+                    id = it.id,
+                    role = it.role,
+                    intrinsicRatio = it.intrinsicZoomRatio,
+                    confidence = it.roleConfidence,
+                )
+            },
+            ratioRange = zoomRange,
+        )
 
         return CameraInfo(
             id = id,
@@ -143,7 +160,7 @@ class CameraSource(private val context: Context) {
             ),
             logicalMultiCamera = capabilityNames.contains("logical_multi_camera"),
             physicalIds = physicalIds,
-            physicalCameras = readPhysicalCameras(manager, physicalIds),
+            physicalCameras = physicalCameras,
             concurrentWith = concurrentSets
                 .filter { id in it }
                 .flatten()
@@ -163,9 +180,9 @@ class CameraSource(private val context: Context) {
             zoom = ZoomInfo(
                 maxDigital = c.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1f,
                 availableFocalLengthsMm = focalLengths,
-                ratioRange = c.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
-                    ?.let { FloatRange(it.lower, it.upper) },
+                ratioRange = zoomRange,
             ),
+            logicalZoom = logicalZoom,
             controls = readControls(c),
             dynamicRange = DynamicRangeInfo(
                 tenBitStreams = tenBit,

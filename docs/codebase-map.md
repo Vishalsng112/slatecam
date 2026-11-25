@@ -79,7 +79,7 @@ root is `android/`, not the repository root.
 | HEVC SPS verification | `:core:common` | `HevcSps.kt` |
 | Look, LUT | `:core:profile` | `PictureProfile.kt`, `Lut3D.kt` |
 | Device quirks/calibration | `:core:device` | `DeviceDatabase.kt`, `DeviceDatabaseRepository.kt`, `CapabilityGates.kt` |
-| Probe | `:core:probe` | `ProbeRunner.kt`, `source/`, `verify/`, `eval/` |
+| Probe | `:core:probe` | `ProbeRunner.kt`, `source/`, `verify/`, `eval/`, `eval/LogicalZoom.kt` |
 | Flutter state/commands | `:bridge` | `SlateCamBridge.kt`, generated Pigeon |
 | Control surface | `lib/src/ui` | `capture_screen.dart` preview/dock, `control_deck.dart` console |
 | Lens-switch encoder continuity | `:bridge` | `SwitchFramePump.kt`, `GlPreviewRenderer.repeatLastFrame` |
@@ -158,7 +158,7 @@ on camera change`
   regenerating, and strip trailing whitespace in the Kotlin callbacks.
 - **Audio API:** `listAudioInputs`, `setAudioInput`, `setAudioGain`,
   `refreshAudioInputs`; meter snapshots arrive via `onAudio` (ADR 0028).
-- **Probe JSON:** schema 1.11.0, `docs/probe-schema.md`.
+- **Probe JSON:** schema 1.12.0, `docs/probe-schema.md`.
 - **Media API:** `listMediaClips`, `mediaStorageInfo`, `mediaClipThumbnail`,
   `deleteMediaClip`, `shareMediaClip` in `pigeon/slatecam.dart`; MediaStore
   ownership is in `:core:storage` (ADR 0026).
@@ -217,6 +217,8 @@ when testing camera access. Probe launch:
   RGBA8888, but the encoded stream is Main10/HLG and SPS-checked. Pad movie mode
   is 10-bit; POCO stays SDR because its encoder fails Main10.
 - Colour matching depends on measured per-camera matrices (not shipped).
+- Logical zoom handoff stops are discovered from the probe; the controller path
+  and `logicalZoomHandoff` verdict are not implemented yet (ADR 0029).
 - Audio capture uses PCM16 48 kHz stereo; input selection and gain are data.
   Headphone monitoring, 24-bit capture and a limiter are not implemented.
 - Manual white balance anchors on the nearest HAL AWB preset and applies the

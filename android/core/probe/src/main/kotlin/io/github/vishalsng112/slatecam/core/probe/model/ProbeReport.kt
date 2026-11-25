@@ -27,8 +27,9 @@ const val SCHEMA_ID = "slatecam.probe"
  * colour pipeline.
  * 1.10.0: 4:3 presets (`fhd43_*`) and per-lens HLG10 session checks, so every
  * camera in a shoot set carries its own verified 10-bit verdict.
+ * 1.12.0: logical-camera zoom handoff discovery (`logical_zoom` stops).
  */
-const val SCHEMA_VERSION = "1.11.0"
+const val SCHEMA_VERSION = "1.12.0"
 
 @Serializable
 data class ProbeReport(
@@ -127,6 +128,13 @@ data class CameraInfo(
     val sensor: SensorInfo? = null,
     val lenses: List<LensInfo> = emptyList(),
     val zoom: ZoomInfo? = null,
+    /**
+     * Discovery result for driving lens handoff through CONTROL_ZOOM_RATIO on
+     * a logical multi-camera. `handoffEligible` only means the session shape
+     * and range look usable; the `logicalZoomHandoff` verdict must still pass
+     * on a recording before the controller enables the path.
+     */
+    @SerialName("logical_zoom") val logicalZoom: LogicalZoomInfo? = null,
     val controls: ControlsInfo? = null,
     @SerialName("dynamic_range") val dynamicRange: DynamicRangeInfo,
     /**
@@ -207,6 +215,35 @@ data class ZoomInfo(
     @SerialName("max_digital") val maxDigital: Float,
     @SerialName("available_focal_lengths_mm") val availableFocalLengthsMm: List<Float> = emptyList(),
     @SerialName("ratio_range") val ratioRange: FloatRange? = null,
+)
+
+/**
+ * Physical lens stops reachable through one logical camera's zoom ratio.
+ *
+ * `CONTROL_ZOOM_RATIO` is relative to the logical camera's default lens, so a
+ * physical lens with `intrinsic_zoom_ratio` 0.6 is the 0.6× stop. Ratios the
+ * logical range cannot reach stay in [uncoveredRatios] and must use the
+ * session-switch fallback.
+ */
+@Serializable
+data class LogicalZoomInfo(
+    @SerialName("handoff_eligible") val handoffEligible: Boolean,
+    @SerialName("ratio_range") val ratioRange: FloatRange? = null,
+    val stops: List<LogicalZoomStop> = emptyList(),
+    @SerialName("uncovered_ratios") val uncoveredRatios: List<Double> = emptyList(),
+    /** Empty when eligible; otherwise why the zoom path is not a candidate. */
+    val reason: String = "",
+)
+
+@Serializable
+data class LogicalZoomStop(
+    /** Physical camera id, or empty for the logical camera's default stop. */
+    @SerialName("physical_id") val physicalId: String = "",
+    val role: String,
+    val ratio: Double,
+    /** physical_intrinsic | logical_default */
+    val basis: String,
+    @SerialName("role_confidence") val roleConfidence: String = "low",
 )
 
 @Serializable
