@@ -9,6 +9,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Added — One-tap orientation button (build 2181)
+- A circular rotate control beside the viewfinder-quality pill flips the app
+  between portrait and landscape. The icon shows the destination orientation;
+  the camera stays open and the preview/MP4 hint follow the new display.
+
 ### Added — Portrait UI and portrait recording (build 2180)
 - The activity now follows `fullSensor`; rotating the device keeps the camera
   open and switches the UI between a side-by-side landscape console and a

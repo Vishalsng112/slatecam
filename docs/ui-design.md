@@ -338,6 +338,10 @@ The same widgets serve both orientations; nothing is duplicated per layout.
 - Rotating while idle updates the preview immediately. Deciding to rotate
   during a take applies after the clip is finalized: a recording never changes
   orientation mid-stream.
+- A circular rotate control beside the viewfinder-quality pill flips the app
+  between portrait and landscape without reopening the camera. Its icon shows
+  the destination orientation, and it uses the same bridge rotation path as a
+  physical turn.
 
 ### 5.6 Picture profile card
 

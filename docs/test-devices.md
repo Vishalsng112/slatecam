@@ -1494,3 +1494,11 @@ a scenario only describes SAF. Choosing SAF highlights the selected scenario.
 **Pad 3:** portrait stacks the viewfinder above the console and the console uses
 its three responsive columns; landscape remains side-by-side. The Pad reports a
 different preview size and still rotates live without reopening the camera.
+
+## One-tap orientation toggle (build 2181)
+
+POCO X6 Pro: the rotate control sits left of the `VF Full` pill. Tapping it in
+portrait moved the display to `ROTATION_90` and switched to the side-by-side
+landscape console; tapping the same control again returned to `ROTATION_0` and
+the stacked portrait console. The camera stayed open and the preview composition
+followed the new orientation in both directions.

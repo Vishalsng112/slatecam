@@ -2,6 +2,7 @@ import 'dart:async' show Timer;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../pigeon/slatecam.g.dart';
 import 'control_deck.dart';
@@ -521,56 +522,107 @@ class _CaptureScreenState extends State<CaptureScreen>
     return Positioned(
       top: 8,
       right: 8,
-      child: PopupMenuButton<String>(
-        tooltip: 'Viewfinder resolution · preview $output',
-        color: UiTokens.surfaceRaised,
-        onSelected: _host.setPreviewQuality,
-        itemBuilder: (context) => [
-          _qualityItem(
-            'full',
-            'Full',
-            'Preview $output · recording size',
-            state.previewQuality == 'full',
-          ),
-          _qualityItem(
-            '1080',
-            '1080p',
-            'Cap the viewfinder at 1080 high',
-            state.previewQuality == '1080',
-          ),
-          _qualityItem(
-            '720',
-            '720p',
-            'Cap the viewfinder at 720 high',
-            state.previewQuality == '720',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _rotationToggle(),
+          const SizedBox(width: 6),
+          PopupMenuButton<String>(
+            tooltip: 'Viewfinder resolution · preview $output',
+            color: UiTokens.surfaceRaised,
+            onSelected: _host.setPreviewQuality,
+            itemBuilder: (context) => [
+              _qualityItem(
+                'full',
+                'Full',
+                'Preview $output · recording size',
+                state.previewQuality == 'full',
+              ),
+              _qualityItem(
+                '1080',
+                '1080p',
+                'Cap the viewfinder at 1080 high',
+                state.previewQuality == '1080',
+              ),
+              _qualityItem(
+                '720',
+                '720p',
+                'Cap the viewfinder at 720 high',
+                state.previewQuality == '720',
+              ),
+            ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+              decoration: BoxDecoration(
+                color: UiTokens.surfaceGlass,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: UiTokens.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.visibility_outlined,
+                    size: 12,
+                    color: UiTokens.muted,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: UiTokens.muted,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.expand_more,
+                    size: 13,
+                    color: UiTokens.muted,
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-          decoration: BoxDecoration(
-            color: UiTokens.surfaceGlass,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: UiTokens.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.visibility_outlined,
-                size: 12,
+      ),
+    );
+  }
+
+  /// One-tap orientation switch. The activity stays alive; the bridge
+  /// recomputes preview rotation and the MP4 hint for the new display.
+  Widget _rotationToggle() {
+    final portrait = MediaQuery.orientationOf(context) == Orientation.portrait;
+    final label = portrait ? 'Rotate to landscape' : 'Rotate to portrait';
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: Material(
+          color: UiTokens.surfaceGlass,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () {
+              SystemChrome.setPreferredOrientations(
+                portrait
+                    ? const [
+                        DeviceOrientation.landscapeLeft,
+                        DeviceOrientation.landscapeRight,
+                      ]
+                    : const [DeviceOrientation.portraitUp],
+              );
+            },
+            child: SizedBox(
+              width: 32,
+              height: 32,
+              child: Icon(
+                portrait ? Icons.screen_rotation : Icons.stay_current_portrait,
+                size: 16,
                 color: UiTokens.muted,
               ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: UiTokens.muted,
-                ),
-              ),
-              const Icon(Icons.expand_more, size: 13, color: UiTokens.muted),
-            ],
+            ),
           ),
         ),
       ),
