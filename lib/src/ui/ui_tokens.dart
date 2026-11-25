@@ -17,6 +17,18 @@ class UiTokens {
   static const success = Color(0xFF4CC38A);
   static const info = Color(0xFF6EA8FE);
 
+  /// Per-section console accents. Kept muted so the console stays cohesive.
+  static const cardRecording = Color(0xFFE8B44A);
+  static const cardShoot = Color(0xFF4CC38A);
+  static const cardExposure = Color(0xFF6EA8FE);
+  static const cardAudio = Color(0xFF2DD4BF);
+  static const cardPicture = Color(0xFFC084FC);
+  static const cardFocus = Color(0xFF22D3EE);
+  static const cardMonitor = Color(0xFFF472B6);
+  static const cardProcessing = Color(0xFFFB923C);
+  static const cardDevice = Color(0xFF94A3B8);
+  static const cardClip = Color(0xFFA3E635);
+
   static const radius = 14.0;
   static const controlRadius = 12.0;
 

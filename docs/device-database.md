@@ -112,10 +112,9 @@ exact `camera_id`, then the `"*"` device-wide fallback. Entries with a
 The matrix is the row-major 3×3 CCM into the working space. `wb_r_offset` and
 `wb_b_offset` are per-lens white-balance multipliers applied before the CCM;
 `shadow_lift` is a small shadow-floor trim. `exposure_trim` and
-`saturation_trim` are multipliers after the matrix. The current renderer applies
-the WB/shadow trims in display space as an interim step; the scene-linear phase
-(ADR 0016) moves them into the linear shader. Identity values are the defaults,
-so an entry without these fields behaves exactly as before.
+`saturation_trim` are multipliers after the matrix. The renderer applies all of
+them in linear Rec.2020, before the creative look (ADR 0018). Identity values are
+the defaults, so an entry without these fields behaves exactly as before.
 
 The pipeline order is documented in [ADR 0005](adr/0005-colour-pipeline.md) and
 [ADR 0016](adr/0016-colour-architecture.md):
@@ -130,19 +129,26 @@ a ColorChecker matrix is added, `InputProfile` stays identity and the UI reports
 `identity · no measured data`. This is deliberate: inventing a matrix would make
 the preview change without evidence.
 
-`ColorCalibration.solve` (`:core:profile`) converts 24 observed/reference RGB
-patches into the matrix and exposure trim used above. It rejects degenerate fits
-and returns identity rather than a guessed result. Feed it the patch means from
-a target captured under one exposure/white-balance state, then copy the printed
-matrix into a `calibrations` entry.
+`ColorCalibration.solve` (`:core:profile`) fits 24 observed/reference RGB
+patches in **linear Rec.2020** (the domain the shader applies the matrix in).
+`ColorChecker` supplies the published ColorChecker Classic references and the
+BT.709/sRGB decode plus ΔE2000. The neutral patches drive `wb_r_offset` /
+`wb_b_offset` and the exposure trim. Degenerate fits are rejected: the result
+reports `accepted = false`, keeps identity and cannot be saved.
+
+The in-app Calibration screen (console → Picture profile → *Calibrate colour…*)
+captures one bypass frame, lets the user align a 6×4 perspective grid, samples
+the patches and saves the accepted result to `files/device-database.json` under
+the probe-stable `lens_key`. It is not a substitute for a physically good chart
+and even lighting, and the 8-bit captured frame limits precision. See ADR 0027.
 
 ## Adding a device or calibration
 
 1. Run the prober on the device and keep the summary report.
 2. Add a quirk only when the report or a test recording proves a workaround is
    needed. Record the failing request, API range, and evidence link.
-3. For colour, capture a ColorChecker under the intended illuminant, derive the
-   3×3 normalisation and trims, and add one `calibrations` entry per camera.
+3. For colour, either use the in-app Calibration screen or supply an external
+   ColorChecker measurement, and add one `calibrations` entry per lens.
 4. Validate the JSON against `DeviceDatabase.validate()`, then either ship it in
    the bundled asset or push it to `files/device-database.json`.
 5. Reload from the Device Database panel and confirm the applied quirk/calibration

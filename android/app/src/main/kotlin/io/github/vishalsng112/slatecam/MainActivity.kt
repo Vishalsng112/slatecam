@@ -35,10 +35,12 @@ class MainActivity : FlutterActivity() {
             peakingSensitivity = intent?.getFloatExtra(EXTRA_PEAKING_SENSITIVITY, 0.5f) ?: 0.5f,
         )
         installed.setProbeMode(intent?.getBooleanExtra(EXTRA_RUN_PROBE, false) == true)
+        installed.permissionRequester = { requestCameraPermission() }
         bridge = installed
     }
 
     override fun onDestroy() {
+        bridge?.permissionRequester = null
         bridge?.dispose()
         bridge = null
         super.onDestroy()

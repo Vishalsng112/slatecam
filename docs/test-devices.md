@@ -1173,3 +1173,194 @@ presets are parameterised look curves, not bit-exact Sony transfers. Auto knee
 is a static max-point/sensitivity mapping, and Detail controls are deferred.
 S-Log/S-Gamut remain absent because the encoder writes truthful HLG/Rec.709
 metadata.
+
+## Manual white balance (Pad 3, build 2092)
+
+Pad 3 (`ef9be99a`), Android 17 / SDK 37, debug APK build 2092. White balance
+gains a Manual chip with temperature and tint sliders.
+
+| Check | Result |
+|---|---|
+| Capability | `android.colorCorrection.availableModes` = `[0 1 2 ]` (TRANSFORM_MATRIX, FAST, HIGH_QUALITY); no CCT mode, no `colorTemperatureRange` |
+| Camera2 gains honoured | forcing `RggbChannelVector(4, 1, 1, 0.25)` with AWB off turned the preview strongly red — the request keys are applied |
+| Gains-only manual | green-normalised black-body gains at 5600 K still produced a strong green cast (sensor white point not neutralised) |
+| Reported CCM | `SENSOR_COLOR_TRANSFORM1` = `1.523,-0.719,-0.234,-0.969,1.875,0.039,0.039,-0.141,0.734` at D65; feeding it back as `COLOR_CORRECTION_TRANSFORM` stayed green. Inverse composition collapses to a near-diagonal gain matrix, so no usable CCM is derivable |
+| Preset base | `daylight` produced correct, neutral colour, so the HAL owns the CCM and manual anchors on it |
+| Manual @ 5600 K | `wb: manual 5600K tint=0 preset=daylight cct=5500`, visually identical to the daylight preset |
+| Temperature | 2600 K → `preset=incandescent cct=2856`, visibly cooler; 7600 K → `preset=shade cct=7500`, visibly warmer |
+| Tint | +70 produced a clear magenta shift with the temperature unchanged |
+| Preset snap | tapping `daylight` selected the chip and moved Temperature/Tint to `5500 K / 0`; the image matched the daylight preset |
+| Drag enters manual | touching Temperature at 3600 K selected Manual: `wb: manual 3600K tint=0 preset=warm_fluorescent cct=3000` |
+| Auto | switching back to Auto restored auto colour (residual reset to 1.0); the sliders keep the last value as the manual starting point |
+| Persistence | force-stop and cold start restored `wb: manual 3500K tint=70 preset=warm_fluorescent cct=3000` with the same visible cast |
+| Recording | 7.0 s 10-bit HLG clip in manual mode: `profile=2 standard=6 transfer=7 range=2` and `bit_depth=10`, MediaStore row `SlateCam_20261124_174739.mp4` 1920×1080 7029 ms, gyro sidecar 547 samples / 202 frames |
+| Lens switch | back → front kept manual 3500 K +70 tint and re-applied the residual |
+| 8-bit path | 1080p 8-bit SDR showed the same manual behaviour (the residual is a shader stage, independent of bit depth) |
+
+The preset CCTs are nominal (standard Camera2 illuminant values). Absolute
+temperature accuracy is therefore the preset's real CCT plus the black-body
+approximation; measured per-lens calibration data is still required to close
+the gap.
+
+## First-run camera access (Pad 3, build 2093)
+
+Pad 3 (`ef9be99a`), Android 17 / SDK 37, debug APK build 2093. Reproduces the
+new-user path by uninstalling and reinstalling without `pm install -g`, so no
+runtime permission is pre-granted.
+
+| Check | Result |
+|---|---|
+| Fresh install, first launch | camera prompt shown, launch screen shows **Grant camera access**; no red `SecurityException` banner (build 2092 and earlier dumped `validateClientPermissionsLocked: … cannot open camera "0" without camera permission`) |
+| Grant camera + audio | after Allow, the viewfinder opened by itself on activity resume (`SlateCamGl: first frame previewSurface=1920x1080`), no restart needed |
+| Deny both | launch screen keeps the explanation and the **Grant camera access** action; nothing is opened or left half-started |
+| Retry after denial | tapping **Grant camera access** re-prompts, and granting on the retry opens the preview |
+| Relaunch with permission granted | auto-opens on the 600 ms launch timer as before |
+| Background → foreground | preview reopens on resume (single session; no duplicate open) |
+
+Root cause of the bad first-run state: `_openCamera` ran 600 ms after launch
+regardless of permission. On a fresh install the open threw `SecurityException`
+while the dialog was up, the renderer stayed started, and the next `openCamera`
+call re-entered `GlPreviewRenderer.start()` on a live pipeline, which wedged the
+app until the process was killed. `openCamera` now checks permission first, and
+a failed open tears down the session and GL state so retrying is safe.
+
+## Viewfinder pacing and resolution control (Pad 3, build 2094)
+
+Pad 3 (`ef9be99a`), Android 17 / SDK 37, debug APK build 2094. Preview is a GL
+surface rendered into Flutter's `SurfaceProducer`; measurement used temporary
+per-frame timing logs and a temporary colour flag (removed after the pass).
+
+| Check | Result |
+|---|---|
+| Camera cadence | `interval=33.333 ms`, `fps=30.0` across every 60-frame window at 720p and 1080p preview |
+| Render cost, no analysis | 1.2–1.5 ms per preview frame (1280×720 and 1920×1080) |
+| Analysis cost | synchronous `glReadPixels` added ~9 ms on every analysis frame; with `ANALYSIS_INTERVAL=2` the average draw was 6.4–7.9 ms |
+| After the change | `ANALYSIS_INTERVAL=3` + vsync-paced draw: 4.7–5.5 ms average, camera still 30.0 fps |
+| Presentation probe | a per-produced-frame colour flag showed irregular holds (1 vs 3–7 refreshes, occasional missing colours) while a 10 Hz time-based flag cycled through the same recording without a gap — production is clean, the display handoff is not vsync-locked |
+| VF pill | `VF Full` → `VF 720` retargeted the producer (`output retargeted 1280x720`); `VF 720` → `VF Full` retargeted to `1920x1080` |
+| Console | the Viewfinder card is gone; the console starts with Monitoring after Processing |
+| Recording regression | 5.1 s 1080p clip (`SlateCam_20261124_194859.mp4`, 1920×1080) with `encoder frames=60` per 2 s during the new pacing, gyro sidecar written |
+| Manual WB regression | dragging Temperature logged `wb: manual 4800K tint=0 preset=twilight cct=4500` |
+
+Remaining latency is the camera → SurfaceTexture → Flutter texture → compositor
+hop; the GL thread is not the bottleneck. The deeper split (native preview
+surface on vsync) is tracked in the backlog and ADR 0022.
+
+## Smooth zoom ramp (Pad 3, build 2100)
+
+Pad 3 (`71f186d3`), Android 17 / SDK 37, debug APK build 2100. Active mode
+1440×1080 · 30p · 4:3 on the 28 mm back lens, zoom range 1×–10×.
+
+| Check | Result |
+|---|---|
+| Unit tests | `SmoothZoomTest` passes: snap, retarget, rate cap, monotonic pull-out, bounds clamp, settle, no-op and stop |
+| Ramp measurement | 30 fps screen recording of a 300 ms slider drag 10× → 1×; readout stepped 10 → 9.7 → 8.9 → 7.2 → 3.8 → 2.9 → 2.3 → 1.4 → 1.2 → 1.1 → 1.0 across ~0.7 s, settling exactly on 1.0 |
+| Recorded output | 2.9 s clip (`SlateCam_20261125_160514.mp4`) with an 800 ms zoom-in while recording; extracted frames at t=1.2/1.4/1.6/1.8/2.0 s show a progressively tighter crop, so the ramp is in the camera stream, not a preview-only effect |
+| Reopen stability | switching resolution/bit depth holds the current zoom; switching lenses snaps to the new range's clamped value and cancels the ramp |
+| UI | slider thumb and right-hand readout follow the applied value while it eases |
+
+Optical hand-off between physical lenses remains vendor HAL behaviour; the ramp
+smooths the requested ratio, not the HAL's internal camera switch.
+
+## Zoom control usability (Pad 3, build 2106)
+
+The old control was a 132 lp Material slider with a 12 lp thumb inside a
+horizontal scroll view; a hand drag was usually claimed by the scroll view or
+missed the thumb. Rebuilt as a two-row panel: lens chips on top, a 48 lp
+full-width track with a 22 lp thumb below. The whole strip is an opaque
+tap/drag target.
+
+| Check | Result |
+|---|---|
+| Off-thumb tap at 50 % | set the target to 5.4× and settled there; image zoomed smoothly |
+| Off-thumb drag to 80 % | settled at 8.0×; thumb tracked the finger and held until the ramp caught up |
+| Single-tap regression | first ramp tick could see `dt = 0` and stop; fixed by posting the first tick after one frame and keeping `advance(0)` animated (test added) |
+| Hand feel | lens chips now have a 36 lp minimum touch height; no horizontal scroll competes with the slider drag |
+
+## Viewfinder judder — state push vs presentation (Pad 3, build 2120)
+
+Pad 3 (`71f186d3`), Android 17 / SDK 37, 1440×1080 30p, 60 Hz display mode.
+Measured with `dumpsys SurfaceFlinger --latency` on the Flutter SurfaceView and
+temporary GL/bridge timing logs (removed after the pass).
+
+| Check | Result |
+|---|---|
+| GL production | `draw` timestamps 33 ms apart for 277/289 frames; only three 49–82 ms warm-up stragglers, no steady-state drops |
+| Before the fix | SurfaceFlinger deltas mostly 33.3 ms, with repeated 83.3/100 ms holds and 16.7 ms catch-up bursts — the classic dropped-present pattern |
+| Root cause probe | suppressing periodic state pushes removed the holds; `setState` on telemetry alone reintroduced them even with a small payload |
+| Idle after the fix | 126/127 frames at 33.2–33.5 ms, no 83/100 ms holds |
+| Recording after the fix | 77 frames at 33.3 ms, 21 at 33.4, 16 at 16.7, three 83 ms holds in 5 s (encoder-path load, not state) |
+| Histogram/waveform visible | 118/126 at ~33.3 ms, six 50 ms holds in 5 s from the 2 Hz array push |
+| Live readouts | dock and console Exposure card still follow ISO/shutter; REC pill, timer and red border update without rebuilding the preview |
+
+The pipeline and decision are in ADR 0024. The remaining analysis-array cost is
+tracked in the backlog as a binary-payload/off-thread decode follow-up.
+
+## User picture profiles (Pad 3, build 2122)
+
+Pad 3 (`71f186d3`), Android 17 / SDK 37, 1440×1080 · 30p.
+
+| Check | Result |
+|---|---|
+| Create | **New** created “Look 2” with identity settings and selected it; the chip appeared in the Picture profile card |
+| Edit + persistence | black level moved to 9; after a force-stop/relaunch the TestLook chip was active with black level 9 |
+| Per-parameter reset | the black-level reset icon returned only that parameter to 0 |
+| Reset all | **Reset all parameters** restored knee/saturation/colour values to defaults |
+| Rename | TestLook replaced the old name in the chip and editor |
+| Delete | confirmation removed TestLook and fell back to Standard |
+| Built-ins | Standard and SlateLook remain read-only; no rename/delete actions are shown for them |
+| Migration | the pre-library `custom_picture_profile` value appeared as a user profile named **Custom** |
+
+## Playback and media library (Pad 3, build 2127)
+
+Pad 3 (`71f186d3`), Android 17 / SDK 37, 1440×1080 · 30p.
+
+| Check | Result |
+|---|---|
+| Library | 15 clips listed newest-first from `Movies/SlateCam`, with thumbnails, duration, 1440×1080, size and date; header showed `66.5 GB free` |
+| Playback | 0:39 clip opened and played; scrub to 0:20; pause/resume and mute worked |
+| Share | share action opened the MIUI chooser with a temporary content-URI grant |
+| Delete | recorded a 0:02 clip (15 clips), confirmed delete → 14 clips, snackbar, MediaStore folder no longer contains the file |
+| Camera handoff | Clips closed the camera; returning reopened the preview with the same mode and lens |
+| Empty/error states | present in code; no failure to report on this device |
+
+## Colour calibration (Xiaomi Pad 6, build 2130)
+
+Device `71f186d3`, Xiaomi Pad 6 (`23043RP34I`, device key `xiaomi/pipa`),
+Android 14 / SDK 34, 1440×1080 · 30p SDR.
+
+| Check | Result |
+|---|---|
+| Entry point | Picture profile → Input calibration → **Calibrate colour…** opened the route over the live preview; recording state disables it |
+| Bypass capture | Capture returned one upright 960×720 frame through the bypass, shown frozen with a 6×4 grid and four draggable handles |
+| Alignment | Handles dragged independently; the quad is sampled with a perspective bilinear mapping |
+| Solve without a chart | Correctly rejected: mean ΔE2000 32.2 → 32.17, max 59.56, red explanation, Save disabled (identity matrix) |
+| Save path | A saved calibration (build 2128) wrote `files/device-database.json` with `lens_key: back:default:28`, `source: in-app ColorChecker`, version 1; the deck immediately showed `in-app ColorChecker` |
+| Restore | Removed the user database and restarted; calibration returned to `identity · no measured data` |
+| Unit tests | `ColorCalibrationTest`/`ColorCheckerTest` cover the linear-domain fit, WB offsets, rejected fits and CIEDE2000 against Sharma pairs; a synthetic BT.709–8-bit camera transform is recovered with mean ΔE < 1 |
+
+Not yet verified on device: a real physical ColorChecker under controlled light,
+and the resulting ΔE improvement in the preview/clip. The plumbing, rejection
+path, persistence and application are exercised.
+
+## Audio input, monitoring and metering (Xiaomi Pad 6, build 2140)
+
+Device `71f186d3`, Xiaomi Pad 6 (`23043RP34I`, device key `xiaomi/pipa`),
+Android 14 / SDK 34, 1440×1080 · 30p SDR. No USB or wired microphone was
+available during the run.
+
+| Check | Result |
+|---|---|
+| Input enumeration | `AudioManager` reported built-in bottom/back mics, telephony, dock and a 48 kHz pseudo-input; telephony/dock/remote-submix were filtered, leaving `System default`, `Built-in mic · back`, `Built-in mic · bottom` |
+| Monitor start | `audio source=unprocessed input=default preferred=false rate=48000` on camera open; pre-roll meter showed live levels (−45…−53 dBFS in the room) |
+| Input switch | Selecting the back mic restarted the monitor with `input=23043RP34I preferred=true`; selecting bottom restored signal. The back mic was effectively silent, and the UI showed `SILENT INPUT` + the no-signal hint after two seconds |
+| Gain | +15 dB raised the recorded RMS from about −60 dBFS (0 dB take) to −46 dBFS; the meter and CLIP latch responded post-gain |
+| Recording | Input chips lock, gain stays live, status changes to `Recording audio · meter is post-gain`; the monitor restarts after finalize |
+| Encoded audio | `ffprobe`: AAC, 48 kHz, 2 ch, 255.8 kbps; `astats` showed non-silent per-channel peaks/RMS, no flat-factor clipping on the 0 dB take |
+| Permission denied | Revoking `RECORD_AUDIO` showed the permission error and Grant action; meter showed NO SIGNAL. Granting and resuming (without closing the camera) re-enumerated inputs and restarted the monitor; a relaunch also restores it |
+| Hotplug | `AudioDeviceCallback` path compiles and refreshes/falls back; not exercised with physical USB hardware |
+| Unit tests | `:core:codec:testDebugUnitTest` covers silence, −6 dBFS, full scale, mono duplication, gain, clamped clipping, zero-gain clip detection and partial buffers |
+
+Test clips created for the audio evidence were removed from MediaStore and the
+app was left live with the default input at 0.0 dB, microphone permission
+granted, and no colour calibration saved.

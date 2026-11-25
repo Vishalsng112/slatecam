@@ -79,34 +79,16 @@ class WaveformPainter extends CustomPainter {
 class GuidesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final thin = Paint()
-      ..color = Colors.white.withValues(alpha: 0.45)
-      ..strokeWidth = 1;
-    final thirds = Paint()
+    final line = Paint()
       ..color = Colors.white.withValues(alpha: 0.35)
       ..strokeWidth = 1;
 
     for (var i = 1; i < 3; i++) {
       final dx = size.width * i / 3;
       final dy = size.height * i / 3;
-      canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), thirds);
-      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), thirds);
+      canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), line);
+      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), line);
     }
-
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    canvas.drawLine(Offset(cx - 16, cy), Offset(cx + 16, cy), thin);
-    canvas.drawLine(Offset(cx, cy - 16), Offset(cx, cy + 16), thin);
-
-    canvas.drawRect(
-      Rect.fromLTWH(
-        size.width * 0.05,
-        size.height * 0.05,
-        size.width * 0.9,
-        size.height * 0.9,
-      ),
-      thin,
-    );
   }
 
   @override

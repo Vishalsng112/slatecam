@@ -1,9 +1,14 @@
 package io.github.vishalsng112.slatecam.bridge
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Environment
@@ -17,7 +22,16 @@ import android.view.Surface
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.view.TextureRegistry
 import io.github.vishalsng112.slatecam.bridge.pigeon.CameraState
+import io.github.vishalsng112.slatecam.bridge.pigeon.CameraTelemetry
+import io.github.vishalsng112.slatecam.bridge.pigeon.CalibrationFrame
+import io.github.vishalsng112.slatecam.bridge.pigeon.CalibrationPatch
+import io.github.vishalsng112.slatecam.bridge.pigeon.CalibrationSolution
+import io.github.vishalsng112.slatecam.bridge.pigeon.AudioInputOption
+import io.github.vishalsng112.slatecam.bridge.pigeon.AudioTelemetry
 import io.github.vishalsng112.slatecam.bridge.pigeon.LensOption
+import io.github.vishalsng112.slatecam.bridge.pigeon.MediaClip
+import io.github.vishalsng112.slatecam.bridge.pigeon.MediaStorageInfo
+import io.github.vishalsng112.slatecam.bridge.pigeon.PictureProfileInfo
 import io.github.vishalsng112.slatecam.bridge.pigeon.ProfileSettings as PigeonProfileSettings
 import io.github.vishalsng112.slatecam.bridge.pigeon.RecordingMode
 import io.github.vishalsng112.slatecam.bridge.pigeon.ShootLens
@@ -29,17 +43,25 @@ import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
 import io.github.vishalsng112.slatecam.core.camera.FocusMode
 import io.github.vishalsng112.slatecam.core.camera.FocusScenario
+import io.github.vishalsng112.slatecam.core.camera.ManualWhiteBalance
 import io.github.vishalsng112.slatecam.core.camera.MeteringMode
 import io.github.vishalsng112.slatecam.core.camera.RecordingModeCatalog
+import io.github.vishalsng112.slatecam.core.codec.AudioInputs
+import io.github.vishalsng112.slatecam.core.codec.AudioLevel
+import io.github.vishalsng112.slatecam.core.codec.AudioMonitor
+import io.github.vishalsng112.slatecam.core.codec.AudioSpec
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.codec.GyroRecorder
 import io.github.vishalsng112.slatecam.core.device.CapabilityGates
+import io.github.vishalsng112.slatecam.core.device.CalibrationEntry
 import io.github.vishalsng112.slatecam.core.device.DeviceDatabaseRepository
 import io.github.vishalsng112.slatecam.core.device.DeviceDatabaseSnapshot
 import io.github.vishalsng112.slatecam.core.device.FeatureGate
 import io.github.vishalsng112.slatecam.core.device.QuirkActions
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
 import io.github.vishalsng112.slatecam.core.profile.BlackGammaRange
+import io.github.vishalsng112.slatecam.core.profile.ColorCalibration
+import io.github.vishalsng112.slatecam.core.profile.ColorChecker
 import io.github.vishalsng112.slatecam.core.profile.ColorMode
 import io.github.vishalsng112.slatecam.core.profile.GammaPreset
 import io.github.vishalsng112.slatecam.core.profile.InputProfile
@@ -47,7 +69,11 @@ import io.github.vishalsng112.slatecam.core.profile.KneeMode
 import io.github.vishalsng112.slatecam.core.profile.KneeSensitivity
 import io.github.vishalsng112.slatecam.core.profile.LutLibrary
 import io.github.vishalsng112.slatecam.core.profile.PictureProfile
+import io.github.vishalsng112.slatecam.core.profile.PictureProfileLibrary
+import io.github.vishalsng112.slatecam.core.profile.ProfileKind
 import io.github.vishalsng112.slatecam.core.profile.ProfileSettings as CoreProfileSettings
+import io.github.vishalsng112.slatecam.core.profile.UserPictureProfile
+import io.github.vishalsng112.slatecam.core.storage.MediaLibrary
 import io.github.vishalsng112.slatecam.core.probe.model.CameraInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +84,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.Executor
 import kotlin.math.roundToInt
 
@@ -80,7 +107,41 @@ class SlateCamBridge private constructor(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val recorder = ClipRecorder(context)
     private val gyro = GyroRecorder(context)
+    private val audioMonitor = AudioMonitor(context)
+    private val audioManager =
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var audioInputOptions: List<AudioInputOption> = emptyList()
+    private val audioDeviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+            onAudioDevicesChanged()
+        }
+
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            onAudioDevicesChanged()
+        }
+    }
+
+    @Volatile
+    private var audioLevel: AudioLevel = AudioLevel.SILENT
+
+    @Volatile
+    private var audioActive = false
+
+    @Volatile
+    private var audioError: String? = null
+
+    @Volatile
+    private var audioSource: String? = null
+
+    private var audioTicker = false
+    private val audioTick = object : Runnable {
+        override fun run() {
+            pushAudio()
+            if (audioTicker) mainHandler.postDelayed(this, 100L)
+        }
+    }
     private val deviceDatabase = DeviceDatabaseRepository(context)
+    private val mediaLibrary = MediaLibrary(context)
     private var deviceSnapshot: DeviceDatabaseSnapshot = deviceDatabase.snapshot()
     private var lastCameraId: String? = null
     private var switchPump: SwitchFramePump? = null
@@ -97,14 +158,19 @@ class SlateCamBridge private constructor(
     /** single | movie. Movie uses the common mode across a set of lenses. */
     private var shootMode: String = SHOOT_SINGLE
     private val shootPrefs = context.getSharedPreferences(PREFS_SHOOT, Context.MODE_PRIVATE)
+    private var audioInputKey: String =
+        shootPrefs.getString(KEY_AUDIO_INPUT, AudioInputs.DEFAULT_KEY)
+            ?: AudioInputs.DEFAULT_KEY
+    private var audioGainDb: Float = shootPrefs.getFloat(KEY_AUDIO_GAIN, 0f)
     private var previewQuality = shootPrefs.getString(KEY_PREVIEW_QUALITY, "full") ?: "full"
     private var previewOutputWidth = 0
     private var previewOutputHeight = 0
-    private var customSettings = decodeSettings(shootPrefs.getString(KEY_CUSTOM_PROFILE, null))
+    private val pictureProfiles = loadPictureProfiles()
     private var creativeLutId = shootPrefs.getString(KEY_CREATIVE_LUT, null)
         ?.takeIf { it.isNotBlank() && it != "none" }
     private var modesCacheKey: String? = null
     private var modesCache: List<RecordingMode> = emptyList()
+    private var analysisOverlayVisible = false
 
     /** Main10/HLG was actually used for the clip in flight. */
     private var activeRecordingTenBit = false
@@ -125,9 +191,7 @@ class SlateCamBridge private constructor(
     private var powerManager: PowerManager? = null
     private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
 
-    private var profileId = (shootPrefs.getString(KEY_PROFILE, null) ?: PictureProfile.STANDARD.id)
-        .takeIf { id -> PictureProfile.all.any { it.id == id } }
-        ?: PictureProfile.STANDARD.id
+    private var profileId = loadActiveProfileId()
     private var zebraEnabled = false
     private var falseColorEnabled = false
     private var peakingEnabled = false
@@ -135,6 +199,12 @@ class SlateCamBridge private constructor(
     private var peakingStrength = 0.8f
     private var lutEntries: List<LutLibrary.Entry> = emptyList()
     private var probeMode = false
+
+    /**
+     * Set by the activity: runtime permissions can only be requested from an
+     * activity, while the bridge only holds an application context.
+     */
+    var permissionRequester: (() -> Unit)? = null
 
 
     private var histogramBins: List<Int> = emptyList()
@@ -144,7 +214,7 @@ class SlateCamBridge private constructor(
     private val tick = object : Runnable {
         override fun run() {
             if (recorder.isRecording) {
-                pushState()
+                pushTelemetry()
                 mainHandler.postDelayed(this, 1_000)
             }
         }
@@ -156,6 +226,11 @@ class SlateCamBridge private constructor(
                 ?: MeteringMode.MULTI.wireValue,
         )
         controller.setMeteringSpeed(shootPrefs.getFloat(KEY_METERING_SPEED, 0.5f))
+        controller.restoreWhiteBalance(
+            shootPrefs.getString(KEY_WHITE_BALANCE, "auto") ?: "auto",
+            shootPrefs.getInt(KEY_WHITE_BALANCE_KELVIN, ManualWhiteBalance.DEFAULT_KELVIN),
+            shootPrefs.getInt(KEY_WHITE_BALANCE_TINT, ManualWhiteBalance.DEFAULT_TINT),
+        )
         val savedScenario = FocusScenario.fromWire(
             shootPrefs.getString(KEY_FOCUS_SCENARIO, FocusScenario.WEDDING.wireValue)
                 ?: FocusScenario.WEDDING.wireValue,
@@ -172,9 +247,32 @@ class SlateCamBridge private constructor(
             ),
         )
         applyDeviceSnapshot(deviceSnapshot)
+        refreshAudioOptions()
+        runCatching {
+            audioManager.registerAudioDeviceCallback(audioDeviceCallback, mainHandler)
+        }
         controller.listener = CameraController.Listener { state ->
+            val previous = lastState
+            val cameraChanged = state.cameraId != lastCameraId
+            val openChanged = previous?.isOpen != state.isOpen
+            val configChanged = previous != null && (
+                previous.whiteBalanceMode != state.whiteBalanceMode ||
+                    previous.focusMode != state.focusMode ||
+                    previous.focusScenario != state.focusScenario ||
+                    previous.exposureMode != state.exposureMode ||
+                    previous.meteringMode != state.meteringMode ||
+                    previous.edgeMode != state.edgeMode ||
+                    previous.noiseReduction != state.noiseReduction ||
+                    previous.antibanding != state.antibanding ||
+                    previous.shadingCorrection != state.shadingCorrection ||
+                    previous.oisEnabled != state.oisEnabled ||
+                    previous.eisEnabled != state.eisEnabled ||
+                    previous.frameRate != state.frameRate ||
+                    previous.previewWidth != state.previewWidth ||
+                    previous.previewHeight != state.previewHeight
+                )
             lastState = state
-            if (state.cameraId != lastCameraId) {
+            if (cameraChanged) {
                 lastCameraId = state.cameraId
                 refreshDeviceSnapshot(state.cameraId)
                 // In single mode the 10-bit gate follows the active camera.
@@ -200,7 +298,12 @@ class SlateCamBridge private constructor(
             renderer.setTenBitSource(state.isTenBit)
             renderer.setDisplayRotation(state.previewRotationDegrees)
             renderer.setGlRotation(state.glRotationDegrees)
-            pushState()
+            applyManualWhiteBalance(state)
+            if (cameraChanged || openChanged || configChanged) {
+                pushState()
+            } else {
+                pushTelemetry()
+            }
         }
         applyProfileById(profileId)
 
@@ -215,11 +318,11 @@ class SlateCamBridge private constructor(
             )
             controller.submitFocus(analysis.focusScore)
             val now = SystemClock.elapsedRealtime()
-            if (now - lastAnalysisPublishMs >= 200L) {
+            if (now - lastAnalysisPublishMs >= 500L) {
                 lastAnalysisPublishMs = now
                 histogramBins = analysis.histogram.toList()
                 waveformBins = analysis.waveform.toList()
-                mainHandler.post { pushState() }
+                mainHandler.post { pushTelemetry(analysis = true) }
             }
         }
     }
@@ -243,6 +346,7 @@ class SlateCamBridge private constructor(
 
     override fun openCamera(): Long {
         if (!opened) {
+            check(hasCameraPermission()) { "camera permission is not granted" }
             val mode = activeMode()
             controller.setFrameRate(mode.fps.toInt())
             val width = mode.width.toInt()
@@ -251,31 +355,56 @@ class SlateCamBridge private constructor(
             previewOutputWidth = previewWidth
             previewOutputHeight = previewHeight
             producer.setSize(previewWidth, previewHeight)
-            renderer.start(
-                freshSurface(),
-                width,
-                height,
-                previewWidth,
-                previewHeight,
-            )
-            val cameraSurface = renderer.cameraSurface
-                ?: throw IllegalStateException("GL pipeline did not expose a camera surface")
-            controller.open(
-                cameraSurface,
-                width,
-                height,
-                tenBit = mode.tenBit,
-            )
+            try {
+                renderer.start(
+                    freshSurface(),
+                    width,
+                    height,
+                    previewWidth,
+                    previewHeight,
+                )
+                val cameraSurface = renderer.cameraSurface
+                    ?: throw IllegalStateException("GL pipeline did not expose a camera surface")
+                controller.open(
+                    cameraSurface,
+                    width,
+                    height,
+                    tenBit = mode.tenBit,
+                )
+            } catch (error: Throwable) {
+                // A failed attempt (denied permission, busy camera, bad mode)
+                // must not wedge the pipeline. Drop the half-open session and
+                // GL state so the next open starts from a clean slate.
+                opened = false
+                resumeOnReturn = false
+                runCatching { controller.close() }
+                runCatching { renderer.reset() }
+                throw error
+            }
             opened = true
         }
+        refreshAudioOptions()
+        startAudioMonitor()
         return producer.id()
     }
 
+    override fun cameraPermissionGranted(): Boolean = hasCameraPermission()
+
+    override fun requestCameraPermissions() {
+        permissionRequester?.invoke()
+    }
+
+    private fun hasCameraPermission(): Boolean =
+        context.checkSelfPermission(Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+
     override fun closeCamera() {
         if (recorder.isRecording) stopRecording()
+        stopAudioMonitor()
         stopSwitchPump()
         controller.close()
         opened = false
+        stopAudioTicker()
     }
 
     override fun setIso(iso: Long) {
@@ -302,7 +431,21 @@ class SlateCamBridge private constructor(
     }
 
     override fun setWhiteBalanceMode(mode: String) {
+        if (mode != ManualWhiteBalance.WIRE_VALUE) {
+            shootPrefs.edit().putString(KEY_WHITE_BALANCE, mode).apply()
+        }
         controller.setWhiteBalanceMode(mode)
+    }
+
+    override fun setManualWhiteBalance(kelvin: Long, tint: Long) {
+        val temperature = ManualWhiteBalance.clampKelvin(kelvin.toInt())
+        val trim = ManualWhiteBalance.clampTint(tint.toInt())
+        shootPrefs.edit()
+            .putString(KEY_WHITE_BALANCE, ManualWhiteBalance.WIRE_VALUE)
+            .putInt(KEY_WHITE_BALANCE_KELVIN, temperature)
+            .putInt(KEY_WHITE_BALANCE_TINT, trim)
+            .apply()
+        controller.setManualWhiteBalance(temperature, trim)
     }
 
     override fun setAutoExposure() {
@@ -319,6 +462,12 @@ class SlateCamBridge private constructor(
         val clamped = speed.toFloat().coerceIn(0f, 1f)
         shootPrefs.edit().putFloat(KEY_METERING_SPEED, clamped).apply()
         controller.setMeteringSpeed(clamped)
+    }
+
+    override fun setAnalysisOverlayVisible(visible: Boolean) {
+        if (analysisOverlayVisible == visible) return
+        analysisOverlayVisible = visible
+        pushTelemetry(analysis = visible)
     }
 
     override fun setFocusScenario(scenario: String) {
@@ -410,11 +559,16 @@ class SlateCamBridge private constructor(
         // for a size, rate or bit depth it does not have.
         if (compatible == null) {
             val fallback = targetModes.firstOrNull {
-                it.enabled && it.width == 1920 && it.height == 1080 &&
+                it.enabled && it.width == 1440 && it.height == 1080 &&
                     it.fps == 30 && it.tenBit
             } ?: targetModes.firstOrNull {
-                it.enabled && it.width == 1920 && it.height == 1080 &&
+                it.enabled && it.width == 1440 && it.height == 1080 &&
                     it.fps == 30
+            } ?: targetModes.firstOrNull {
+                it.enabled && it.width == 1440 && it.height == 1080
+            } ?: targetModes.firstOrNull {
+                it.enabled && it.width == 1920 && it.height == 1080 &&
+                    it.fps == 30 && it.tenBit
             } ?: targetModes.firstOrNull {
                 it.enabled && it.width == 1920 && it.height == 1080
             } ?: targetModes.firstOrNull { it.enabled }
@@ -478,21 +632,64 @@ class SlateCamBridge private constructor(
     }
 
     override fun setProfile(profileId: String) {
+        if (!isKnownProfile(profileId)) return
         applyProfileById(profileId)
         pushState()
     }
 
     override fun setProfileSettings(settings: PigeonProfileSettings) {
-        customSettings = settings.toCore().normalized()
-        persistCustomSettings()
-        if (profileId == PictureProfile.CUSTOM.id) applyProfileById(profileId)
+        val core = settings.toCore().normalized()
+        if (!pictureProfiles.updateSettings(profileId, core)) {
+            // Built-in profiles are read-only.
+            pushState()
+            return
+        }
+        persistPictureProfiles()
+        applyProfileById(profileId)
         pushState()
     }
 
     override fun resetProfile() {
-        customSettings = CoreProfileSettings.IDENTITY
-        persistCustomSettings()
-        if (profileId == PictureProfile.CUSTOM.id) applyProfileById(profileId)
+        if (!pictureProfiles.resetSettings(profileId)) return
+        persistPictureProfiles()
+        applyProfileById(profileId)
+        pushState()
+    }
+
+    override fun resetProfileParameter(key: String) {
+        if (!pictureProfiles.resetParameter(profileId, key)) return
+        persistPictureProfiles()
+        applyProfileById(profileId)
+        pushState()
+    }
+
+    override fun createPictureProfile(name: String): String {
+        var id: String
+        do {
+            id = "look-${UUID.randomUUID().toString().take(8)}"
+        } while (pictureProfiles.get(id) != null)
+        pictureProfiles.add(id, name, CoreProfileSettings.IDENTITY)
+        persistPictureProfiles()
+        applyProfileById(id)
+        pushState()
+        return id
+    }
+
+    override fun renamePictureProfile(id: String, name: String) {
+        if (!pictureProfiles.rename(id, name)) return
+        persistPictureProfiles()
+        if (profileId == id) applyProfileById(id)
+        pushState()
+    }
+
+    override fun deletePictureProfile(id: String) {
+        if (!pictureProfiles.delete(id)) return
+        shootPrefs.edit()
+            .remove(profileNameKey(id))
+            .remove(profileSettingsKey(id))
+            .apply()
+        persistPictureProfiles()
+        if (profileId == id) applyProfileById(PictureProfile.STANDARD.id)
         pushState()
     }
 
@@ -508,11 +705,60 @@ class SlateCamBridge private constructor(
         pushState()
     }
 
-    private fun persistCustomSettings() {
-        shootPrefs.edit()
-            .putString(KEY_CUSTOM_PROFILE, encodeSettings(customSettings))
-            .apply()
+    private fun persistPictureProfiles() {
+        persistPictureProfiles(pictureProfiles)
     }
+
+    private fun persistPictureProfiles(library: PictureProfileLibrary) {
+        val editor = shootPrefs.edit()
+        val profiles = library.all()
+        editor.putString(KEY_PICTURE_PROFILE_IDS, profiles.joinToString(",") { it.id })
+        profiles.forEach { profile ->
+            editor.putString(profileNameKey(profile.id), profile.name)
+            editor.putString(profileSettingsKey(profile.id), encodeSettings(profile.settings))
+        }
+        editor.apply()
+    }
+
+    private fun loadPictureProfiles(): PictureProfileLibrary {
+        val library = PictureProfileLibrary()
+        val rawIds = shootPrefs.getString(KEY_PICTURE_PROFILE_IDS, null)
+        if (rawIds == null) {
+            // One-time seed: keep the pre-library custom look as "Custom".
+            library.add("custom", "Custom", decodeSettings(shootPrefs.getString(KEY_CUSTOM_PROFILE, null)))
+            persistPictureProfiles(library)
+            shootPrefs.edit().remove(KEY_CUSTOM_PROFILE).apply()
+            return library
+        }
+        val restored = rawIds.split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .mapNotNull { id ->
+                val name = shootPrefs.getString(profileNameKey(id), null) ?: return@mapNotNull null
+                val settings = decodeSettings(shootPrefs.getString(profileSettingsKey(id), null))
+                UserPictureProfile(id, name, settings)
+            }
+        library.restore(restored)
+        if (library.all().isEmpty()) {
+            library.add("custom", "Custom", CoreProfileSettings.IDENTITY)
+            persistPictureProfiles(library)
+        }
+        return library
+    }
+
+    private fun loadActiveProfileId(): String {
+        val saved = shootPrefs.getString(KEY_PROFILE, null) ?: return PictureProfile.STANDARD.id
+        return if (isKnownProfile(saved)) saved else PictureProfile.STANDARD.id
+    }
+
+    private fun isKnownProfile(id: String): Boolean =
+        id == PictureProfile.STANDARD.id ||
+            id == PictureProfile.SLATE_LOOK.id ||
+            pictureProfiles.get(id) != null
+
+    private fun profileNameKey(id: String): String = "picture_profile_name_$id"
+
+    private fun profileSettingsKey(id: String): String = "picture_profile_settings_$id"
 
     override fun setZebra(enabled: Boolean) {
         zebraEnabled = enabled
@@ -601,6 +847,8 @@ class SlateCamBridge private constructor(
         deviceReportError = null
         val reopen = opened
         if (recorder.isRecording) stopRecording()
+        stopAudioMonitor()
+        stopAudioTicker()
         controller.close()
         opened = false
         pushState()
@@ -640,6 +888,275 @@ class SlateCamBridge private constructor(
 
     override fun isProbeMode(): Boolean = probeMode
 
+    override fun listMediaClips(): List<MediaClip> = mediaLibrary.list().map { clip ->
+        MediaClip(
+            id = clip.id,
+            name = clip.name,
+            uri = clip.uri,
+            durationMs = clip.durationMs,
+            sizeBytes = clip.sizeBytes,
+            width = clip.width.toLong(),
+            height = clip.height.toLong(),
+            dateAddedMs = clip.dateAddedMs,
+        )
+    }
+
+    override fun mediaStorageInfo(): MediaStorageInfo {
+        val info = mediaLibrary.storage()
+        return MediaStorageInfo(
+            freeBytes = info.freeBytes,
+            totalBytes = info.totalBytes,
+        )
+    }
+
+    override fun mediaClipThumbnail(id: String): String? = mediaLibrary.thumbnail(id)
+
+    override fun deleteMediaClip(id: String): Boolean = mediaLibrary.delete(id)
+
+    override fun shareMediaClip(id: String): Boolean = mediaLibrary.share(id)
+
+    override fun captureCalibrationFrame() {
+        if (recorder.isRecording) {
+            publishCalibrationError("Stop recording before calibrating.")
+            return
+        }
+        if (!opened) {
+            publishCalibrationError("Open the camera before calibrating.")
+            return
+        }
+        val cameraId = lastCameraId ?: ""
+        val lens = currentLensKey()
+        renderer.captureCalibrationFrame { capture ->
+            mainHandler.post {
+                if (capture == null) {
+                    publishCalibrationError("No camera frame available.")
+                    return@post
+                }
+                val api = flutterApi ?: return@post
+                scope.launch {
+                    runCatching {
+                        api.onCalibrationFrame(
+                            CalibrationFrame(
+                                width = capture.width.toLong(),
+                                height = capture.height.toLong(),
+                                rgba = capture.rgba,
+                                cameraId = cameraId,
+                                lensKey = lens,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Fits in the linear Rec.2020 domain the shader applies the matrix in.
+     * Flutter sends encoded BT.709 samples from the bypass frame.
+     */
+    override fun solveCalibration(
+        patches: List<CalibrationPatch>,
+        cameraId: String,
+        lensKey: String?,
+    ): CalibrationSolution {
+        require(patches.size == ColorChecker.CLASSIC_24_SRGB.size) {
+            "expected 24 ColorChecker patches, got ${patches.size}"
+        }
+        val references = ColorChecker.referenceLinear2020()
+        val samples = patches.mapIndexed { index, patch ->
+            ColorCalibration.Sample(
+                ColorChecker.observedFromEncoded(
+                    patch.r.toFloat(),
+                    patch.g.toFloat(),
+                    patch.b.toFloat(),
+                ),
+                references[index],
+            )
+        }
+        val neutrals = ColorChecker.NEUTRAL_INDICES.map { samples[it] }
+        val result = ColorCalibration.solve(samples, neutrals)
+        return CalibrationSolution(
+            matrix = result.profile.matrix.map { it.toDouble() },
+            accepted = result.accepted,
+            exposureTrim = result.profile.exposureTrim.toDouble(),
+            wbROffset = result.profile.wbROffset.toDouble(),
+            wbBOffset = result.profile.wbBOffset.toDouble(),
+            deltaEBefore = result.deltaEBefore.toDouble(),
+            deltaEAfter = result.deltaEAfter.toDouble(),
+            deltaEMaxAfter = result.deltaEMaxAfter.toDouble(),
+            patchDeltaEAfter = result.patchDeltaEAfter.map { it.toDouble() },
+            cameraId = cameraId,
+            lensKey = lensKey,
+        )
+    }
+
+    override fun saveCalibration(solution: CalibrationSolution) {
+        if (solution.matrix.size != 9) {
+            throw IllegalArgumentException("calibration matrix must be 3x3")
+        }
+        val cameraId = solution.cameraId.ifBlank { lastCameraId ?: "" }
+        val entry = CalibrationEntry(
+            deviceKey = deviceSnapshot.identity.deviceKey,
+            cameraId = cameraId.ifBlank { io.github.vishalsng112.slatecam.core.device.DeviceDatabase.WILDCARD_CAMERA },
+            lensKey = solution.lensKey,
+            matrix = solution.matrix.map { it.toFloat() },
+            exposureTrim = solution.exposureTrim.toFloat(),
+            saturationTrim = 1f,
+            wbROffset = solution.wbROffset.toFloat(),
+            wbBOffset = solution.wbBOffset.toFloat(),
+            source = "in-app ColorChecker",
+        )
+        deviceDatabase.saveCalibration(entry)
+        deviceSnapshot = snapshotFor(lastCameraId ?: cameraId)
+        deviceReportPath = deviceSnapshot.lastReportPath
+        applyDeviceSnapshot(deviceSnapshot)
+        pushState()
+    }
+
+    override fun listAudioInputs(): List<AudioInputOption> {
+        refreshAudioOptions()
+        return audioInputOptions
+    }
+
+    override fun setAudioInput(key: String) {
+        if (recorder.isRecording) {
+            audioError = "Stop recording to change the audio input."
+            pushState()
+            return
+        }
+        audioInputKey = key.ifBlank { AudioInputs.DEFAULT_KEY }
+        shootPrefs.edit().putString(KEY_AUDIO_INPUT, audioInputKey).apply()
+        audioError = null
+        restartAudioMonitor()
+        pushState()
+    }
+
+    override fun setAudioGain(db: Double) {
+        audioGainDb = db.toFloat().coerceIn(MIN_AUDIO_GAIN_DB, MAX_AUDIO_GAIN_DB)
+        shootPrefs.edit().putFloat(KEY_AUDIO_GAIN, audioGainDb).apply()
+        audioMonitor.setGain(audioGainDb)
+        if (recorder.isRecording) recorder.setAudioGain(audioGainDb)
+        pushState()
+    }
+
+    override fun refreshAudioInputs() {
+        refreshAudioOptions()
+        if (opened && !recorder.isRecording) restartAudioMonitor()
+        pushState()
+    }
+
+    private fun refreshAudioOptions() {
+        val options = mutableListOf(
+            AudioInputOption(
+                key = AudioInputs.DEFAULT_KEY,
+                name = "System default",
+                type = "Automatic",
+                detail = "platform route",
+            ),
+        )
+        AudioInputs.list(context).forEach { input ->
+            options += AudioInputOption(
+                key = input.key,
+                name = input.name,
+                type = input.type,
+                detail = input.detail,
+            )
+        }
+        audioInputOptions = options
+    }
+
+    private fun restartAudioMonitor() {
+        stopAudioMonitor()
+        startAudioMonitor()
+    }
+
+    /**
+     * Hotplug: refresh the choices, fall back to the platform route when the
+     * selected device disappeared, and restart metering. Never interrupts a
+     * take; the recorder keeps its route until stop.
+     */
+    private fun onAudioDevicesChanged() {
+        refreshAudioOptions()
+        if (!recorder.isRecording &&
+            audioInputKey != AudioInputs.DEFAULT_KEY &&
+            audioInputOptions.none { it.key == audioInputKey }
+        ) {
+            audioInputKey = AudioInputs.DEFAULT_KEY
+            shootPrefs.edit().putString(KEY_AUDIO_INPUT, audioInputKey).apply()
+        }
+        if (opened && !recorder.isRecording) restartAudioMonitor()
+        pushState()
+    }
+
+    private fun startAudioMonitor() {
+        if (!opened || recorder.isRecording) return
+        if (!AudioInputs.hasPermission(context)) {
+            audioActive = false
+            audioError = "Microphone permission is not granted."
+            return
+        }
+        audioMonitor.onLevel = { level -> audioLevel = level }
+        audioMonitor.onFailure = { message ->
+            mainHandler.post {
+                audioActive = false
+                audioLevel = AudioLevel.SILENT
+                audioError = message
+                pushState()
+            }
+        }
+        audioMonitor.start(audioInputKey, audioGainDb)
+        audioActive = audioMonitor.isRunning
+        audioSource = audioMonitor.sourceLabel
+        audioError = if (audioActive) null else "Audio input is unavailable."
+        startAudioTicker()
+    }
+
+    private fun stopAudioMonitor() {
+        audioMonitor.onLevel = null
+        audioMonitor.onFailure = null
+        audioMonitor.stop()
+        audioActive = false
+        audioSource = null
+        audioLevel = AudioLevel.SILENT
+    }
+
+    private fun startAudioTicker() {
+        if (audioTicker) return
+        audioTicker = true
+        mainHandler.post(audioTick)
+    }
+
+    private fun stopAudioTicker() {
+        audioTicker = false
+        mainHandler.removeCallbacks(audioTick)
+    }
+
+    private fun pushAudio() {
+        val api = flutterApi ?: return
+        val level = audioLevel
+        val telemetry = AudioTelemetry(
+            peakDbL = level.peakDbL.toDouble(),
+            peakDbR = level.peakDbR.toDouble(),
+            rmsDbL = level.rmsDbL.toDouble(),
+            rmsDbR = level.rmsDbR.toDouble(),
+            clipped = level.clipped,
+            active = audioActive,
+        )
+        scope.launch { runCatching { api.onAudio(telemetry) } }
+    }
+
+    private fun currentLensKey(): String? = deviceDatabase.latestReport()
+        ?.cameras
+        ?.firstOrNull { it.id == lastCameraId }
+        ?.let(::lensKey)
+
+    private fun publishCalibrationError(message: String) {
+        val api = flutterApi ?: return
+        scope.launch {
+            runCatching { api.onCalibrationError(message) }
+        }
+    }
+
     fun setProbeMode(enabled: Boolean) {
         probeMode = enabled
     }
@@ -654,7 +1171,24 @@ class SlateCamBridge private constructor(
     }
 
     private fun applyProfileById(id: String) {
-        applyProfile(PictureProfile.byId(id, customSettings))
+        val user = pictureProfiles.get(id)
+        val profile = if (user != null) {
+            PictureProfile(user.id, ProfileKind.CUSTOM, user.settings)
+        } else {
+            PictureProfile.byId(id)
+        }
+        applyProfile(profile)
+    }
+
+    private fun activeSettings(): CoreProfileSettings =
+        pictureProfiles.get(profileId)?.settings ?: PictureProfile.byId(profileId).settings
+
+    private fun pictureProfileInfos(): List<PictureProfileInfo> = buildList {
+        add(PictureProfileInfo(PictureProfile.STANDARD.id, "Standard", true))
+        add(PictureProfileInfo(PictureProfile.SLATE_LOOK.id, "SlateLook", true))
+        pictureProfiles.all().forEach { profile ->
+            add(PictureProfileInfo(profile.id, profile.name, false))
+        }
     }
 
     private fun applyCreativeLut() {
@@ -716,6 +1250,32 @@ class SlateCamBridge private constructor(
         applyCreativeLut()
     }
 
+    /**
+     * Manual white balance keeps a HAL preset as the colour base and applies
+     * only the kelvin/tint residual in the scene-linear shader. Computing the
+     * residual here keeps the camera module free of renderer concerns and the
+     * Flutter UI free of colour maths.
+     */
+    private fun applyManualWhiteBalance(state: CameraUiState) {
+        if (state.whiteBalanceMode != ManualWhiteBalance.WIRE_VALUE) {
+            renderer.setManualWhiteBalance(1f, 1f)
+            return
+        }
+        val preset = ManualWhiteBalance.presetFor(
+            state.whiteBalanceKelvin,
+            state.whiteBalanceModes,
+        ) ?: run {
+            renderer.setManualWhiteBalance(1f, 1f)
+            return
+        }
+        val gains = ManualWhiteBalance.residualGains(
+            state.whiteBalanceKelvin,
+            state.whiteBalanceTint,
+            preset.cct,
+        )
+        renderer.setManualWhiteBalance(gains.red, gains.blue)
+    }
+
     private fun refreshDeviceSnapshot(cameraId: String?) {
         deviceSnapshot = snapshotFor(cameraId)
         deviceReportPath = deviceSnapshot.lastReportPath
@@ -771,6 +1331,8 @@ class SlateCamBridge private constructor(
             tenBit = mode.tenBit,
         )
         opened = true
+        refreshAudioOptions()
+        startAudioMonitor()
     }
 
     /**
@@ -828,7 +1390,23 @@ class SlateCamBridge private constructor(
             SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".mp4"
 
         try {
+            stopAudioMonitor()
+            recorder.onAudioLevel = { level -> audioLevel = level }
+            recorder.onAudioFailure = { message ->
+                audioActive = false
+                audioError = message
+                mainHandler.post { pushState() }
+            }
+            recorder.setAudioGain(audioGainDb)
             val started = startRecorder(name, mode)
+            audioError = if (recorder.audioStarted) {
+                null
+            } else {
+                "Recording without audio: microphone is unavailable or permission was denied."
+            }
+            audioActive = recorder.audioStarted
+            audioSource = recorder.audioSource
+            startAudioTicker()
             activeDestination = started.destination
             activeRecordingTenBit = started.tenBitHlg
             renderer.attachEncoderSurface(started.surface, started.tenBitHlg)
@@ -882,7 +1460,15 @@ class SlateCamBridge private constructor(
             commitDestination(activeDestination, finalized)
             activeDestination = null
             activeRecordingTenBit = false
-            mainHandler.post { pushState() }
+            recorder.onAudioLevel = null
+            recorder.onAudioFailure = null
+            audioLevel = AudioLevel.SILENT
+            audioActive = false
+            audioSource = null
+            mainHandler.post {
+                if (opened) startAudioMonitor()
+                pushState()
+            }
         }, "slatecam-finalize").start()
 
         pushState()
@@ -890,6 +1476,9 @@ class SlateCamBridge private constructor(
 
     fun dispose() {
         stopSwitchPump()
+        stopAudioMonitor()
+        stopAudioTicker()
+        runCatching { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) }
         if (recorder.isRecording) {
             renderer.detachEncoderSurface()
             val destination = activeDestination
@@ -934,6 +1523,7 @@ class SlateCamBridge private constructor(
                 tenBitHlg,
                 destination.muxer,
                 orientationHint = 0,
+                audio = ClipRecorder.AudioConfig(audioInputKey, audioGainDb),
             )
         } catch (first: Throwable) {
             // Main10 configure can be refused; retry as 8-bit with a clean sink.
@@ -949,6 +1539,7 @@ class SlateCamBridge private constructor(
                     false,
                     destination.muxer,
                     orientationHint = 0,
+                    audio = ClipRecorder.AudioConfig(audioInputKey, audioGainDb),
                 )
             } catch (second: Throwable) {
                 abandon(destination)
@@ -1054,6 +1645,8 @@ class SlateCamBridge private constructor(
     fun pause() {
         resumeOnReturn = opened
         if (recorder.isRecording) stopRecording()
+        stopAudioMonitor()
+        stopAudioTicker()
         controller.close()
         opened = false
     }
@@ -1529,21 +2122,30 @@ class SlateCamBridge private constructor(
             }
         }
 
+    /**
+     * The default shoot mode is 4:3 1080p at 30 fps, preferring a probe-verified
+     * 10-bit path. Every step below is capability-gated, so a camera that does
+     * not offer 1440×1080 still lands on an enabled mode instead of a guess.
+     */
+    private fun preferredDefault(modes: List<RecordingMode>): RecordingMode? {
+        fun pick(width: Long, height: Long, tenBit: Boolean? = null) =
+            modes.firstOrNull {
+                it.enabled && it.width == width && it.height == height &&
+                    it.fps == 30L && (tenBit == null || it.tenBit == tenBit)
+            }
+
+        return pick(1440, 1080, tenBit = true)
+            ?: pick(1440, 1080)
+            ?: pick(1920, 1080, tenBit = true)
+            ?: pick(1920, 1080)
+            ?: pick(1920, 1440)
+            ?: modes.firstOrNull { it.enabled }
+    }
+
     private fun activeMode(): RecordingMode {
         val modes = recordingModes()
         return modes.firstOrNull { it.id == selectedModeId }
-            ?: modes.firstOrNull {
-                it.enabled && it.width == 1920L && it.height == 1080L &&
-                    it.fps == 30L && it.tenBit
-            }
-            ?: modes.firstOrNull {
-                it.enabled && it.width == 1920L && it.height == 1080L &&
-                    it.fps == 30L
-            }
-            ?: modes.firstOrNull {
-                it.enabled && it.width == 1920L && it.height == 1080L
-            }
-            ?: modes.firstOrNull { it.enabled }
+            ?: preferredDefault(modes)
             ?: RecordingMode(
                 id = RecordingModeCatalog.id(1920, 1080, 30, false),
                 label = "1920×1080 · 30p · 16:9 · 8-bit SDR",
@@ -1587,6 +2189,61 @@ class SlateCamBridge private constructor(
         }
     }
 
+    /**
+     * Small, high-frequency snapshot for the viewfinder readouts. The full
+     * [CameraState] is too heavy to send at analysis/exposure rates: its
+     * serialisation blocked the platform thread long enough for the preview to
+     * miss presentation slots. Configuration changes still use [pushState].
+     */
+    private fun pushTelemetry(analysis: Boolean = false) {
+        val api = flutterApi ?: return
+        val state = lastState ?: return
+        val elapsedSeconds = if (recorder.isRecording) {
+            ((SystemClock.elapsedRealtime() - recordingStartMs) / 1_000).toInt()
+        } else {
+            0
+        }
+        val grant = tenBitGate(state.cameraId)
+        val telemetry = CameraTelemetry(
+            iso = state.iso.toLong(),
+            shutterNs = state.shutterNs,
+            shutterAngle = state.shutterAngle.toDouble(),
+            focusDiopters = state.focusDiopters.toDouble(),
+            whiteBalanceMode = state.whiteBalanceMode,
+            whiteBalanceKelvin = state.whiteBalanceKelvin.toLong(),
+            whiteBalanceTint = state.whiteBalanceTint.toLong(),
+            zoomRatio = state.zoomRatio.toDouble(),
+            isRecording = recorder.isRecording,
+            recordingSeconds = elapsedSeconds.toLong(),
+            clipPath = clipPath,
+            recordingError = recordingError ?: recorder.lastError,
+            frameRate = state.frameRate.toLong(),
+            gyroSampleCount = gyroSampleCount.toLong(),
+            exposureMode = state.exposureMode,
+            meteringSpeed = state.meteringSpeed.toDouble(),
+            zebra = zebraEnabled,
+            falseColor = falseColorEnabled,
+            peaking = peakingEnabled,
+            peakingSensitivity = peakingSensitivity.toDouble(),
+            peakingStrength = peakingStrength.toDouble(),
+            tenBit = state.isTenBit || (recorder.isRecording && activeRecordingTenBit),
+            hlgAvailable = grant.available,
+            hlgReason = grant.reason,
+            histogram = if (analysisOverlayVisible && analysis) {
+                histogramBins.map { it.toLong() }
+            } else {
+                emptyList()
+            },
+            waveform = if (analysisOverlayVisible && analysis) {
+                waveformBins.map { it.toLong() }
+            } else {
+                emptyList()
+            },
+            waveformColumns = WAVEFORM_COLUMNS.toLong(),
+            waveformBins = WAVEFORM_BINS.toLong(),
+        )
+        scope.launch { runCatching { api.onTelemetry(telemetry) } }
+    }
 
     private fun CameraUiState.toPigeon(
         isRecording: Boolean,
@@ -1622,6 +2279,9 @@ class SlateCamBridge private constructor(
         focusShiftSpeed = focusShiftSpeed.toDouble(),
         whiteBalanceMode = whiteBalanceMode,
         whiteBalanceModes = whiteBalanceModes,
+        whiteBalanceKelvin = whiteBalanceKelvin.toLong(),
+        whiteBalanceTint = whiteBalanceTint.toLong(),
+        manualWhiteBalanceSupported = manualWhiteBalanceSupported,
         autoExposure = autoExposure,
         autoFocus = autoFocus,
         autoFocusSupported = autoFocusSupported,
@@ -1658,10 +2318,8 @@ class SlateCamBridge private constructor(
         frameRate = frameRate.toLong(),
         gyroSampleCount = gyroSampleCount.toLong(),
         profile = profileId,
-        profileNames = PictureProfile.all.map { it.id },
-        profileSettings = PictureProfile.byId(profileId, customSettings)
-            .settings
-            .toPigeon(),
+        pictureProfiles = pictureProfileInfos(),
+        profileSettings = activeSettings().toPigeon(),
         creativeLut = creativeLutId ?: "none",
         creativeLuts = listOf("none") + lutEntries.map { it.id },
         zebra = zebraEnabled,
@@ -1695,6 +2353,15 @@ class SlateCamBridge private constructor(
         deviceReportRunning = deviceReportRunning,
         deviceReportPath = deviceReportPath,
         deviceReportError = deviceReportError,
+        audioInputs = audioInputOptions,
+        audioInputKey = audioInputKey,
+        audioGainDb = audioGainDb.toDouble(),
+        audioPermissionGranted = AudioInputs.hasPermission(context),
+        audioAvailable = audioActive,
+        audioError = audioError,
+        audioSource = audioSource,
+        audioSampleRate = AudioSpec.SAMPLE_RATE.toLong(),
+        audioChannels = AudioSpec.CHANNELS.toLong(),
         histogram = histogramBins.map { it.toLong() },
         waveform = waveformBins.map { it.toLong() },
         waveformColumns = WAVEFORM_COLUMNS.toLong(),
@@ -1713,14 +2380,22 @@ class SlateCamBridge private constructor(
         private const val KEY_EIS_OFF = "eis_off_cameras"
         private const val KEY_METERING_MODE = "metering_mode"
         private const val KEY_METERING_SPEED = "metering_speed"
+        private const val KEY_WHITE_BALANCE = "white_balance_mode"
+        private const val KEY_WHITE_BALANCE_KELVIN = "white_balance_kelvin"
+        private const val KEY_WHITE_BALANCE_TINT = "white_balance_tint"
         private const val KEY_FOCUS_SCENARIO = "focus_scenario"
         private const val KEY_FOCUS_SENSITIVITY = "focus_shift_sensitivity"
         private const val KEY_FOCUS_SPEED = "focus_transition_speed"
         private const val KEY_FOCUS_SOFTWARE = "focus_software"
         private const val KEY_PREVIEW_QUALITY = "preview_quality"
         private const val KEY_CUSTOM_PROFILE = "custom_picture_profile"
+        private const val KEY_PICTURE_PROFILE_IDS = "picture_profile_ids"
         private const val KEY_CREATIVE_LUT = "creative_lut"
         private const val KEY_PROFILE = "picture_profile"
+        private const val KEY_AUDIO_INPUT = "audio_input"
+        private const val KEY_AUDIO_GAIN = "audio_gain_db"
+        private const val MIN_AUDIO_GAIN_DB = -12f
+        private const val MAX_AUDIO_GAIN_DB = 24f
         private const val WAVEFORM_COLUMNS = 64
         private const val WAVEFORM_BINS = 16
         private val LENS_ROLES = setOf("default", "ultrawide", "tele", "macro")

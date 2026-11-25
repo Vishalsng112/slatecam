@@ -144,8 +144,42 @@ data class ProfileSettings(
             colorDepthR != 0 || colorDepthG != 0 || colorDepthB != 0 ||
             colorDepthC != 0 || colorDepthM != 0 || colorDepthY != 0
 
+    /** Resets one editor parameter to its default; unknown keys are unchanged. */
+    fun reset(key: String): ProfileSettings = when (key) {
+        "blackLevel" -> copy(blackLevel = DEFAULTS.blackLevel)
+        "gamma" -> copy(gamma = DEFAULTS.gamma)
+        "blackGammaRange" -> copy(blackGammaRange = DEFAULTS.blackGammaRange)
+        "blackGammaLevel" -> copy(blackGammaLevel = DEFAULTS.blackGammaLevel)
+        "kneeMode" -> copy(kneeMode = DEFAULTS.kneeMode)
+        "kneeAutoMaxPoint" -> copy(kneeAutoMaxPoint = DEFAULTS.kneeAutoMaxPoint)
+        "kneeAutoSensitivity" -> copy(kneeAutoSensitivity = DEFAULTS.kneeAutoSensitivity)
+        "kneePoint" -> copy(kneePoint = DEFAULTS.kneePoint)
+        "kneeSlope" -> copy(kneeSlope = DEFAULTS.kneeSlope)
+        "colorMode" -> copy(colorMode = DEFAULTS.colorMode)
+        "saturation" -> copy(saturation = DEFAULTS.saturation)
+        "colorPhase" -> copy(colorPhase = DEFAULTS.colorPhase)
+        "colorDepthR" -> copy(colorDepthR = DEFAULTS.colorDepthR)
+        "colorDepthG" -> copy(colorDepthG = DEFAULTS.colorDepthG)
+        "colorDepthB" -> copy(colorDepthB = DEFAULTS.colorDepthB)
+        "colorDepthC" -> copy(colorDepthC = DEFAULTS.colorDepthC)
+        "colorDepthM" -> copy(colorDepthM = DEFAULTS.colorDepthM)
+        "colorDepthY" -> copy(colorDepthY = DEFAULTS.colorDepthY)
+        else -> this
+    }
+
     companion object {
-        val IDENTITY = ProfileSettings()
+        val DEFAULTS = ProfileSettings()
+
+        val IDENTITY = DEFAULTS
+
+        /** Parameter keys exposed by the custom-profile editor. */
+        val EDITOR_KEYS: Set<String> = setOf(
+            "blackLevel", "gamma", "blackGammaRange", "blackGammaLevel",
+            "kneeMode", "kneeAutoMaxPoint", "kneeAutoSensitivity", "kneePoint",
+            "kneeSlope", "colorMode", "saturation", "colorPhase",
+            "colorDepthR", "colorDepthG", "colorDepthB", "colorDepthC",
+            "colorDepthM", "colorDepthY",
+        )
     }
 }
 

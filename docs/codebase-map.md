@@ -52,9 +52,11 @@ root is `android/`, not the repository root.
 | Concern | Owner | Key files |
 |---|---|---|
 | Camera state, session, repeating request | `:core:camera` | `CameraController.kt` |
+| Zoom target and smooth ramp | `:core:camera` | `SmoothZoom.kt`, `CameraController.setZoomRatio` |
 | Per-camera capabilities | `:core:camera` | `CameraCapabilities.kt` |
 | Recording modes / common mode | `:core:camera` | `RecordingModeCatalog.kt` |
 | Exposure P/S/M | `:core:camera` | `ExposureEngine.kt` |
+| Manual white balance | `:core:camera`, `:core:gpu` | `ManualWhiteBalance.kt`, `CameraController.applyControls`, `GlPreviewRenderer.setManualWhiteBalance` |
 | Metering patterns and response speed | `:core:camera` | `Metering.kt`, `ExposureEngine.kt` |
 | Luma grid for metering | `:core:gpu` | `FrameAnalysis.kt`, `GlPreviewRenderer.runAnalysis` |
 | Lens-shading / vignette correction | `:core:camera` | `ShadingCorrection.kt`, `CameraController.applyControls` |
@@ -65,13 +67,15 @@ root is `android/`, not the repository root.
 | Scene-linear shader / output routing | `:core:gpu` | `GlPreviewRenderer.ShaderSource.FRAGMENT` |
 | Flicker-safe exposure grid | `:core:common` | `FlickerGrid`, `CameraController.setShutterNs` |
 | Viewfinder tap-to-focus / pinch | `lib/src/ui/capture_screen.dart`, `:core:gpu` transform, `:core:camera` AF region | `GlPreviewRenderer.viewfinderToBuffer`, `CameraController.setFocusPoint` |
-| Picture profiles / look pipeline | `:core:profile` | `PictureProfile.kt`, `SlateCamBridge.applyProfile` |
+| Picture profiles / look pipeline | `:core:profile` | `PictureProfile.kt`, `PictureProfileLibrary.kt`, `SlateCamBridge.applyProfile` |
 | Custom profile persistence | `:bridge` | `setProfileSettings`, `encodeSettings`/`decodeSettings` |
-| Per-lens calibration / WB / shadow | `:core:device` | `CalibrationEntry`, `DeviceDatabase.calibrationFor`, `InputProfile` |
+| Per-lens calibration / WB / shadow | `:core:device`, `:core:profile` | `CalibrationEntry`, `DeviceDatabase.calibrationFor`, `InputProfile`, `ColorChecker` |
 | Independent viewfinder resolution | `:core:gpu`, `:bridge`, Flutter | `GlPreviewRenderer` capture/preview sizes, `SlateCamBridge.previewOutputFor` |
 | OIS / EIS requests | `:core:camera` | `CameraController.readCapabilities/applyControls` |
 | Frame rendering, shader, overlays | `:core:gpu` | `GlPreviewRenderer.kt` |
-| Recording/mux/audio | `:core:codec` | `ClipRecorder.kt`, `GyroRecorder.kt` |
+| Live telemetry vs configuration state | `:bridge`, Flutter | `SlateCamBridge.pushTelemetry/pushState`, `CameraTelemetry`, `capture_screen.dart` builders |
+| Recording/mux/audio | `:core:codec` | `ClipRecorder.kt`, `GyroRecorder.kt`, `AudioInputs.kt`, `AudioMonitor.kt`, `AudioMeter.kt` |
+| Clip library / playback | `:core:storage`, Flutter | `MediaLibrary.kt`, `playback_screen.dart` |
 | HEVC SPS verification | `:core:common` | `HevcSps.kt` |
 | Look, LUT | `:core:profile` | `PictureProfile.kt`, `Lut3D.kt` |
 | Device quirks/calibration | `:core:device` | `DeviceDatabase.kt`, `DeviceDatabaseRepository.kt`, `CapabilityGates.kt` |
@@ -79,8 +83,8 @@ root is `android/`, not the repository root.
 | Flutter state/commands | `:bridge` | `SlateCamBridge.kt`, generated Pigeon |
 | Control surface | `lib/src/ui` | `capture_screen.dart` preview/dock, `control_deck.dart` console |
 | Lens-switch encoder continuity | `:bridge` | `SwitchFramePump.kt`, `GlPreviewRenderer.repeatLastFrame` |
-| Colour calibration math | `:core:profile` | `ColorCalibration.kt` |
-| UI | `lib/src/ui` | `capture_screen.dart`, `control_deck.dart`, `zoom_plugin.dart` |
+| Colour calibration math | `:core:profile` | `ColorCalibration.kt`, `ColorChecker.kt` |
+| UI | `lib/src/ui` | `capture_screen.dart`, `control_deck.dart`, `calibration_screen.dart`, `zoom_plugin.dart` |
 
 ## Flows
 
@@ -91,9 +95,43 @@ root is `android/`, not the repository root.
 `Camera2 → renderer.cameraSurface (SurfaceTexture) → GlPreviewRenderer.drawFrame
 → preview EGL surface (overlays) + encoder EGL surface (clean) + analysis FBO`
 
+### State
+`CameraController / renderer analysis → SlateCamBridge
+→ onState (configuration) + onTelemetry (live readouts)
+→ CaptureScreen ValueNotifier → status/dock/zoom/monitor/console-exposure builders`
+
+`onTelemetry` deliberately does **not** rebuild the preview Texture or the whole
+Control Console; see ADR 0024.
+
 ### Recording
 `SlateCamBridge.startRecording → ClipRecorder.start (encoder surface)
 → renderer draws each frame twice → MediaMuxer → MediaStore`
+
+### Media
+`MediaStore (Movies/SlateCam) → :core:storage MediaLibrary
+→ Pigeon media API → Flutter playback_screen → video_player (ExoPlayer)`
+
+The camera closes while the clips screen is open and reopens when it is popped.
+
+### Audio
+`AudioManager inputs → :core:codec AudioInputs → AudioMonitor (pre-roll)
+→ 10 Hz AudioTelemetry → Flutter audio card`
+`AudioInputs → ClipRecorder audio thread (gain + meter) → AAC 48 kHz stereo
+→ MediaMuxer`
+
+The monitor and recorder are mutually exclusive: the monitor stops before the
+recorder opens its own `AudioRecord` and restarts after finalize. Metering runs
+on its own channel so it never rebuilds camera state. See ADR 0028.
+
+### Colour calibration
+`Calibration screen → Pigeon captureCalibrationFrame → GlPreviewRenderer bypass FBO
+→ 24 patch samples → SlateCamBridge.solveCalibration (linear Rec.2020)
+→ ColorCalibration/ColorChecker → Pigeon solution → saveCalibration
+→ files/device-database.json → InputProfile → shader input stage`
+
+The camera stays open; recording must be stopped. The bypass exposes the ISP
+signal before the input profile, so a measured matrix is not fitted against
+itself. See ADR 0027.
 
 ### Probe
 `DeviceReport UI or --ez run_probe → ProbeRunner → sources + verifiers
@@ -116,6 +154,7 @@ on camera change`
 | Add colour transform/log/LUT | `:core:profile` + `ShaderSource.FRAGMENT` | `GlPreviewRenderer.drawQuad` uniforms; ADR 0005 |
 | Add an AI feature | `:core:ai/AiEngine.kt` | Renderer offscreen pass + `AiFrameGate`, bridge config/UI |
 | Add a UI control | `pigeon/slatecam.dart` | Regenerate Pigeon; bridge; `control_deck.dart`/`capture_screen.dart` |
+| Add/change audio routing or metering | `:core:codec/AudioInputs.kt`, `AudioMonitor.kt`, `AudioMeter.kt` | `ClipRecorder` audio loop, `SlateCamBridge` ticker, `AudioTelemetry`, audio card |
 | Add a device quirk | `assets/device-database.json` | `QuirkActions` consumer; report evidence |
 | Change grading/HLG policy | `CapabilityGates.kt`, `ClipRecorder.kt` | Probe verification, ADR 0004 |
 
@@ -124,7 +163,18 @@ on camera change`
 - **Pigeon:** `pigeon/slatecam.dart` is the source of truth. Regenerate both
   clients after edits:
   `dart run pigeon --input pigeon/slatecam.dart --dart_out lib/src/pigeon/slatecam.g.dart --kotlin_out android/bridge/src/main/kotlin/io/github/vishalsng112/slatecam/bridge/pigeon/SlateCamPigeon.kt --kotlin_package io.github.vishalsng112.slatecam.bridge.pigeon`
+  Pigeon 30 emits `Uint8List` in generated code but omits it from the
+  `dart:typed_data` show-list; add it (and the `unnecessary_import` ignore) after
+  regenerating, and strip trailing whitespace in the Kotlin callbacks.
+- **Calibration API:** `captureCalibrationFrame` (async via
+  `onCalibrationFrame`/`onCalibrationError`), `solveCalibration`,
+  `saveCalibration`; ADR 0027.
+- **Audio API:** `listAudioInputs`, `setAudioInput`, `setAudioGain`,
+  `refreshAudioInputs`; meter snapshots arrive via `onAudio` (ADR 0028).
 - **Probe JSON:** schema 1.11.0, `docs/probe-schema.md`.
+- **Media API:** `listMediaClips`, `mediaStorageInfo`, `mediaClipThumbnail`,
+  `deleteMediaClip`, `shareMediaClip` in `pigeon/slatecam.dart`; MediaStore
+  ownership is in `:core:storage` (ADR 0026).
 - **Device DB:** `slatecam.device-db` v1, `docs/device-database.md`.
 - **Orientation/aspect:** ADR 0006.
 - **Lens-shading (vignette) correction:** ADR 0009.
@@ -132,6 +182,8 @@ on camera change`
 - **Exposure metering and response speed:** ADR 0011.
 - **Software focus engine and scenarios:** ADR 0012.
 - **Viewfinder gestures and tap-to-focus:** ADR 0013.
+- **Viewfinder presentation and resolution control:** ADR 0022.
+- **Telemetry push and preview presentation:** ADR 0024.
 - **Colour-science trim (superseded):** ADR 0014.
 - **Independent viewfinder resolution:** ADR 0015.
 - **Staged colour architecture:** ADR 0016.
@@ -139,6 +191,9 @@ on camera change`
 - **Scene-linear shader and routing:** ADR 0018.
 - **Flicker-safe manual exposure:** ADR 0019.
 - **Picture profiles and look pipeline:** ADR 0020.
+- **User picture profiles:** ADR 0025.
+- **Media library and playback:** ADR 0026.
+- **Manual white balance:** ADR 0021.
 - **Shoot profiles/movie mode:** ADR 0007.
 
 ## Keeping docs current
@@ -159,12 +214,14 @@ flutter analyze
 flutter build apk --debug
 cd android && ./gradlew checkModuleGraph :core:common:testDebugUnitTest \
   :core:probe:testDebugUnitTest :core:device:testDebugUnitTest \
-  :core:camera:testDebugUnitTest
+  :core:camera:testDebugUnitTest :core:codec:testDebugUnitTest
 scripts/probe.sh <serial> [out.json]     # PROBE_WAIT=160 for Main10-failing devices
 ```
 
 Debug install on the Pad 3 uses push + `pm install -r -t -d -g` because streamed
-installs can drop adbd. Probe launch:
+installs can drop adbd. `-g` pre-grants runtime permissions, so it does **not**
+exercise the first-run prompt: drop `-g` (or uninstall and reinstall without it)
+when testing camera access. Probe launch:
 `am start -n io.github.vishalsng112.slatecam/.MainActivity --ez run_probe true`.
 
 ## Known current limits
@@ -172,11 +229,19 @@ installs can drop adbd. Probe launch:
 - True 10-bit GL intermediate is not available; HLG encoder surface is
   RGBA8888, but the encoded stream is Main10/HLG and SPS-checked. Pad movie mode
   is 10-bit; POCO stays SDR because its encoder fails Main10.
-- Colour matching depends on measured per-camera matrices (not shipped).
+- Colour matching depends on measured per-camera matrices. The in-app capture,
+  solve and save flow ships (ADR 0027); the bundled database still has no
+  measured data, and one matrix per lens is not yet illuminant-interpolated.
+- Audio capture uses PCM16 48 kHz stereo; input selection and gain are data.
+  Headphone monitoring, 24-bit capture and a limiter are not implemented.
+- Manual white balance anchors on the nearest HAL AWB preset and applies the
+  kelvin/tint residual in the scene-linear shader; absolute kelvin accuracy is
+  the preset's nominal CCT plus a black-body approximation (ADR 0021).
 - Shoot profiles live in `ShootProfileStore` (pure Kotlin, persisted through a
   storage interface; JVM tests in `bridge/src/test`).
 - The Control Console is one surface with a fixed record/lens/mode bar; avoid
   reintroducing tabs or dropdowns for primary actions.
 - Phase 5.5 remaining: captured colour-target data; the solver already exists.
 
-- Feature modules `:feature:capture` and `:feature:playback` are empty.
+- `:feature:capture` and `:feature:playback` remain marker modules; media
+  access lives in `:core:storage` and the Flutter clips screen.

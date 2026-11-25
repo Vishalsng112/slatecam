@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../pigeon/slatecam.g.dart';
 import 'ui_tokens.dart';
@@ -59,24 +62,32 @@ class ControlDeck extends StatefulWidget {
     required this.host,
     required this.onClose,
     required this.onCloseCamera,
+    required this.onOpenClips,
+    required this.onOpenCalibration,
     required this.showGuides,
     required this.onGuidesChanged,
     required this.showHistogram,
     required this.onHistogramChanged,
     required this.showWaveform,
     required this.onWaveformChanged,
+    required this.telemetry,
+    required this.audio,
   });
 
   final CameraState state;
   final SlateCamHostApi host;
   final VoidCallback onClose;
   final VoidCallback onCloseCamera;
+  final VoidCallback onOpenClips;
+  final VoidCallback onOpenCalibration;
   final bool showGuides;
   final ValueChanged<bool> onGuidesChanged;
   final bool showHistogram;
   final ValueChanged<bool> onHistogramChanged;
   final bool showWaveform;
   final ValueChanged<bool> onWaveformChanged;
+  final ValueListenable<CameraTelemetry?> telemetry;
+  final ValueListenable<AudioTelemetry?> audio;
 
   @override
   State<ControlDeck> createState() => _ControlDeckState();
@@ -89,9 +100,12 @@ class _ControlDeckState extends State<ControlDeck> {
   double? _meterSpeedDraft;
   double? _focusSensitivityDraft;
   double? _focusTransitionDraft;
+  double? _wbKelvinDraft;
+  double? _wbTintDraft;
   final Map<String, double> _profileDrafts = {};
   double? _peakingSensitivityDraft;
   double? _peakingStrengthDraft;
+  double? _audioGainDraft;
 
   CameraState get state => widget.state;
 
@@ -109,6 +123,12 @@ class _ControlDeckState extends State<ControlDeck> {
     if (oldWidget.state.focusTransitionSpeed != state.focusTransitionSpeed) {
       _focusTransitionDraft = null;
     }
+    if (oldWidget.state.whiteBalanceKelvin != state.whiteBalanceKelvin) {
+      _wbKelvinDraft = null;
+    }
+    if (oldWidget.state.whiteBalanceTint != state.whiteBalanceTint) {
+      _wbTintDraft = null;
+    }
     if (oldWidget.state.profileSettings != state.profileSettings) {
       _profileDrafts.clear();
     }
@@ -117,6 +137,9 @@ class _ControlDeckState extends State<ControlDeck> {
     }
     if (oldWidget.state.peakingStrength != state.peakingStrength) {
       _peakingStrengthDraft = null;
+    }
+    if (oldWidget.state.audioGainDb != state.audioGainDb) {
+      _audioGainDraft = null;
     }
   }
 
@@ -130,6 +153,10 @@ class _ControlDeckState extends State<ControlDeck> {
   double get _peakingSensitivity =>
       _peakingSensitivityDraft ?? state.peakingSensitivity;
   double get _peakingStrength => _peakingStrengthDraft ?? state.peakingStrength;
+  double get _wbKelvin =>
+      _wbKelvinDraft ?? state.whiteBalanceKelvin.toDouble();
+  double get _wbTint => _wbTintDraft ?? state.whiteBalanceTint.toDouble();
+  double get _audioGain => _audioGainDraft ?? state.audioGainDb;
 
   @override
   void dispose() {
@@ -156,7 +183,11 @@ class _ControlDeckState extends State<ControlDeck> {
                 builder: (context, constraints) {
                   final primary = <Widget>[
                     _modeCard(context),
-                    _exposureCard(context),
+                    ValueListenableBuilder<CameraTelemetry?>(
+                      valueListenable: widget.telemetry,
+                      builder: (context, _, _) => _exposureCard(context),
+                    ),
+                    _audioCard(context),
                     _focusCard(context),
                   ];
                   final secondary = <Widget>[
@@ -164,7 +195,6 @@ class _ControlDeckState extends State<ControlDeck> {
                     _colourCard(context),
                   ];
                   final tertiary = <Widget>[
-                    _viewfinderCard(context),
                     _monitorCard(context),
                     _processingCard(context),
                     _clipCard(context),
@@ -207,7 +237,6 @@ class _ControlDeckState extends State<ControlDeck> {
                             children: [
                               ...primary,
                               _processingCard(context),
-                              _viewfinderCard(context),
                             ],
                           ),
                         ),
@@ -266,6 +295,12 @@ class _ControlDeckState extends State<ControlDeck> {
                     ],
                   ),
                 ),
+              ),
+              IconButton(
+                tooltip: 'Clips',
+                visualDensity: VisualDensity.compact,
+                onPressed: widget.onOpenClips,
+                icon: const Icon(Icons.video_library_outlined, size: 20),
               ),
               IconButton(
                 tooltip: 'Hide controls',
@@ -521,6 +556,7 @@ class _ControlDeckState extends State<ControlDeck> {
     if (current == null) {
       return DeckCard(
         title: 'Recording mode',
+        tint: UiTokens.cardRecording,
         child: Text(
           'No recording modes reported.',
           style: Theme.of(context).textTheme.bodySmall,
@@ -555,6 +591,7 @@ class _ControlDeckState extends State<ControlDeck> {
 
     return DeckCard(
       title: 'Recording mode',
+      tint: UiTokens.cardRecording,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -755,7 +792,7 @@ class _ControlDeckState extends State<ControlDeck> {
     final current = _currentMode;
     final fps = current?.fps.toInt() ?? 30;
     final tenBit = current?.tenBit ?? true;
-    final wide = current == null ? true : _isWideMode(current);
+    final wide = current == null ? false : _isWideMode(current);
     _chooseFromSizes(_sizesFor(label, wide), fps, tenBit);
   }
 
@@ -763,7 +800,7 @@ class _ControlDeckState extends State<ControlDeck> {
     final current = _currentMode;
     final fps = current?.fps.toInt() ?? 30;
     final tenBit = current?.tenBit ?? true;
-    final family = current == null ? '4K' : _familyOf(current);
+    final family = current == null ? '1080' : _familyOf(current);
     _chooseFromSizes(_sizesFor(family, wide), fps, tenBit);
   }
 
@@ -976,6 +1013,7 @@ class _ControlDeckState extends State<ControlDeck> {
     final editable = !state.isRecording;
     return DeckCard(
       title: 'Shoot set & profiles',
+      tint: UiTokens.cardShoot,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1114,6 +1152,7 @@ class _ControlDeckState extends State<ControlDeck> {
 
     return DeckCard(
       title: 'Exposure',
+      tint: UiTokens.cardExposure,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1218,14 +1257,145 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
+  Widget _audioCard(BuildContext context) {
+    final inputs = state.audioInputs;
+    final selected = inputs.where((input) => input.key == state.audioInputKey);
+    final input = selected.isEmpty ? null : selected.first;
+    final channels = state.audioChannels == 1 ? 'mono' : 'stereo';
+    final rate = state.audioSampleRate >= 1000
+        ? '${(state.audioSampleRate / 1000).round()} kHz'
+        : '${state.audioSampleRate} Hz';
+    final locked = state.isRecording;
+    return DeckCard(
+      title: 'Audio',
+      tint: UiTokens.cardAudio,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('INPUT', style: Theme.of(context).textTheme.labelSmall),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Rescan audio inputs',
+                visualDensity: VisualDensity.compact,
+                onPressed: widget.host.refreshAudioInputs,
+                icon: const Icon(Icons.refresh, size: 16),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final option in inputs)
+                ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  label: Text(
+                    option.name,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  selected: option.key == state.audioInputKey,
+                  onSelected: locked
+                      ? null
+                      : (_) => widget.host.setAudioInput(option.key),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$rate · $channels · ${input?.type ?? 'platform default'}'
+            '${state.audioSource == null ? '' : ' · ${state.audioSource}'}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (locked)
+            Text(
+              'Input is locked while recording; gain stays live.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          if (!state.audioPermissionGranted) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Microphone permission is not granted.',
+                    style: TextStyle(color: UiTokens.danger, fontSize: 11),
+                  ),
+                ),
+                TextButton(
+                  onPressed: widget.host.requestCameraPermissions,
+                  child: const Text(
+                    'Grant',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (state.audioError != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              state.audioError!,
+              style: const TextStyle(color: UiTokens.danger, fontSize: 11),
+            ),
+          ] else
+            Text(
+              state.isRecording
+                  ? 'Recording audio · meter is post-gain'
+                  : state.audioAvailable
+                  ? 'Monitoring · pre-roll levels'
+                  : 'Audio input inactive',
+              style: TextStyle(
+                fontSize: 11,
+                color: state.audioAvailable
+                    ? UiTokens.muted
+                    : UiTokens.danger,
+              ),
+            ),
+          const SizedBox(height: 8),
+          ValueListenableBuilder<AudioTelemetry?>(
+            valueListenable: widget.audio,
+            builder: (context, level, _) => _AudioMeter(
+              level: level,
+              active: state.audioAvailable,
+            ),
+          ),
+          LabeledSlider(
+            label: 'Input gain',
+            valueLabel:
+                '${_audioGain >= 0 ? '+' : ''}${_audioGain.toStringAsFixed(1)} dB',
+            value: _audioGain.clamp(-12.0, 24.0),
+            min: -12,
+            max: 24,
+            divisions: 72,
+            onChanged: (value) => setState(() => _audioGainDraft = value),
+            onChangeEnd: (value) => widget.host.setAudioGain(value),
+          ),
+          Text(
+            'Applied before the meter and the AAC encoder.',
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _colourCard(BuildContext context) {
     final calibration = state.deviceCalibrationActive
         ? (state.deviceCalibrationSource ?? 'measured matrix')
         : 'identity · no measured data';
     final settings = state.profileSettings;
-    final editable = state.profile == 'custom';
+    final profileIndex = state.pictureProfiles.indexWhere(
+      (profile) => profile.id == state.profile,
+    );
+    final activeProfile = profileIndex >= 0
+        ? state.pictureProfiles[profileIndex]
+        : null;
+    final editable = activeProfile != null && !activeProfile.builtIn;
     return DeckCard(
       title: 'Picture profile',
+      tint: UiTokens.cardPicture,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1235,17 +1405,24 @@ class _ControlDeckState extends State<ControlDeck> {
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final profile in state.profileNames)
+              for (final profile in state.pictureProfiles)
                 ChoiceChip(
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   label: Text(
-                    _profileLabel(profile),
+                    profile.name,
                     style: const TextStyle(fontSize: 10),
                   ),
-                  selected: profile == state.profile,
-                  onSelected: (_) => widget.host.setProfile(profile),
+                  selected: profile.id == state.profile,
+                  onSelected: (_) => widget.host.setProfile(profile.id),
                 ),
+              ActionChip(
+                avatar: const Icon(Icons.add, size: 14),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                label: const Text('New', style: TextStyle(fontSize: 10)),
+                onPressed: _createPictureProfile,
+              ),
             ],
           ),
           if (state.profile == 'slatelook')
@@ -1262,16 +1439,54 @@ class _ControlDeckState extends State<ControlDeck> {
                 context,
               ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
             )
-          else if (!editable)
+          else if (editable)
             Text(
-              'Preset look. Select Custom to edit every control.',
+              'Custom look. Changes save automatically.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+            )
+          else
+            Text(
+              'Preset look. Pick a user profile to edit every control.',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
             ),
           if (editable) ...[
             const Divider(height: 10, color: UiTokens.border),
-            Text('CUSTOM PROFILE', style: Theme.of(context).textTheme.labelSmall),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'CUSTOM PROFILE',
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Rename profile',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 26,
+                    height: 26,
+                  ),
+                  onPressed: _renamePictureProfile,
+                  icon: const Icon(Icons.edit_outlined, size: 15),
+                ),
+                IconButton(
+                  tooltip: 'Delete profile',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 26,
+                    height: 26,
+                  ),
+                  onPressed: _deletePictureProfile,
+                  icon: const Icon(Icons.delete_outline, size: 15),
+                ),
+              ],
+            ),
             _profileSlider(
               context,
               key: 'blackLevel',
@@ -1282,18 +1497,23 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 30,
               onCommit: (value) =>
                   _patchProfile(blackLevel: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('blackLevel'),
             ),
             _profileChoiceGroup(
               'Gamma',
               _gammaOptions,
               settings.gamma,
               (value) => _patchProfile(gamma: value),
+              onReset: () => _resetProfileParameter('gamma'),
             ),
             _profileChoiceGroup(
               'Black gamma range',
               _blackGammaRangeOptions,
               settings.blackGammaRange,
               (value) => _patchProfile(blackGammaRange: value),
+              onReset: () =>
+                  _resetProfileParameter('blackGammaRange'),
             ),
             _profileSlider(
               context,
@@ -1305,12 +1525,15 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(blackGammaLevel: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('blackGammaLevel'),
             ),
             _profileChoiceGroup(
               'Knee mode',
               _kneeModeOptions,
               settings.kneeMode,
               (value) => _patchProfile(kneeMode: value),
+              onReset: () => _resetProfileParameter('kneeMode'),
             ),
             if (settings.kneeMode == 'auto') ...[
               _profileSlider(
@@ -1324,12 +1547,16 @@ class _ControlDeckState extends State<ControlDeck> {
                 suffix: '%',
                 onCommit: (value) =>
                     _patchProfile(kneeAutoMaxPoint: value.round()),
+                onReset: () =>
+                    _resetProfileParameter('kneeAutoMaxPoint'),
               ),
               _profileChoiceGroup(
                 'Knee sensitivity',
                 _kneeSensitivityOptions,
                 settings.kneeAutoSensitivity,
                 (value) => _patchProfile(kneeAutoSensitivity: value),
+                onReset: () =>
+                    _resetProfileParameter('kneeAutoSensitivity'),
               ),
             ] else ...[
               _profileSlider(
@@ -1343,6 +1570,8 @@ class _ControlDeckState extends State<ControlDeck> {
                 suffix: '%',
                 onCommit: (value) =>
                     _patchProfile(kneePoint: value.round()),
+                onReset: () =>
+                    _resetProfileParameter('kneePoint'),
               ),
               _profileSlider(
                 context,
@@ -1354,6 +1583,8 @@ class _ControlDeckState extends State<ControlDeck> {
                 divisions: 10,
                 onCommit: (value) =>
                     _patchProfile(kneeSlope: value.round()),
+                onReset: () =>
+                    _resetProfileParameter('kneeSlope'),
               ),
             ],
             _profileChoiceGroup(
@@ -1361,6 +1592,7 @@ class _ControlDeckState extends State<ControlDeck> {
               _colorModeOptions,
               settings.colorMode,
               (value) => _patchProfile(colorMode: value),
+              onReset: () => _resetProfileParameter('colorMode'),
             ),
             _profileSlider(
               context,
@@ -1372,6 +1604,8 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 64,
               onCommit: (value) =>
                   _patchProfile(saturation: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('saturation'),
             ),
             _profileSlider(
               context,
@@ -1383,6 +1617,8 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(colorPhase: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('colorPhase'),
             ),
             Text(
               'COLOR DEPTH',
@@ -1398,6 +1634,8 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(colorDepthR: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('colorDepthR'),
             ),
             _profileSlider(
               context,
@@ -1409,6 +1647,8 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(colorDepthG: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('colorDepthG'),
             ),
             _profileSlider(
               context,
@@ -1420,6 +1660,8 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(colorDepthB: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('colorDepthB'),
             ),
             _profileSlider(
               context,
@@ -1431,6 +1673,8 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(colorDepthC: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('colorDepthC'),
             ),
             _profileSlider(
               context,
@@ -1442,6 +1686,8 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(colorDepthM: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('colorDepthM'),
             ),
             _profileSlider(
               context,
@@ -1453,52 +1699,22 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(colorDepthY: value.round()),
+              onReset: () =>
+                  _resetProfileParameter('colorDepthY'),
             ),
             TextButton.icon(
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
               ),
-              onPressed: widget.host.resetProfile,
+              onPressed: _resetAllProfileParameters,
               icon: const Icon(Icons.restart_alt, size: 15),
               label: const Text(
-                'Reset custom profile',
+                'Reset all parameters',
                 style: TextStyle(fontSize: 11),
               ),
             ),
           ],
-          const Divider(height: 10, color: UiTokens.border),
-          Text('CREATIVE LUT', style: Theme.of(context).textTheme.labelSmall),
-          const SizedBox(height: 4),
-          DropdownButton<String>(
-            value: state.creativeLuts.contains(state.creativeLut)
-                ? state.creativeLut
-                : 'none',
-            isExpanded: true,
-            isDense: true,
-            items: [
-              for (final id in state.creativeLuts)
-                DropdownMenuItem(
-                  value: id,
-                  child: Text(
-                    id == 'none' ? 'None' : id,
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ),
-            ],
-            onChanged: (value) {
-              if (value != null) widget.host.setCreativeLut(value);
-            },
-          ),
-          TextButton.icon(
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-            ),
-            onPressed: () => widget.host.reloadLuts(),
-            icon: const Icon(Icons.refresh, size: 14),
-            label: const Text('Reload LUTs', style: TextStyle(fontSize: 10)),
-          ),
           const Divider(height: 10, color: UiTokens.border),
           Text('WHITE BALANCE', style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 4),
@@ -1517,17 +1733,88 @@ class _ControlDeckState extends State<ControlDeck> {
                   selected: mode == state.whiteBalanceMode,
                   onSelected: (_) => widget.host.setWhiteBalanceMode(mode),
                 ),
+              if (state.manualWhiteBalanceSupported)
+                ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  label: Text(
+                    'Manual',
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  selected: state.whiteBalanceMode == 'manual',
+                  onSelected: (_) => widget.host.setManualWhiteBalance(
+                    state.whiteBalanceKelvin,
+                    state.whiteBalanceTint,
+                  ),
+                ),
             ],
           ),
+          if (state.manualWhiteBalanceSupported) ...[
+            const SizedBox(height: 2),
+            LabeledSlider(
+              label: 'Temperature',
+              valueLabel: '${_wbKelvin.round()} K',
+              value: _wbKelvin.clamp(2000.0, 10000.0),
+              min: 2000,
+              max: 10000,
+              divisions: 80,
+              onChanged: (value) => setState(() => _wbKelvinDraft = value),
+              onChangeEnd: (value) => widget.host.setManualWhiteBalance(
+                value.round(),
+                _wbTint.round(),
+              ),
+            ),
+            LabeledSlider(
+              label: 'Tint',
+              valueLabel: _wbTint.round() > 0
+                  ? '+${_wbTint.round()}'
+                  : '${_wbTint.round()}',
+              value: _wbTint.clamp(-100.0, 100.0),
+              min: -100,
+              max: 100,
+              divisions: 40,
+              onChanged: (value) => setState(() => _wbTintDraft = value),
+              onChangeEnd: (value) => widget.host.setManualWhiteBalance(
+                _wbKelvin.round(),
+                value.round(),
+              ),
+            ),
+          ],
           const Divider(height: 10, color: UiTokens.border),
           Text(
             'Input calibration',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           Text(calibration, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: widget.state.isRecording
+                  ? null
+                  : widget.onOpenCalibration,
+              icon: const Icon(Icons.tune, size: 15),
+              label: const Text(
+                'Calibrate colour…',
+                style: TextStyle(fontSize: 11),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  void _resetProfileParameter(String key) {
+    _profileDrafts.remove(key);
+    setState(() {});
+    widget.host.resetProfileParameter(key);
+  }
+
+  void _resetAllProfileParameters() {
+    _profileDrafts.clear();
+    setState(() {});
+    widget.host.resetProfile();
   }
 
   void _patchProfile({
@@ -1586,6 +1873,7 @@ class _ControlDeckState extends State<ControlDeck> {
     int? divisions,
     String suffix = '',
     required void Function(double value) onCommit,
+    VoidCallback? onReset,
   }) {
     final draft = _profileDrafts[key];
     return LabeledSlider(
@@ -1595,6 +1883,7 @@ class _ControlDeckState extends State<ControlDeck> {
       min: min,
       max: max,
       divisions: divisions,
+      onReset: onReset,
       onChanged: (next) => setState(() => _profileDrafts[key] = next),
       onChangeEnd: (next) {
         _profileDrafts.remove(key);
@@ -1607,14 +1896,36 @@ class _ControlDeckState extends State<ControlDeck> {
     String label,
     Map<String, String> options,
     String selected,
-    ValueChanged<String> onSelected,
-  ) {
+    ValueChanged<String> onSelected, {
+    VoidCallback? onReset,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label.toUpperCase(), style: Theme.of(context).textTheme.labelSmall),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label.toUpperCase(),
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ),
+              if (onReset != null)
+                IconButton(
+                  tooltip: 'Reset $label to default',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 22,
+                    height: 22,
+                  ),
+                  onPressed: onReset,
+                  icon: const Icon(Icons.restart_alt, size: 14),
+                ),
+            ],
+          ),
           const SizedBox(height: 4),
           Wrap(
             spacing: 4,
@@ -1638,18 +1949,10 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
-  String _profileLabel(String id) {
-    switch (id) {
-      case 'slatelook':
-        return 'SlateLook';
-      default:
-        return humanizeWireValue(id);
-    }
-  }
-
   Widget _monitorCard(BuildContext context) {
     return DeckCard(
       title: 'Monitoring',
+      tint: UiTokens.cardMonitor,
       child: Column(
         children: [
           Wrap(
@@ -1756,6 +2059,7 @@ class _ControlDeckState extends State<ControlDeck> {
     final focusValue = state.focusDiopters.clamp(0.0, focusMax);
     return DeckCard(
       title: 'Focus & stabilisation',
+      tint: UiTokens.cardFocus,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1981,6 +2285,7 @@ class _ControlDeckState extends State<ControlDeck> {
   Widget _processingCard(BuildContext context) {
     return DeckCard(
       title: 'Processing',
+      tint: UiTokens.cardProcessing,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2057,57 +2362,10 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
-  Widget _viewfinderCard(BuildContext context) {
-    final output = state.previewOutputWidth > 0
-        ? '${state.previewOutputWidth}×${state.previewOutputHeight}'
-        : '—';
-    return DeckCard(
-      title: 'Viewfinder',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _modeRow(
-            'Preview',
-            [
-              _modeChip(
-                label: 'Full',
-                tooltip: 'Preview at the recording resolution',
-                selected: state.previewQuality == 'full',
-                onTap: () => widget.host.setPreviewQuality('full'),
-              ),
-              _modeChip(
-                label: '1080',
-                tooltip: 'Limit the viewfinder to 1080-high',
-                selected: state.previewQuality == '1080',
-                onTap: () => widget.host.setPreviewQuality('1080'),
-              ),
-              _modeChip(
-                label: '720',
-                tooltip: 'Limit the viewfinder to 720-high',
-                selected: state.previewQuality == '720',
-                onTap: () => widget.host.setPreviewQuality('720'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Preview $output · stream ${state.previewWidth}×${state.previewHeight}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          Text(
-            'Recording and encoder stay at the mode resolution.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _deviceCard(BuildContext context) {
     return DeckCard(
       title: 'Device',
+      tint: UiTokens.cardDevice,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2177,6 +2435,7 @@ class _ControlDeckState extends State<ControlDeck> {
   Widget _clipCard(BuildContext context) {
     return DeckCard(
       title: 'Last clip',
+      tint: UiTokens.cardClip,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2214,6 +2473,54 @@ class _ControlDeckState extends State<ControlDeck> {
         style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
       ),
     );
+  }
+
+  PictureProfileInfo? get _activePictureProfile {
+    for (final profile in state.pictureProfiles) {
+      if (profile.id == state.profile) return profile;
+    }
+    return null;
+  }
+
+  Future<void> _createPictureProfile() async {
+    final customCount = state.pictureProfiles
+        .where((profile) => !profile.builtIn)
+        .length;
+    final name = await _askProfileName(
+      'New picture profile',
+      'Look ${customCount + 1}',
+    );
+    if (name != null) await widget.host.createPictureProfile(name);
+  }
+
+  Future<void> _renamePictureProfile() async {
+    final active = _activePictureProfile;
+    if (active == null || active.builtIn) return;
+    final name = await _askProfileName('Rename picture profile', active.name);
+    if (name != null) await widget.host.renamePictureProfile(active.id, name);
+  }
+
+  Future<void> _deletePictureProfile() async {
+    final active = _activePictureProfile;
+    if (active == null || active.builtIn) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete picture profile?'),
+        content: Text('“${active.name}” will be removed.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await widget.host.deletePictureProfile(active.id);
   }
 
   Future<String?> _askProfileName(String title, String initial) async {
@@ -2410,10 +2717,12 @@ class _ProfileNameDialogState extends State<_ProfileNameDialog> {
                 child: TextField(
                   controller: _controller,
                   autofocus: true,
+                  maxLength: 24,
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
                     labelText: widget.title,
                     isDense: true,
+                    counterText: '',
                   ),
                   onSubmitted: (_) => _submit(),
                 ),
@@ -2428,6 +2737,256 @@ class _ProfileNameDialogState extends State<_ProfileNameDialog> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Stereo peak/RMS meter with a short peak hold and latching clip indicator.
+/// Rebuilt only by the audio [ValueListenable], never by full camera state.
+class _AudioMeter extends StatefulWidget {
+  const _AudioMeter({required this.level, required this.active});
+
+  final AudioTelemetry? level;
+  final bool active;
+
+  @override
+  State<_AudioMeter> createState() => _AudioMeterState();
+}
+
+class _AudioMeterState extends State<_AudioMeter> {
+  static const _floor = -120.0;
+
+  double _holdL = _floor;
+  double _holdR = _floor;
+  DateTime? _clipUntil;
+  DateTime? _silentSince;
+
+  @override
+  void didUpdateWidget(covariant _AudioMeter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final level = widget.level;
+    if (level == null || !widget.active) {
+      _holdL = _floor;
+      _holdR = _floor;
+      _clipUntil = null;
+      _silentSince = null;
+      return;
+    }
+    _holdL = math.max(level.peakDbL, _holdL - 0.6);
+    _holdR = math.max(level.peakDbR, _holdR - 0.6);
+    if (level.clipped) {
+      _clipUntil = DateTime.now().add(const Duration(seconds: 2));
+    }
+    final silent = level.peakDbL <= -60 && level.peakDbR <= -60;
+    if (silent) {
+      _silentSince ??= DateTime.now();
+    } else {
+      _silentSince = null;
+    }
+  }
+
+  bool get _clipped {
+    final until = _clipUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final level = widget.level;
+    final active = widget.active && level != null;
+    final peakL = active ? level.peakDbL : _floor;
+    final peakR = active ? level.peakDbR : _floor;
+    final rmsL = active ? level.rmsDbL : _floor;
+    final rmsR = active ? level.rmsDbR : _floor;
+    final clipped = active && _clipped;
+    final silent = active &&
+        _silentSince != null &&
+        DateTime.now().difference(_silentSince!) > const Duration(seconds: 2);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: clipped
+                    ? UiTokens.danger
+                    : UiTokens.surfaceRaised,
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(
+                  color: clipped ? UiTokens.danger : UiTokens.border,
+                ),
+              ),
+              child: Text(
+                'CLIP',
+                style: TextStyle(
+                  fontSize: 8,
+                  letterSpacing: 0.8,
+                  color: clipped ? Colors.black : UiTokens.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              silent ? 'SILENT INPUT' : active ? 'dBFS' : 'NO SIGNAL',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        _MeterBar(
+          label: 'L',
+          peakDb: peakL,
+          rmsDb: rmsL,
+          holdDb: active ? _holdL : _floor,
+        ),
+        const SizedBox(height: 3),
+        _MeterBar(
+          label: 'R',
+          peakDb: peakR,
+          rmsDb: rmsR,
+          holdDb: active ? _holdR : _floor,
+        ),
+        const SizedBox(height: 2),
+        const Padding(
+          padding: EdgeInsets.only(left: 16),
+          child: Row(
+            children: [
+              Text('-60', style: TextStyle(fontSize: 8, color: UiTokens.muted)),
+              Spacer(),
+              Text('-40', style: TextStyle(fontSize: 8, color: UiTokens.muted)),
+              Spacer(),
+              Text('-20', style: TextStyle(fontSize: 8, color: UiTokens.muted)),
+              Spacer(),
+              Text('-12', style: TextStyle(fontSize: 8, color: UiTokens.muted)),
+              Spacer(),
+              Text('-6', style: TextStyle(fontSize: 8, color: UiTokens.muted)),
+              Spacer(),
+              Text('0', style: TextStyle(fontSize: 8, color: UiTokens.muted)),
+            ],
+          ),
+        ),
+        if (silent)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'No signal on this input. Choose another microphone or check the connection.',
+              style: TextStyle(color: UiTokens.accent, fontSize: 10),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _MeterBar extends StatelessWidget {
+  const _MeterBar({
+    required this.label,
+    required this.peakDb,
+    required this.rmsDb,
+    required this.holdDb,
+  });
+
+  final String label;
+  final double peakDb;
+  final double rmsDb;
+  final double holdDb;
+
+  static double _fraction(double db) =>
+      ((db.clamp(-60.0, 0.0) + 60.0) / 60.0).clamp(0.0, 1.0);
+
+  @override
+  Widget build(BuildContext context) {
+    final peak = _fraction(peakDb);
+    final rms = _fraction(rmsDb);
+    final hold = _fraction(holdDb);
+    return Row(
+      children: [
+        SizedBox(
+          width: 14,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9,
+              color: UiTokens.muted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: SizedBox(
+            height: 11,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFF4CC38A),
+                              Color(0xFF4CC38A),
+                              Color(0xFFE8B44A),
+                              Color(0xFFE5484D),
+                            ],
+                            stops: [0.0, 0.62, 0.84, 1.0],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: width * peak,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: const ColoredBox(color: UiTokens.surface),
+                      ),                      if (peak > 0)
+                        Positioned(
+                          left: (width * rms - 1).clamp(0.0, width - 2),
+                          top: 0,
+                          bottom: 0,
+                          child: const SizedBox(
+                            width: 2,
+                            child: ColoredBox(color: Colors.white70),
+                          ),
+                        ),
+                      if (hold > 0)
+                        Positioned(
+                          left: (width * hold - 1).clamp(0.0, width - 2),
+                          top: 0,
+                          bottom: 0,
+                          child: const SizedBox(
+                            width: 2,
+                            child: ColoredBox(color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        SizedBox(
+          width: 30,
+          child: Text(
+            peakDb <= -60 ? '—' : peakDb.toStringAsFixed(0),
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 9,
+              color: UiTokens.muted,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

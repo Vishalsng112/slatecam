@@ -45,6 +45,7 @@ val moduleAllowlist: Map<String, Set<String>> = mapOf(
         ":core:codec",
         ":core:gpu",
         ":core:device",
+        ":core:storage",
     ),
     ":feature:capture" to setOf(
         ":core:common",
@@ -68,12 +69,15 @@ val moduleAllowlist: Map<String, Set<String>> = mapOf(
         ":core:device",
         ":bridge",
     ),
+    // Flutter plugins are auto-included subprojects; the app owns their wiring.
+    ":video_player_android" to emptySet(),
     ":app" to setOf(
         ":core:common",
         ":bridge",
         ":feature:capture",
         ":feature:playback",
         ":feature:devicereport",
+        ":video_player_android",
     ),
 )
 

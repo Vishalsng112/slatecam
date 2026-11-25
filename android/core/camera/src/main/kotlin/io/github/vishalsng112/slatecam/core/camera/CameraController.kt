@@ -50,6 +50,12 @@ data class CameraUiState(
     val focusShiftSpeed: Float = 2f,
     val whiteBalanceMode: String,
     val whiteBalanceModes: List<String>,
+    /** Colour temperature for manual white balance, in kelvin. */
+    val whiteBalanceKelvin: Int = ManualWhiteBalance.DEFAULT_KELVIN,
+    /** Green/magenta trim for manual white balance, -100..100. */
+    val whiteBalanceTint: Int = ManualWhiteBalance.DEFAULT_TINT,
+    /** True when the sensor advertises AWB off, so manual WB can be offered. */
+    val manualWhiteBalanceSupported: Boolean = false,
     val autoExposure: Boolean,
     val autoFocus: Boolean,
     val autoFocusSupported: Boolean = true,
@@ -142,6 +148,11 @@ class CameraController(private val context: Context) {
     private var focusShiftSpeed = 2f
     private var focusRampActive = false
     private var wbMode = "auto"
+    private var wbKelvin = ManualWhiteBalance.DEFAULT_KELVIN
+    private var wbTint = ManualWhiteBalance.DEFAULT_TINT
+    private var manualWbSupported = false
+    private var manualPreset = "daylight"
+    private var manualPresetCct = 5500
     private var autoExposure = true
     private var exposureMode = ExposureMode.PROGRAM
     private val exposureController = ExposureController()
@@ -165,6 +176,7 @@ class CameraController(private val context: Context) {
     private var focusTransitionSpeed = 0.5f
     private var softFocusSettleUntilMs = 0L
     private var lastFocusLogMs = 0L
+    private var lastWbLog: String? = null
     private var softwareFocusInitialized = false
     private var reportedFocusDiopters = 0f
     private var softFocusSearching = false
@@ -198,7 +210,9 @@ class CameraController(private val context: Context) {
     private var frameRate = 30
     private var timestampRealtime = false
 
-    private var zoomRatio = 1f
+    private val zoomRamp = SmoothZoom()
+    private var zoomAnimating = false
+    private var lastZoomTickMs = 0L
     private var zoomMin = 1f
     private var zoomMax = 1f
     private var zoomByRatioControl = false
@@ -243,7 +257,9 @@ class CameraController(private val context: Context) {
                 currentCharacteristics = characteristics
                 readCapabilities(characteristics)
                 if (switchingCamera) {
-                    zoomRatio = 1f.coerceIn(zoomMin, zoomMax)
+                    zoomRamp.snapTo(1f)
+                } else {
+                    zoomRamp.stop()
                 }
 
                 manager.openCamera(selectedId, callbackExecutor, object : CameraDevice.StateCallback() {
@@ -377,12 +393,54 @@ class CameraController(private val context: Context) {
         }
     }
 
-    /** Applies a zoom ratio to the active camera, opto-digital as the HAL allows. */
+    /**
+     * Sets a new zoom target. The applied ratio eases toward it on the camera
+     * thread instead of jumping in one capture request, so slider steps and
+     * pinch deltas both produce a continuous push-in / pull-out.
+     */
     fun setZoomRatio(ratio: Float) {
         handler.post {
-            zoomRatio = ratio.coerceIn(zoomMin, zoomMax)
-            applyAndEmit()
+            if (!zoomRamp.retarget(ratio)) {
+                if (zoomAnimating) {
+                    stopZoomRamp()
+                    applyAndEmit()
+                }
+                return@post
+            }
+            if (!zoomAnimating) {
+                zoomAnimating = true
+                lastZoomTickMs = SystemClock.elapsedRealtime()
+                handler.postDelayed(zoomRampTick, ZOOM_TICK_MS)
+            }
         }
+    }
+
+    /**
+     * One camera-frame step of the zoom ramp. 33 ms matches the 30 fps stream,
+     * so the recorded clip sees an intermediate zoom on every frame during the
+     * move.
+     */
+    private val zoomRampTick = object : Runnable {
+        override fun run() {
+            if (!zoomAnimating) return
+            if (!open) {
+                zoomAnimating = false
+                return
+            }
+            val now = SystemClock.elapsedRealtime()
+            val dt = (now - lastZoomTickMs) / 1000f
+            lastZoomTickMs = now
+            val moving = zoomRamp.advance(dt)
+            zoomAnimating = moving
+            applyAndEmit()
+            if (moving) handler.postDelayed(this, ZOOM_TICK_MS)
+        }
+    }
+
+    private fun stopZoomRamp() {
+        zoomAnimating = false
+        handler.removeCallbacks(zoomRampTick)
+        zoomRamp.stop()
     }
 
     /** Frame rate for the next session; reopens only when a size changes. */
@@ -588,7 +646,7 @@ class CameraController(private val context: Context) {
                 array.bottom,
             )
         }
-        val zoom = zoomRatio.coerceAtLeast(1f)
+        val zoom = zoomRamp.value.coerceAtLeast(1f)
         val cropWidth = (base.width() / zoom).roundToInt().coerceAtLeast(1)
         val cropHeight = (base.height() / zoom).roundToInt().coerceAtLeast(1)
         val crop = Rect(
@@ -664,9 +722,67 @@ class CameraController(private val context: Context) {
 
     fun setWhiteBalanceMode(mode: String) {
         handler.post {
-            if (mode !in wbModes) return@post
+            val manual = mode == ManualWhiteBalance.WIRE_VALUE
+            if (manual.not() && mode !in wbModes) return@post
+            if (manual && !manualWbSupported) return@post
+            // Picking a preset moves the temperature/tint controls to that
+            // preset's values so the sliders always describe the active look;
+            // touching them then switches to manual.
+            val preset = ManualWhiteBalance.presetForMode(mode)
+            val presetValues = preset?.let { it.cct to ManualWhiteBalance.DEFAULT_TINT }
+            val unchanged = wbMode == mode &&
+                (presetValues == null || (wbKelvin to wbTint) == presetValues)
+            if (unchanged) return@post
+            if (presetValues != null) {
+                wbKelvin = presetValues.first
+                wbTint = presetValues.second
+            }
             wbMode = mode
             applyAndEmit()
+        }
+    }
+
+    /**
+     * Sets the manual colour temperature and tint. Selecting manual white
+     * balance is implicit: the request leaves AWB for fixed channel gains.
+     */
+    fun setManualWhiteBalance(kelvin: Int, tint: Int) {
+        handler.post {
+            wbKelvin = ManualWhiteBalance.clampKelvin(kelvin)
+            wbTint = ManualWhiteBalance.clampTint(tint)
+            val previousPreset = manualPreset
+            if (!manualWbSupported || !selectManualPreset()) {
+                emit()
+                return@post
+            }
+            val changed = wbMode != ManualWhiteBalance.WIRE_VALUE ||
+                previousPreset != manualPreset
+            wbMode = ManualWhiteBalance.WIRE_VALUE
+            if (changed) applyAndEmit() else emit()
+        }
+    }
+
+    /**
+     * Picks the preset nearest [wbKelvin]. Returns false when the sensor offers
+     * no preset, which is the only case that disables manual white balance.
+     */
+    private fun selectManualPreset(): Boolean {
+        val preset = ManualWhiteBalance.presetFor(wbKelvin, wbModes) ?: return false
+        manualPreset = preset.mode
+        manualPresetCct = preset.cct
+        return true
+    }
+
+    /**
+     * Restores a persisted white balance choice before the camera is opened.
+     * Support is resolved from the characteristics once they are known.
+     */
+    fun restoreWhiteBalance(mode: String, kelvin: Int, tint: Int) {
+        handler.post {
+            wbKelvin = ManualWhiteBalance.clampKelvin(kelvin)
+            wbTint = ManualWhiteBalance.clampTint(tint)
+            wbMode = mode
+            emit()
         }
     }
 
@@ -981,19 +1097,25 @@ class CameraController(private val context: Context) {
             ?.map(::awbModeName)
             ?.distinct()
             ?: listOf("auto")
+        // Manual white balance is anchored on a HAL white-balance preset, so it
+        // needs at least one preset besides auto/off.
+        manualWbSupported = selectManualPreset()
 
         // Ranges are always refreshed; user values survive a close/reopen so
         // backgrounding the app does not silently undo manual settings.
+        wbMode = ManualWhiteBalance.restoreMode(wbMode, wbModes, manualWbSupported)
+        ManualWhiteBalance.presetForMode(wbMode)?.let { preset ->
+            wbKelvin = preset.cct
+            wbTint = ManualWhiteBalance.DEFAULT_TINT
+        }
         if (!initialized) {
             iso = 400.coerceIn(isoMin, isoMax)
             shutterNs = (1_000_000_000L / 50).coerceIn(shutterMinNs, shutterMaxNs)
             focusDiopters = 0f
-            wbMode = if ("auto" in wbModes) "auto" else wbModes.first()
             initialized = true
         } else {
             iso = iso.coerceIn(isoMin, isoMax)
             shutterNs = shutterNs.coerceIn(shutterMinNs, shutterMaxNs)
-            if (wbMode !in wbModes) wbMode = if ("auto" in wbModes) "auto" else wbModes.first()
         }
 
         fpsRange = pickFpsRange(characteristics, targetFps)
@@ -1012,7 +1134,7 @@ class CameraController(private val context: Context) {
             ?: CameraCharacteristics.LENS_FACING_BACK
         maxAfRegions = characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0
         afRegion = null
-        zoomRatio = zoomRatio.coerceIn(zoomMin, zoomMax)
+        zoomRamp.setBounds(zoomMin, zoomMax)
 
         edgeModes = characteristics.get(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES)
             ?.map(::edgeModeName) ?: emptyList()
@@ -1188,10 +1310,10 @@ class CameraController(private val context: Context) {
         request.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
 
         if (zoomByRatioControl) {
-            request.set(CaptureRequest.CONTROL_ZOOM_RATIO, zoomRatio)
+            request.set(CaptureRequest.CONTROL_ZOOM_RATIO, zoomRamp.value)
         } else {
             activeArray?.let { array ->
-                request.set(CaptureRequest.SCALER_CROP_REGION, cropRegion(array, zoomRatio))
+                request.set(CaptureRequest.SCALER_CROP_REGION, cropRegion(array, zoomRamp.value))
             }
         }
 
@@ -1252,7 +1374,20 @@ class CameraController(private val context: Context) {
             )
         }
 
-        request.set(CaptureRequest.CONTROL_AWB_MODE, awbModeValue(wbMode))
+        if (wbMode == ManualWhiteBalance.WIRE_VALUE) {
+            // Manual white balance uses the nearest HAL preset as its colour
+            // base: the sensor's own white point and CCM are not knowable from
+            // the public metadata, and gains alone leave a strong cast. The
+            // kelvin/tint residual is applied in the scene-linear shader.
+            request.set(CaptureRequest.CONTROL_AWB_MODE, awbModeValue(manualPreset))
+            val log = "manual ${wbKelvin}K tint=$wbTint preset=$manualPreset cct=$manualPresetCct"
+            if (log != lastWbLog) {
+                lastWbLog = log
+                android.util.Log.i("SlateCam", "wb: $log")
+            }
+        } else {
+            request.set(CaptureRequest.CONTROL_AWB_MODE, awbModeValue(wbMode))
+        }
 
         if (edgeMode in edgeModes) {
             request.set(CaptureRequest.EDGE_MODE, edgeModeValue(edgeMode))
@@ -1313,6 +1448,7 @@ class CameraController(private val context: Context) {
     }
 
     private fun closeInternal() {
+        stopZoomRamp()
         runCatching { session?.close() }
         runCatching { device?.close() }
         session = null
@@ -1341,7 +1477,12 @@ class CameraController(private val context: Context) {
             focusMax = focusMax,
             focusShiftSpeed = focusShiftSpeed,
             whiteBalanceMode = wbMode,
-            whiteBalanceModes = wbModes,
+            // AWB "off" with no gains produces an unbalanced green cast; the
+            // manual control owns that state, so it is not offered separately.
+            whiteBalanceModes = wbModes.filter { it != "off" },
+            whiteBalanceKelvin = wbKelvin,
+            whiteBalanceTint = wbTint,
+            manualWhiteBalanceSupported = manualWbSupported,
             autoExposure = autoExposure,
             autoFocus = autoFocus,
             autoFocusSupported = autoFocusSupported,
@@ -1355,7 +1496,7 @@ class CameraController(private val context: Context) {
             previewHeight = previewSize.height,
             previewRotationDegrees = rotationDegrees,
             glRotationDegrees = glRotationDegrees,
-            zoomRatio = zoomRatio,
+            zoomRatio = zoomRamp.value,
             zoomMin = zoomMin,
             zoomMax = zoomMax,
             isTenBit = tenBitActive,
@@ -1634,6 +1775,6 @@ class CameraController(private val context: Context) {
         private const val P_UPDATE_SECONDS = 0.2f
         private const val AF_REGION_WEIGHT = 1000
         private const val AF_REGION_FRACTION = 0.20f
-
+        private const val ZOOM_TICK_MS = 33L
     }
 }

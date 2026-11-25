@@ -34,16 +34,16 @@ module owns the data.
 
 | Group | Purpose | Primary location |
 |---|---|---|
-| Status | What the camera is doing right now | Top HUD |
+| Status | What the camera is doing right now | Top status strip |
 | Record & lens | Record, lens, mode, shoot mode, shoot set | Fixed console header |
-| Exposure | P/S/M, ISO, shutter time/angle, auto exposure | Console card |
+| Exposure | P/S/M, ISO, shutter time/angle, auto exposure | Bottom dock + console card |
 | Focus | Continuous AF by default; manual controls deferred | Kotlin default |
 | Colour | Profile, LUT, white balance, calibration | Console card |
-| Monitoring | Guides, zebra, false colour, peaking, histogram, waveform | Left rail + console card |
+| Monitoring | Guides, zebra, false colour, peaking, histogram, waveform | Console card (+ overlay cards) |
 | Capture | Edge, noise reduction, antibanding, output format | Console card |
 | Device | Device database, quirks, calibration state, reports | Console card |
 | Future AI | Subject tracking, focus assist, local assistant | Reserved AI tab |
-| Future media | Playback/library, export, clip management | Reserved deck tab / separate screen |
+| Media library | Clip library, playback, share/delete, free space | Clips screen |
 | Settings | Theme, help, diagnostics, privacy | Reserved deck tab |
 
 ## 3. Final layout
@@ -52,43 +52,47 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┬─────────────────────────┐
-│ SLATECAM  cam 0 · db v1    P  1/50  ISO 400  WB auto          │  CONTROL DECK           │
-│                                     REC 00:12  1080p · 30p    │  [Exposure][Focus]...   │
+│ 1440×1080 · 30p · HEVC · 10-bit    REC 00:12                 │  CONTROL DECK           │
+│                                                              │  [Exposure][Focus]...   │
 │                                                              │                         │
-│  ┌──┐                                                        │  EXPOSURE               │
-│  │G │                                                        │  P  |  S  |  M          │
-│  │Z │                LIVE PREVIEW                            │                         │
-│  │F │                                                        │  ISO      400           │
-│  │P │                                                        │  ─────●──────           │
-│  │H │                                                        │  Shutter  20.00 ms      │
-│  │W │                                                        │  ───────●────           │
-│  └──┘                                                        │  Angle    216°          │
-│                                                              │  [AE auto]              │
-│  ┌────────────┐                                              │                         │
-│  │ HISTOGRAM  │                                              │  Kotlin owns state      │
+│                                                              │  EXPOSURE               │
+│                                                              │  P  |  S  |  M          │
+│                  LIVE PREVIEW                                │                         │
+│                                                              │  ISO      400           │
+│                                                              │  ─────●──────           │
+│                                                              │  Shutter  20.00 ms      │
+│                                                              │  ───────●────           │
+│  ┌────────────┐                                              │  Angle    216°          │
+│  │ HISTOGRAM  │  (only when enabled from the deck)           │  [AE auto]              │
 │  └────────────┘                                              │                         │
-│                                                              │                         │
-│ ┌──────────────────────────────────────────────────────────┐ │                         │
-│ │ ●  P | S | M   ISO 400   1/50   5600K  0.19D    [Deck] │ │                         │
-│ └──────────────────────────────────────────────────────────┘ │                         │
+│  [16mm][25mm]                                   ┃ 1.0×      │  Kotlin owns state      │
+│  ●   P | S | M   ISO 400   1/50   5600K                 (›)  │                         │
 └──────────────────────────────────────────────────────────────┴─────────────────────────┘
 ```
 
 ### Regions
 
-1. **Top HUD** — brand, camera/device identity, exposure summary, recording
-   timer, fixed output summary, errors. Translucent, auto-readable over preview.
-2. **Live preview** — a 16:9 frame with the camera stream rotated to the
-   display orientation and centre-cropped inside it. The frame is never
-   stretched to fill an arbitrary window shape; black surround is preferred to
-   a distorted image.
-3. **Left monitor rail** — fast toggles: guides, zebra, false colour, peaking,
-   histogram, waveform. Selected state is visibly lit.
-4. **Monitor cards** — optional histogram and waveform cards above the bottom
-   dock, bottom-left.
-5. **Bottom dock** — record button, P/S/M selector, quick readout chips (ISO,
-   shutter, white balance, focus), and Control Deck toggle.
-6. **Control Console** — a docked, collapsible right panel with no tabs. A fixed
+1. **Top status strip** — compact output-format, recording-timer and error
+   pills, plus the `VF Full / 1080 / 720` preview-quality pill at the
+   top-right. No brand, camera identity or exposure summary: those live in the
+   Control Deck so the preview stays clean.
+2. **Live preview** — a 4:3/16:9 frame with the camera stream rotated to the
+   display orientation and letterboxed inside it. The frame is never stretched
+   to fill an arbitrary window shape; black surround is preferred to a distorted
+   image.
+3. **Left monitor rail** — removed from the viewfinder. Guides, zebra, false
+   colour, peaking, histogram and waveform are toggled from the Control Deck's
+   Monitoring card; selected overlays still render over the preview.
+4. **Monitor cards** — histogram and waveform cards appear bottom-left while
+   enabled from the Monitoring card.
+5. **Bottom dock** — a flat floating row with no enclosing panel: record
+   button, P/S/M selector, ISO/shutter/white-balance readout chips and the
+   Control Deck toggle.
+6. **Right zoom rail** — lens chips, a vertical 48 lp zoom strip, zoom in/out
+   markers and the active ratio, pinned to the preview's right edge and centred
+   vertically. Tap or drag anywhere on the strip; the camera ramp keeps the
+   move smooth. It clears the top-right VF pill and the bottom dock.
+7. **Control Console** — a docked, collapsible right panel with no tabs. A fixed
    header holds a circular RECORD/STOP button, circular S/M shoot-mode buttons
    and one circular lens badge per camera (`B0`, `F1`, …), plus a compact mode
    stepper. Below it, three columns at >=720 lp (two at >=520 lp) of dense cards
@@ -96,7 +100,7 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
    lens and mode are always one tap from any scroll position. On narrow
    landscape phones the console can be closed to give the preview the whole
    width.
-7. **Overlay banners** — camera errors, recording errors, probe mode and saved
+8. **Overlay banners** — camera errors, recording errors, probe mode and saved
    clip messages. These sit above the dock and never block the record button.
 
 ### Responsive behaviour
@@ -133,14 +137,19 @@ position without opening a menu.
 
 - Black field with `SLATECAM` wordmark and tagline.
 - Primary `Open camera` button.
-- Permission or bridge error message.
+- Before camera access is granted the primary action becomes
+  `Grant camera access`, with a short explanation and no red error; granting it
+  opens the viewfinder automatically.
+- Bridge error message for a genuine failure (not permissions).
 - Probe-mode message: preview unavailable while the prober owns the camera.
 
 ### 4.2 Live camera
 
-- Top HUD, preview, left rail, bottom dock and optional deck as above.
+- Top status strip, preview, bottom dock and optional deck as above.
 - Recording state replaces the record glyph with a stop square, turns the timer
-  red, and keeps the deck usable.
+  red, draws a 3 lp red border around the preview pane, and keeps the deck usable.
+- The Clips action in the fixed header closes the camera and opens the media
+  library; recording must be stopped first. Returning reopens the camera.
 - Saved-clip path and gyro sample count appear as a temporary status card, not a
   permanent paragraph.
 
@@ -158,25 +167,60 @@ position without opening a menu.
   Capture, not an enabled toggle.
 - AI not installed: AI tab not shown until `:core:ai` reports capabilities.
 
+### 4.5 Media library and playback
+
+- Clips opens a full-screen library from the console header. The camera closes
+  while reviewing and reopens on return.
+- Grid: newest first, thumbnail, duration, resolution, size, date, free space.
+  Empty and error states are explicit; Refresh re-queries MediaStore.
+- Player: play/pause, scrub, mute, current/total time, share via the system
+  sheet, delete with confirmation. Deleting removes the MediaStore entry and the
+  gyro sidecar, then refreshes the grid.
+- Clips are app-owned in `Movies/SlateCam`; the library never uploads anything.
+
+### 4.6 Colour calibration
+
+- **Calibrate colour…** sits under Input calibration in the Picture profile
+  card and is disabled while recording.
+- The route keeps the camera open. A bypass badge marks the live preview; a
+  6×4 guide shows where the chart should sit.
+- Capture freezes one frame. The user drags the four corners onto the chart;
+  Solve fits a per-lens matrix and shows mean/max ΔE2000, WB offsets, exposure
+  trim, lens key and the matrix.
+- A rejected fit is red, explains why and disables Save. A good fit can be
+  saved to the device database and is applied immediately.
+- Retake returns to framing; Another lens / Done appears after saving.
+
+### 4.7 Audio
+
+- An **Audio** card sits under Exposure: live input chips, the routed
+  source/rate/channels, a stereo post-gain meter and an input-gain slider.
+- The meter shows peak bars, an RMS marker, a slow peak hold and a CLIP badge
+  that latches for two seconds. A silent input shows a NO SIGNAL hint after
+  two seconds.
+- Pre-roll metering runs while the camera is open; recording locks the input
+  choice but gain stays live. Missing permission shows a Grant action; a failed
+  input shows the error instead of pretending audio is present.
+- Inputs are live-enumerated and hotplug-aware; only real capture routes are
+  offered. The source line names `unprocessed`, `camcorder` or `mic`.
+
 ## 5. Element inventory
 
-### 5.1 Status HUD
+### 5.1 Status strip
 
 | Element | Current source | Status |
 |---|---|---|
-| `SLATECAM` wordmark | static | Current |
-| Camera ID | `CameraState.cameraId` | Current |
-| Device key | `CameraState.deviceKey` | Current |
-| Database version | `CameraState.deviceDatabaseVersion` | Current |
-| Exposure mode | `CameraState.exposureMode` | Current |
-| ISO / shutter / WB snapshot | camera state | Current |
+| Output summary pill | `previewWidth`, `previewHeight`, `frameRate`, `tenBit` | Current |
 | Recording timer | `recordingSeconds` | Current |
-| Preview / frame rate | `previewWidth`, `previewHeight`, `frameRate` | Current |
-| Codec | fixed HEVC in the recording path | Current |
+| Gyro sample count | `gyroSampleCount` | Current |
+| Error pill | `recordingError`, `error` | Current |
+| `SLATECAM` wordmark | launch screen only | Current |
+| Camera ID / database version | Control Deck | Current |
+| Exposure mode + ISO / shutter / WB | bottom dock and console | Current |
 | Thermal status | native thermal listener only stops recording; not in state | Future |
 | Battery level | not exposed | Future |
 | Free storage | not exposed | Future |
-| Audio meters | not exposed | Future |
+| Audio meters | Audio card: post-gain peak/RMS, peak hold, clip latch | Current |
 | GPS/timecode | not implemented | Future |
 
 ### 5.2 Bottom dock
@@ -188,11 +232,10 @@ position without opening a menu.
 | ISO chip | opens the console | Current |
 | Shutter chip | opens the console | Current |
 | WB chip | opens the console | Current |
-| Focus chip | opens the console | Current |
 | Control Deck toggle | opens/closes the deck | Current |
 | Photo shutter | not in native API | Future |
-| Zoom / lens selector | lens chips + continuous zoom, from the probe report | **Current** (`ZoomPlugin`) |
-| Audio monitor mute | no audio monitor path | Future |
+| Zoom / lens selector | lens chips + vertical 48 lp zoom strip on the preview's right edge, tap or drag anywhere; continuous ramp | **Current** (`ZoomPlugin`) |
+| Headphone monitoring | capture meters ship; no playback monitor path | Future |
 
 ### 5.3 Recording mode card
 
@@ -208,9 +251,12 @@ the first enabled size from 3840×2880, 4096×3072 and 2880×2160. 1080 4:3 is
 1440×1080 (with 1920×1440 as a fallback). Changing aspect therefore keeps the
 resolution family instead of dropping 4K to 1080.
 
-Changing a row keeps the other two where possible and falls back to the closest
-enabled combination. If no size in the family/aspect is enabled, the console
-reports the bridge reason and leaves the current mode alone.
+The initial selection is **4:3 · 1080 · 30 fps**, preferring a probe-verified
+10-bit path and falling back to the closest enabled combination (16:9 1080p,
+then any enabled mode) when a camera does not offer 1440×1080. Changing a row
+keeps the other two where possible and falls back to the closest enabled
+combination. If no size in the family/aspect is enabled, the console reports the
+bridge reason and leaves the current mode alone.
 
 The shoot set lists lenses as focal-length circles (`16mm`, `25mm`, `26mm`).
 Tapping a circle includes or excludes that lens from the Movie/Vlog set; the
@@ -288,10 +334,13 @@ restarts. There is no face or eye tracking.
 
 | Element | Native call | Status |
 |---|---|---|
-| Profile chips: Standard / SlateLook / Custom | `setProfile` | Current |
-| Reload LUTs | `reloadLuts` | Current |
+| Profile chips: Standard / SlateLook + user profiles, plus **New** | `setProfile`, `createPictureProfile` | Current |
+| Rename / delete the active user profile | `renamePictureProfile`, `deletePictureProfile` | Current |
 | White balance mode | `setWhiteBalanceMode` | Current |
-| Input calibration status | device database / InputProfile | Current (display only) |
+| Manual white balance (2000–10000 K, tint ±100), sliders snap to the chosen preset; dragging enters manual | `setManualWhiteBalance` | Current |
+| Input calibration status | device database / InputProfile | Current |
+| In-app ColorChecker calibration | `captureCalibrationFrame`, `solveCalibration`, `saveCalibration` | Current (ADR 0027) |
+| Creative LUT selection / reload | `setCreativeLut`, `reloadLuts` | Future (native path exists, UI hidden) |
 | LUT SAF picker | requires plugin/native picker | Future |
 | Detail controls (V/H, crispening, highlight) | spatial detail pass | Future |
 | Creative vignette | shader effect | Future |
@@ -303,39 +352,49 @@ restarts. There is no face or eye tracking.
 
 | Element | Native call | Status |
 |---|---|---|
-| Profile: Standard / SlateLook / Custom | `setProfile` | Current |
+| Built-in Standard / SlateLook + saved user profiles | `setProfile` | Current |
+| Create / rename / delete user profile | `createPictureProfile`, `renamePictureProfile`, `deletePictureProfile` | Current |
 | Black level −15…+15 | `setProfileSettings` | Current |
 | Gamma preset | `setProfileSettings` | Current |
 | Black gamma range + level | `setProfileSettings` | Current |
 | Knee auto/manual, point/slope/max point/sensitivity | `setProfileSettings` | Current |
 | Color mode | `setProfileSettings` | Current |
 | Saturation, colour phase, colour depth R/G/B/C/M/Y | `setProfileSettings` | Current |
-| Reset custom | `resetProfile` | Current |
-| Creative LUT | `setCreativeLut` | Current |
-| Reload LUTs | `reloadLuts` | Current |
+| Per-parameter reset icon → default for that control | `resetProfileParameter` | Current |
+| Reset all parameters | `resetProfile` | Current |
 | White balance modes | `setWhiteBalanceMode` | Current |
+| Manual white balance (2000–10000 K, tint ±100), sliders snap to the chosen preset; dragging enters manual | `setManualWhiteBalance` | Current |
 
 Standard is the camera look (identity, no creative processing). SlateLook is
-tuned to a Sony S-Cinetone-style picture profile. The Custom editor is the only
-creative tone/colour path; the old Colour science card was removed. Preset
-profiles show the same values read-only and direct the user to Custom.
+tuned to a Sony S-Cinetone-style picture profile. Built-ins are read-only. Saved
+user profiles are editable copies: editing a parameter persists it immediately,
+selecting another profile keeps each look independent, and deleting the active
+profile falls back to Standard. Every editor row has a reset icon that restores
+that one parameter; **Reset all parameters** restores the whole profile to the
+library defaults.
+
+Creative LUT selection and reload are not exposed while the LUT workflow is
+deferred; the native `setCreativeLut` / `reloadLuts` paths stay in the bridge.
 
 Gamma presets are look curves in the delivery domain, not container transfers.
 S-Log/HLG/S-Gamut gamut modes are not offered until a recordable-log delivery
 exists. Detail controls are deferred.
 
-### 5.6.2 Viewfinder card
+### 5.6.2 Viewfinder resolution (in the preview)
 
 | Element | Native call | Status |
 |---|---|---|
-| Preview quality Full / 1080 / 720 | `setPreviewQuality` | Current |
-| Preview output / stream readout | `previewOutputWidth/Height` + `previewWidth/Height` | Current |
+| `VF Full / 1080 / 720` pill, top-right over the preview | `setPreviewQuality` | Current |
+| Exact preview output in the menu | `previewOutputWidth/Height` | Current |
 
-The quality is a height cap that preserves the recording aspect. The camera
-stream and encoder stay at the recording mode; only the preview EGL surface and
-viewport change.
+The control sits in the viewfinder, not the console, because it only affects
+what is displayed. The pill shows the active cap (`VF 720`); the menu lists Full,
+1080p and 720p with the resolved output size and check mark. Full matches the
+recording mode. The quality is a height cap that preserves the recording aspect;
+the camera stream, encoder and recorded file stay at the recording mode, and
+only the preview EGL surface and viewport change.
 
-### 5.7 Monitoring card and left rail
+### 5.7 Monitoring card (no left rail)
 
 | Element | Native call | Status |
 |---|---|---|
@@ -353,7 +412,13 @@ viewport change.
 | False-colour legend | UI only | Future |
 | Monitor size/opacity settings | UI only | Future |
 
-### 5.7 Capture tab
+All monitor toggles live in the Control Deck's Monitoring card. Overlays render
+over the preview, and the histogram/waveform cards appear only while enabled.
+Framing guides draw only the thirds grid lines, confined to the displayed image
+rectangle, so they stay aligned with the recorded aspect when the preview is
+letterboxed.
+
+### 5.8 Capture tab
 
 | Element | Native call | Status |
 |---|---|---|
@@ -367,12 +432,12 @@ viewport change.
 | Recording mode | per-camera size/fps/bit-depth incl. 4K/1080p/720p, 16:9/4:3 and 4K 4:3 families, probe-gated | **Current** |
 | Resolution / frame-rate selector | replaced by the recording-mode catalog | **Current** |
 | Codec / bitrate selector | fixed HEVC, bitrate scales with mode | Future |
-| Audio source and level | native selection exists, no UI/state | Future |
+| Audio source and level | Audio card: input, source, gain, stereo meter | **Current** (ADR 0028) |
 | Stabilisation / OIS / EIS | per-sensor toggles in Focus & stabilisation card | **Current** |
 | RAW / DNG burst | Camera2 still capture not implemented | Future |
 | Photo mode | not implemented | Future |
 
-### 5.8 Device tab
+### 5.9 Device tab
 
 | Element | Native source | Status |
 |---|---|---|
@@ -387,7 +452,7 @@ viewport change.
 | Report upload / share | no network client | Future |
 | Quirk editor | database is reviewed JSON | Future |
 
-### 5.9 Future AI tab
+### 5.10 Future AI tab
 
 Not shown while `:core:ai` reports unavailable.
 
@@ -401,13 +466,17 @@ Not shown while `:core:ai` reports unavailable.
 | Local assistant | separate text interface | Future |
 | Model download / status | not designed | Future |
 
-### 5.10 Future media and settings
+### 5.11 Media and future settings
 
 | Element | Notes |
 |---|---|
-| Clip library / playback | feature:playback is declared, no source |
-| Export / share sheet | needs Android share intent |
-| Storage-free warning | needs storage state |
+| Clip library / playback | Current: `:core:storage` MediaLibrary + Flutter clips screen |
+| Export / share sheet | Current: Android share intent |
+| Storage-free warning | Current: free space in the library header |
+| Multi-select / batch delete | Future |
+| Rename / album | Future |
+| Proxy / transcode | Future |
+| SD / USB-C SSD destination | Future |
 | Theme/accent choice | optional later |
 | Diagnostics / about | can consume probe and device DB |
 | Help / gestures | after interaction model stabilises |
@@ -445,23 +514,41 @@ Not shown while `:core:ai` reports unavailable.
 | Success / calibration | `#4CC38A` |
 | Info / focus | `#6EA8FE` |
 
+### Console section accents
+
+Each `DeckCard` carries one muted accent. It is rendered as a 5.5 % background
+wash, a tinted frame and the card title colour, so sections read as distinct
+groups without adding chrome:
+
+| Section | Accent |
+|---|---|
+| Recording mode | amber `#E8B44A` |
+| Shoot set & profiles | green `#4CC38A` |
+| Exposure | blue `#6EA8FE` |
+| Picture profile | violet `#C084FC` |
+| Focus & stabilisation | cyan `#22D3EE` |
+| Monitoring | pink `#F472B6` |
+| Processing | orange `#FB923C` |
+| Device | slate `#94A3B8` |
+| Last clip | lime `#A3E635` |
+
 - Corner radius: 14 for cards, 12 for controls, pill for chips.
 - Spacing: 4/8/12/16/24.
 - Numeric readouts use tabular figures where available.
 - Minimum touch target: 44 logical pixels.
-- Preview overlays use a slight dark gradient at top and bottom for legibility.
+- Preview overlays are compact translucent pills; no full-frame dark gradient.
 - Icons: Material Symbols equivalents (`record`, `tune`, `exposure`, `center_focus`, `palette`, `monitor`, `camera`, `memory`, `psychology`).
 
 ## 8. Implementation decision
 
 The final implementation is:
 
-- a full-bleed preview with top HUD and bottom transport dock;
-- a quick monitor rail on the left;
+- a full-bleed preview with a compact top status strip and a flat bottom dock;
+- monitor toggles in the collapsible Control Deck on the right;
 - a collapsible, tabbed Control Deck on the right with six tabs:
   **Exposure, Focus, Colour, Monitor, Capture, Device**;
 - optional overlay cards for histogram and waveform;
-- no AI, playback or future-control tab until the native contract exists;
+- no AI tab; the media library opens as a separate clips screen;
 - future options listed in this document and reserved structurally, not exposed
   as dead buttons.
 

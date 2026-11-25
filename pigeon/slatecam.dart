@@ -85,7 +85,7 @@ class ShootLens {
   bool selected;
 }
 
-/// Editable settings for the Custom picture profile.
+/// Editable settings for a user picture profile.
 class ProfileSettings {
   ProfileSettings({
     required this.blackLevel,
@@ -141,6 +141,145 @@ class ProfileSettings {
   int colorDepthY;
 }
 
+/// One selectable picture profile. Built-ins are read-only; user profiles can
+/// be renamed, edited and deleted.
+class PictureProfileInfo {
+  PictureProfileInfo({
+    required this.id,
+    required this.name,
+    required this.builtIn,
+  });
+
+  String id;
+  String name;
+  bool builtIn;
+}
+
+/// A recorded clip in the SlateCam media library.
+class MediaClip {
+  MediaClip({
+    required this.id,
+    required this.name,
+    required this.uri,
+    required this.durationMs,
+    required this.sizeBytes,
+    required this.width,
+    required this.height,
+    required this.dateAddedMs,
+  });
+
+  String id;
+  String name;
+  String uri;
+  int durationMs;
+  int sizeBytes;
+  int width;
+  int height;
+  int dateAddedMs;
+}
+
+class MediaStorageInfo {
+  MediaStorageInfo({required this.freeBytes, required this.totalBytes});
+
+  int freeBytes;
+  int totalBytes;
+}
+
+/// One selectable audio input.
+class AudioInputOption {
+  AudioInputOption({
+    required this.key,
+    required this.name,
+    required this.type,
+    required this.detail,
+  });
+
+  /// Persisted identity; `default` means the system route.
+  String key;
+  String name;
+  /// Built-in mic / USB audio / wired headset / ...
+  String type;
+  /// e.g. `48 kHz · 2 ch`
+  String detail;
+}
+
+/// One audio meter snapshot in dBFS.
+class AudioTelemetry {
+  AudioTelemetry({
+    required this.peakDbL,
+    required this.peakDbR,
+    required this.rmsDbL,
+    required this.rmsDbR,
+    required this.clipped,
+    required this.active,
+  });
+
+  double peakDbL;
+  double peakDbR;
+  double rmsDbL;
+  double rmsDbR;
+  bool clipped;
+  /// True while the monitor or recorder is actually capturing.
+  bool active;
+}
+
+/// One sampled ColorChecker patch, values in encoded BT.709 (0..1).
+class CalibrationPatch {
+  CalibrationPatch({required this.r, required this.g, required this.b});
+
+  double r;
+  double g;
+  double b;
+}
+
+/// One upright frame captured through the calibration bypass.
+class CalibrationFrame {
+  CalibrationFrame({
+    required this.width,
+    required this.height,
+    required this.rgba,
+    required this.cameraId,
+    required this.lensKey,
+  });
+
+  int width;
+  int height;
+  Uint8List rgba;
+  String cameraId;
+  String? lensKey;
+}
+
+/// Fitted per-lens calibration plus measured error.
+class CalibrationSolution {
+  CalibrationSolution({
+    required this.matrix,
+    required this.accepted,
+    required this.exposureTrim,
+    required this.wbROffset,
+    required this.wbBOffset,
+    required this.deltaEBefore,
+    required this.deltaEAfter,
+    required this.deltaEMaxAfter,
+    required this.patchDeltaEAfter,
+    required this.cameraId,
+    required this.lensKey,
+  });
+
+  /// Row-major 3x3 CCM into linear Rec.2020.
+  List<double> matrix;
+  /// False when the fit was rejected (no chart, glare, black frame).
+  bool accepted;
+  double exposureTrim;
+  double wbROffset;
+  double wbBOffset;
+  double deltaEBefore;
+  double deltaEAfter;
+  double deltaEMaxAfter;
+  List<double> patchDeltaEAfter;
+  String cameraId;
+  String? lensKey;
+}
+
 /// Immutable camera snapshot. Kotlin owns this state; Dart only renders it.
 class CameraState {
   CameraState({
@@ -162,6 +301,9 @@ class CameraState {
     required this.focusShiftSpeed,
     required this.whiteBalanceMode,
     required this.whiteBalanceModes,
+    required this.whiteBalanceKelvin,
+    required this.whiteBalanceTint,
+    required this.manualWhiteBalanceSupported,
     required this.autoExposure,
     required this.autoFocus,
     required this.autoFocusSupported,
@@ -198,7 +340,7 @@ class CameraState {
     required this.frameRate,
     required this.gyroSampleCount,
     required this.profile,
-    required this.profileNames,
+    required this.pictureProfiles,
     required this.profileSettings,
     required this.creativeLut,
     required this.creativeLuts,
@@ -233,6 +375,15 @@ class CameraState {
     required this.deviceReportRunning,
     required this.deviceReportPath,
     required this.deviceReportError,
+    required this.audioInputs,
+    required this.audioInputKey,
+    required this.audioGainDb,
+    required this.audioPermissionGranted,
+    required this.audioAvailable,
+    required this.audioError,
+    required this.audioSource,
+    required this.audioSampleRate,
+    required this.audioChannels,
     required this.histogram,
     required this.waveform,
     required this.waveformColumns,
@@ -260,6 +411,12 @@ class CameraState {
   double focusShiftSpeed;
   String whiteBalanceMode;
   List<String> whiteBalanceModes;
+  /// Colour temperature for manual white balance, in kelvin (2000..10000).
+  int whiteBalanceKelvin;
+  /// Green/magenta trim for manual white balance (-100..100).
+  int whiteBalanceTint;
+  /// True when the sensor advertises AWB off, so manual WB can be offered.
+  bool manualWhiteBalanceSupported;
   bool autoExposure;
   bool autoFocus;
   bool autoFocusSupported;
@@ -313,7 +470,7 @@ class CameraState {
   int frameRate;
   int gyroSampleCount;
   String profile;
-  List<String> profileNames;
+  List<PictureProfileInfo> pictureProfiles;
   /// Settings of the active profile; editable only for `custom`.
   ProfileSettings profileSettings;
   /// Selected creative LUT id, or empty for none.
@@ -359,6 +516,84 @@ class CameraState {
   bool deviceReportRunning;
   String? deviceReportPath;
   String? deviceReportError;
+  /// Selectable inputs, including a synthetic `default` entry.
+  List<AudioInputOption> audioInputs;
+  /// Persisted input key; `default` asks the platform for its route.
+  String audioInputKey;
+  /// Software input trim in dB, applied before metering and encoding.
+  double audioGainDb;
+  bool audioPermissionGranted;
+  /// True when the monitor or recorder currently owns a working input.
+  bool audioAvailable;
+  String? audioError;
+  /// Platform source actually used: `unprocessed`, `camcorder` or `mic`.
+  String? audioSource;
+  int audioSampleRate;
+  int audioChannels;
+  List<int> histogram;
+  List<int> waveform;
+  int waveformColumns;
+  int waveformBins;
+}
+
+/// High-frequency camera readouts. Pushed much more often than [CameraState];
+/// keep it small so the preview presentation thread is not blocked.
+class CameraTelemetry {
+  CameraTelemetry({
+    required this.iso,
+    required this.shutterNs,
+    required this.shutterAngle,
+    required this.focusDiopters,
+    required this.whiteBalanceMode,
+    required this.whiteBalanceKelvin,
+    required this.whiteBalanceTint,
+    required this.zoomRatio,
+    required this.isRecording,
+    required this.recordingSeconds,
+    this.clipPath,
+    this.recordingError,
+    required this.frameRate,
+    required this.gyroSampleCount,
+    required this.exposureMode,
+    required this.meteringSpeed,
+    required this.zebra,
+    required this.falseColor,
+    required this.peaking,
+    required this.peakingSensitivity,
+    required this.peakingStrength,
+    required this.tenBit,
+    required this.hlgAvailable,
+    required this.hlgReason,
+    required this.histogram,
+    required this.waveform,
+    required this.waveformColumns,
+    required this.waveformBins,
+  });
+
+  int iso;
+  int shutterNs;
+  double shutterAngle;
+  double focusDiopters;
+  String whiteBalanceMode;
+  int whiteBalanceKelvin;
+  int whiteBalanceTint;
+  double zoomRatio;
+  bool isRecording;
+  int recordingSeconds;
+  String? clipPath;
+  String? recordingError;
+  int frameRate;
+  int gyroSampleCount;
+  String exposureMode;
+  double meteringSpeed;
+  bool zebra;
+  bool falseColor;
+  bool peaking;
+  double peakingSensitivity;
+  double peakingStrength;
+  bool tenBit;
+  bool hlgAvailable;
+  String hlgReason;
   List<int> histogram;
   List<int> waveform;
   int waveformColumns;
@@ -370,6 +605,13 @@ abstract class SlateCamHostApi {
   /// Creates the preview texture and opens the camera. Returns the Flutter
   /// texture id to render with `Texture(textureId:)`.
   int openCamera();
+
+  /// True when the app currently holds the camera runtime permission.
+  bool cameraPermissionGranted();
+
+  /// Shows the system camera prompt when the permission is missing. The answer
+  /// arrives through the app lifecycle, not as a return value.
+  void requestCameraPermissions();
 
   void closeCamera();
 
@@ -385,11 +627,18 @@ abstract class SlateCamHostApi {
 
   void setWhiteBalanceMode(String mode);
 
+  /// Sets the manual colour temperature and tint; switches to manual WB.
+  void setManualWhiteBalance(int kelvin, int tint);
+
   void setAutoExposure();
 
   void setMeteringMode(String mode);
 
   void setMeteringSpeed(double speed);
+
+  /// Tells the bridge whether histogram/waveform data is visible, so the
+  /// high-frequency telemetry does not carry the arrays when nobody draws them.
+  void setAnalysisOverlayVisible(bool visible);
 
   /// Selects the exposure mode: P (HAL AE), S (fixed shutter, auto ISO), or M.
   void setExposureMode(String mode);
@@ -446,11 +695,22 @@ abstract class SlateCamHostApi {
 
   void setProfile(String profileId);
 
-  /// Rewrites the Custom profile settings.
+  /// Rewrites the active user profile's settings.
   void setProfileSettings(ProfileSettings settings);
 
-  /// Resets the Custom profile to identity.
+  /// Resets the active user profile to default values.
   void resetProfile();
+
+  /// Resets one parameter of the active user profile to its default.
+  void resetProfileParameter(String key);
+
+  /// Creates and selects a user profile; returns its id.
+  String createPictureProfile(String name);
+
+  void renamePictureProfile(String id, String name);
+
+  /// Deletes a user profile. Built-ins cannot be deleted.
+  void deletePictureProfile(String id);
 
   /// Selects a creative LUT, or `none` to disable it.
   void setCreativeLut(String lutId);
@@ -490,9 +750,61 @@ abstract class SlateCamHostApi {
 
   /// True when the app was launched to run a probe: preview must stay closed.
   bool isProbeMode();
+
+  /// Recorded clips under Movies/SlateCam, newest first.
+  List<MediaClip> listMediaClips();
+
+  MediaStorageInfo mediaStorageInfo();
+
+  /// Cached JPEG thumbnail path, or null when the clip has no readable frame.
+  String? mediaClipThumbnail(String id);
+
+  /// Deletes a SlateCam-owned clip (and its gyro sidecar).
+  bool deleteMediaClip(String id);
+
+  /// Opens the system share sheet for a clip.
+  bool shareMediaClip(String id);
+
+  /// Captures one upright calibration frame. The answer arrives through
+  /// [SlateCamFlutterApi.onCalibrationFrame] or `onCalibrationError`.
+  void captureCalibrationFrame();
+
+  /// Fits a per-lens input profile from ColorChecker patch samples.
+  CalibrationSolution solveCalibration(
+    List<CalibrationPatch> patches,
+    String cameraId,
+    String? lensKey,
+  );
+
+  /// Persists the solution into `files/device-database.json` and applies it.
+  void saveCalibration(CalibrationSolution solution);
+
+  /// Live audio inputs, with a synthetic `default` route first.
+  List<AudioInputOption> listAudioInputs();
+
+  /// Persists the input choice and restarts the monitor. Ignored while recording.
+  void setAudioInput(String key);
+
+  /// Applies a software input trim; takes effect immediately, even mid-take.
+  void setAudioGain(double db);
+
+  /// Re-enumerates inputs (after plugging/unplugging a microphone).
+  void refreshAudioInputs();
 }
 
 @FlutterApi()
 abstract class SlateCamFlutterApi {
   void onState(CameraState state);
+
+  /// Fast-changing readouts; merges into the last [CameraState] on the Dart side.
+  void onTelemetry(CameraTelemetry telemetry);
+
+  /// One calibration frame, captured on the GL thread.
+  void onCalibrationFrame(CalibrationFrame frame);
+
+  /// Capture failed (camera closed, recording, or no rendered frame).
+  void onCalibrationError(String message);
+
+  /// Audio meter snapshot, pushed at ~10 Hz.
+  void onAudio(AudioTelemetry audio);
 }

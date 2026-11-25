@@ -24,11 +24,12 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 | Item | Notes |
 |---|---|
 | SAF LUT picker | Folder scan exists (`files/luts`); picker needs a plugin or native SAF |
-| Profile editor UI | Live colour-science trim ships; saving a named custom profile still needs persistence |
+| Creative LUT UI | `setCreativeLut` / `reloadLuts` remain in the bridge but are hidden from the UI; restore selection/reload when the LUT workflow is prioritised |
 | 10-bit 4K 4:3 verification | `dci43_*` / `uhd43_*` / `qhd43_*` presets exist but current reports pre-date them; run the device report to enable 10-bit at 4096×3072 / 3840×2880 / 2880×2160 |
 | Creative vignette | Shader effect, distinct from lens-shading correction (correction toggle is current) |
 | Colour calibration data | Model, shader stage and loader exist; measured ColorChecker matrices are data to add |
 | Control-panel touch pass | Dropdowns did not respond to synthetic taps |
+| Analysis-overlay payload | Histogram/waveform still cross Pigeon as int lists at 2 Hz; move to a compact binary payload or decode off the UI thread to remove the residual ~50 ms holds while the cards are visible |
 | Peaking temporal decay | Needs a ping-pong mask buffer |
 
 ## Phase 5 — remaining
@@ -42,7 +43,7 @@ recorded in [`adr/`](adr/) and summarised in [`codebase-map.md`](codebase-map.md
 | Picture-profile Detail controls | Level only is planned; V/H balance, B/W balance, limit, crispening and highlight detail need a spatial detail pass |
 | Continuous auto knee | Current auto knee is a static max-point/sensitivity mapping; frame-driven tracking is not implemented |
 | Monitoring-only LUT | Creative LUT is baked into both outputs; a separate preview-only LUT is not implemented |
-| Manual white balance | Kelvin/tint + per-lens offsets are schema/probe only; no UI or Camera2 gain path |
+| Viewfinder latency | Preview goes through Flutter's texture path. Split the pipeline: encoder renders every camera frame while the preview is blitted to a native surface (or FBO) on vsync; also revisit async analysis readback via JNI/PBO. Measured baseline in ADR 0022 |
 
 | Per-lens CCM/WB measurement | Schema and lookup ship; the database still has no measured ColorChecker data |
 | 65³ LUT support | The 2D atlas `n*n × n` exceeds common texture limits at 65; needs tiling or GLES3 3D textures |
@@ -61,9 +62,31 @@ AF handling). Remaining:
 
 | Item | Notes |
 |---|---|
-| Manual focus UI | Focus card and dock chip removed while continuous AF is the default; restore with tap-to-focus, AF/AE lock and focus speed |
-| Measured colour matrices | `ColorCalibration` solves a 3×3 matrix + trim; capture 24 patches per lens and add the result to the device database |
+| Manual focus UI | The MF slider, tap-to-focus and pinch zoom ship in the Focus card; **focus/AE lock** remains and is not implemented |
+| Measured colour data | In-app capture/solve/save ships (ADR 0027); each shipping lens still needs a good chart measurement, and the bundled database has none |
+| Per-illuminant matrices | One CCM per lens is illuminant-specific; add CCT-indexed entries or interpolation |
+| HLG calibration entry | SDR and HLG share one matrix today; verify and store per transfer function |
+| Calibration capture lock | AE/AWB run as-is during capture; add optional lock once neutral-patch trims are proven on device |
+| Chart auto-detection | Corners are dragged manually; auto-detect the 24-patch quad and reject low-contrast patches |
+| Higher-precision capture | The bypass frame is RGBA8888; a 16-bit readback would raise shadow precision |
+| Clear calibration | Remove the current lens's user entry from the UI; today only the file can be replaced |
+| Calibration history | Entries are versioned but the UI shows only the active one |
 | Dual-session seamless switch | The frame pump hides the session gap; a true no-freeze switch needs concurrent sessions and a probe verdict |
+
+## Audio
+
+Input selection, pre-roll metering, gain and 256 kbps AAC ship (ADR 0028).
+Remaining:
+
+| Item | Notes |
+|---|---|
+| Headphone monitoring | `AudioTrack` playback has latency/echo risks; needs a routing and feedback policy |
+| Higher-resolution capture | PCM16 ships; 24-bit/PCM and 96 kHz depend on per-input capabilities |
+| Limiter / AGC toggle | Processing is deliberately off; a limiter would need an explicit, visible mode |
+| Per-input sensitivity calibration | Gain is a single trim; mics differ in sensitivity |
+| Loudness history | Meters are instantaneous; LUFS/true-peak history is future |
+| Audio metadata in MP4 | Input, gain and source are in state, not embedded in the clip |
+| Bluetooth caveat | SCO input is low quality; surface a warning when selected |
 
 ## Phase 6 — AI
 
@@ -74,7 +97,8 @@ GL frame handoff, opt-in UI, optional local assistant.
 ## Phase 7 — device database
 
 The database, quirks, overrides, opt-in reports and loader are implemented.
-Remaining: measured ColorChecker matrices, and new quirk entries from real device
+Remaining: captured ColorChecker data for shipping lenses, calibration
+invalidation by firmware fingerprint, and new quirk entries from real device
 reports (including the Pad's hidden-lens policy). See
 [`device-database.md`](device-database.md).
 
@@ -82,6 +106,21 @@ reports (including the Pad's hidden-lens policy). See
 
 Stress tests, profiling, startup stability, signed releases, F-Droid, API
 tracking. Unchanged.
+
+## Media workflow
+
+First clip library and player shipped in build 2126 (ADR 0026). Remaining:
+
+| Item | Notes |
+|---|---|
+| Batch select / delete | Single-clip delete is current |
+| Rename / album | MediaStore DISPLAY_NAME update and a SlateCam album |
+| Proxy / transcode | For sharing and fast scrubbing |
+| SD / USB-C SSD destination | MediaStore external volumes and SAF |
+| Worker-thread media query | Move MediaStore listing + thumbnail generation off the platform thread |
+| Playback scopes / LUT preview | Reuse the analysis FBO path |
+| Frame-accurate scrubbing | Native Media3 view or frame-step handling |
+| Embedded gyro/metadata | The sidecar is removed on delete; embedding remains future |
 
 ## Rejected, with reasons
 

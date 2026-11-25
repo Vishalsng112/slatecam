@@ -7,35 +7,10 @@ import org.junit.Test
 import kotlin.math.abs
 
 class ColorCalibrationTest {
-    // ColorChecker Classic sRGB (8-bit), in patch order.
-    private val reference = listOf(
-        intArrayOf(115, 82, 68),
-        intArrayOf(194, 150, 130),
-        intArrayOf(98, 122, 157),
-        intArrayOf(87, 108, 67),
-        intArrayOf(133, 128, 177),
-        intArrayOf(103, 189, 170),
-        intArrayOf(214, 126, 44),
-        intArrayOf(80, 91, 166),
-        intArrayOf(193, 90, 99),
-        intArrayOf(94, 60, 108),
-        intArrayOf(157, 188, 64),
-        intArrayOf(224, 163, 46),
-        intArrayOf(56, 61, 150),
-        intArrayOf(70, 148, 73),
-        intArrayOf(175, 54, 60),
-        intArrayOf(231, 199, 31),
-        intArrayOf(187, 86, 149),
-        intArrayOf(8, 133, 161),
-        intArrayOf(243, 243, 242),
-        intArrayOf(200, 200, 200),
-        intArrayOf(160, 160, 160),
-        intArrayOf(122, 122, 121),
-        intArrayOf(85, 85, 85),
-        intArrayOf(52, 52, 52),
-    ).map { rgb -> rgb.map { it / 255f }.toFloatArray() }
+    // ColorChecker Classic 24, linear Rec.2020, in patch order.
+    private val reference = ColorChecker.referenceLinear2020()
 
-    private val neutralRange = 18..23
+    private val neutralRange = ColorChecker.NEUTRAL_INDICES
 
     private fun ref(i: Int) = reference[i].copyOf()
 
@@ -44,7 +19,7 @@ class ColorCalibrationTest {
 
     private fun neutral(i: Int) = reference[i].copyOf()
 
-    private fun solveIdentity(): InputProfile {
+    private fun solveIdentity(): ColorCalibration.Result {
         val samples = reference.indices.map { sample(ref(it), it) }
         return ColorCalibration.solve(samples, neutralRange.map { sample(neutral(it), it) })
     }
@@ -61,11 +36,15 @@ class ColorCalibrationTest {
 
     @Test
     fun `an unmodified target solves to the identity`() {
-        val profile = solveIdentity()
+        val result = solveIdentity()
 
-        assertMatrix(InputProfile.IDENTITY_MATRIX.toFloatArray(), profile.matrix, 0.01f)
-        assertEquals(1f, profile.exposureTrim, 0.02f)
-        assertEquals(1f, profile.saturationTrim, 0f)
+        assertMatrix(InputProfile.IDENTITY_MATRIX.toFloatArray(), result.profile.matrix, 0.01f)
+        assertEquals(1f, result.profile.exposureTrim, 0.02f)
+        assertEquals(1f, result.profile.saturationTrim, 0f)
+        assertEquals(1f, result.profile.wbROffset, 0.01f)
+        assertEquals(1f, result.profile.wbBOffset, 0.01f)
+        assertTrue(result.accepted)
+        assertTrue("deltaE after should be near zero", result.deltaEAfter < 0.1f)
     }
 
     @Test
@@ -78,13 +57,14 @@ class ColorCalibrationTest {
         val samples = reference.indices.map { index ->
             ColorCalibration.Sample(ref(index), apply(known, ref(index)))
         }
-        val profile = ColorCalibration.solve(
+        val result = ColorCalibration.solve(
             samples,
             neutralRange.map { ColorCalibration.Sample(neutral(it), apply(known, neutral(it))) },
         )
 
-        assertMatrix(known, profile.matrix, 0.01f)
-        assertEquals(1f, profile.exposureTrim, 0.02f)
+        assertMatrix(known, result.profile.matrix, 0.01f)
+        assertEquals(1f, result.profile.exposureTrim, 0.02f)
+        assertTrue(result.deltaEAfter < 0.2f)
     }
 
     @Test
@@ -92,31 +72,32 @@ class ColorCalibrationTest {
         val samples = reference.indices.map { index ->
             sample(ref(index).map { it * 0.8f }.toFloatArray(), index)
         }
-        val profile = ColorCalibration.solve(
+        val result = ColorCalibration.solve(
             samples,
             neutralRange.map { sample(neutral(it).map { ch -> ch * 0.8f }.toFloatArray(), it) },
         )
 
-        assertMatrix(InputProfile.IDENTITY_MATRIX.map { it * 1.25f }.toFloatArray(), profile.matrix, 0.02f)
-        assertEquals(1f, profile.exposureTrim, 0.03f)
+        assertMatrix(
+            InputProfile.IDENTITY_MATRIX.map { it * 1.25f }.toFloatArray(),
+            result.profile.matrix,
+            0.02f,
+        )
+        assertEquals(1f, result.profile.exposureTrim, 0.03f)
     }
 
     @Test
-    fun `a blue cast is neutralised per channel`() {
+    fun `a blue cast is neutralised by the white-balance offsets`() {
         val samples = reference.indices.map { index ->
             sample(ref(index).also { it[2] *= 0.9f }, index)
         }
-        val profile = ColorCalibration.solve(
+        val result = ColorCalibration.solve(
             samples,
             neutralRange.map { sample(neutral(it).also { ch -> ch[2] *= 0.9f }, it) },
         )
 
-        val expected = floatArrayOf(
-            1f, 0f, 0f,
-            0f, 1f, 0f,
-            0f, 0f, 1f / 0.9f,
-        )
-        assertMatrix(expected, profile.matrix, 0.02f)
+        assertMatrix(InputProfile.IDENTITY_MATRIX.toFloatArray(), result.profile.matrix, 0.02f)
+        assertEquals(1f / 0.9f, result.profile.wbBOffset, 0.01f)
+        assertEquals(1f, result.profile.wbROffset, 0.01f)
     }
 
     @Test
@@ -132,11 +113,11 @@ class ColorCalibrationTest {
                 reference[index].copyOf(),
             )
         }
-        val profile = ColorCalibration.solve(samples, doubledNeutrals)
+        val result = ColorCalibration.solve(samples, doubledNeutrals)
 
         // The matrix itself is identity; the trim has to remove a 2x lift that
         // only the neutral patches saw.
-        assertEquals(0.5f, profile.exposureTrim, 0.05f)
+        assertEquals(0.5f, result.profile.exposureTrim, 0.05f)
     }
 
     @Test
@@ -144,27 +125,29 @@ class ColorCalibrationTest {
         val black = reference.indices.map {
             sample(floatArrayOf(0f, 0f, 0f), it)
         }
-        val profile = ColorCalibration.solve(black)
+        val result = ColorCalibration.solve(black)
 
-        assertMatrix(InputProfile.IDENTITY_MATRIX.toFloatArray(), profile.matrix, 0f)
-        assertEquals(1f, profile.exposureTrim, 0f)
+        assertMatrix(InputProfile.IDENTITY_MATRIX.toFloatArray(), result.profile.matrix, 0f)
+        assertEquals(1f, result.profile.exposureTrim, 0f)
+        assertTrue(!result.accepted)
+        assertTrue(result.deltaEMaxAfter > 0f)
     }
 
     @Test
-    fun `non-finite and out-of-range samples are ignored`() {
+    fun `non-finite and negative samples are ignored`() {
         val samples = reference.indices.map { sample(ref(it), it) }.toMutableList()
         samples += ColorCalibration.Sample(
             floatArrayOf(Float.NaN, 0.5f, 0.5f),
             floatArrayOf(0.5f, 0.5f, 0.5f),
         )
         samples += ColorCalibration.Sample(
-            floatArrayOf(1.5f, 0.5f, 0.5f),
+            floatArrayOf(-0.1f, 0.5f, 0.5f),
             floatArrayOf(0.5f, 0.5f, 0.5f),
         )
 
-        val profile = ColorCalibration.solve(samples)
+        val result = ColorCalibration.solve(samples)
 
-        assertMatrix(InputProfile.IDENTITY_MATRIX.toFloatArray(), profile.matrix, 0.01f)
+        assertMatrix(InputProfile.IDENTITY_MATRIX.toFloatArray(), result.profile.matrix, 0.01f)
     }
 
     @Test(expected = IllegalArgumentException::class)
@@ -175,10 +158,14 @@ class ColorCalibrationTest {
 
     @Test
     fun `the transform matches the fitted matrix`() {
-        val profile = solveIdentity()
+        val result = solveIdentity()
         val patch = reference[6]
 
-        assertArrayEquals(patch, profile.transform(patch[0], patch[1], patch[2]), 0.02f)
+        assertArrayEquals(
+            patch,
+            result.profile.transform(patch[0], patch[1], patch[2]),
+            0.02f,
+        )
     }
 
     private fun apply(matrix: FloatArray, rgb: FloatArray): FloatArray = floatArrayOf(

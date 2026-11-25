@@ -15,12 +15,21 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
 import android.util.Log
+import android.view.Choreographer
 import android.view.Surface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
+
+/** One captured calibration frame: upright, top-down, RGBA8888. */
+data class CalibrationCapture(
+    val width: Int,
+    val height: Int,
+    val rgba: ByteArray,
+)
 
 /**
  * Phase 2 preview pipeline: camera OES texture -> simple shader -> the surface
@@ -81,6 +90,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uLut = 0
     private var uLutEnabled = 0
     private var uLutSize = 0
+    private var uCalibrationBypass = 0
 
     private var lutTexture = 0
     private var lutSize = 0f
@@ -141,6 +151,24 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var cameraFrames = 0L
     private var lastFrameTimestampNs = 0L
 
+    /**
+     * Preview presentation is paced to the display: the camera listener marks a
+     * frame pending and exactly one draw runs on the next vsync. Drawing on
+     * arrival instead let Flutter's texture path replace frames before they
+     * were composited, which showed up as irregular holds in the viewfinder.
+     */
+    private var choreographer: Choreographer? = null
+    private var vsyncScheduled = false
+    @Volatile private var framePending = false
+    /** While recording, every camera frame must reach the encoder. */
+    @Volatile private var encoderActive = false
+    private val vsyncCallback = Choreographer.FrameCallback {
+        vsyncScheduled = false
+        if (!started || !framePending) return@FrameCallback
+        framePending = false
+        drawFrame()
+    }
+
     private val encoderTimestamps = ArrayList<Long>(512)
 
     @Volatile
@@ -180,6 +208,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var inputSaturation = 1f
     @Volatile private var inputWbR = 1f
     @Volatile private var inputWbB = 1f
+    // Manual white-balance residual, multiplied with the per-lens calibration.
+    @Volatile private var manualWbR = 1f
+    @Volatile private var manualWbB = 1f
     @Volatile private var inputShadowLift = 0f
     @Volatile private var peaking = false
     @Volatile private var peakingThreshold = 0.12f
@@ -211,6 +242,15 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         inputWbR = wbROffset
         inputWbB = wbBOffset
         inputShadowLift = shadowLift
+    }
+
+    /**
+     * Manual white-balance residual on top of the camera's preset balance.
+     * Applied in the same scene-linear stage as the per-lens input calibration.
+     */
+    fun setManualWhiteBalance(red: Float, blue: Float) {
+        manualWbR = red.coerceIn(0.1f, 10f)
+        manualWbB = blue.coerceIn(0.1f, 10f)
     }
 
     /**
@@ -431,6 +471,8 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
         handler.post {
             try {
+                // A retry after a failed open must start from a clean slate.
+                if (started) teardown()
                 this.captureWidth = captureWidth
                 this.captureHeight = captureHeight
                 this.previewWidth = previewWidth
@@ -462,6 +504,22 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             throw IllegalStateException("GL preview start timed out")
         }
         failure?.let { throw it }
+    }
+
+    /**
+     * Drops every GL/EGL object but keeps the render thread alive, so a failed
+     * open can be followed by a clean [start].
+     */
+    fun reset() {
+        val latch = CountDownLatch(1)
+        handler.post {
+            try {
+                teardown()
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await(3, TimeUnit.SECONDS)
     }
 
     /** Re-targets rendering when Flutter recreates the producer surface
@@ -528,6 +586,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 )
             } else {
                 encoderFrames = 0
+                encoderActive = true
                 Log.i(
                     TAG,
                     "encoder surface attached (tenBit=$tenBitHlg) " +
@@ -615,6 +674,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             )
             EGL14.eglDestroySurface(display, encoderEglSurface)
             encoderEglSurface = EGL14.EGL_NO_SURFACE
+            encoderActive = false
             // Keep a valid drawable bound so the preview keeps rendering.
             EGL14.eglMakeCurrent(
                 display,
@@ -749,6 +809,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uLut = GLES20.glGetUniformLocation(program, "uLut")
         uLutEnabled = GLES20.glGetUniformLocation(program, "uLutEnabled")
         uLutSize = GLES20.glGetUniformLocation(program, "uLutSize")
+        uCalibrationBypass = GLES20.glGetUniformLocation(program, "uCalibrationBypass")
 
         GLES20.glDeleteShader(vertex)
         GLES20.glDeleteShader(fragment)
@@ -780,9 +841,24 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             GLES20.GL_CLAMP_TO_EDGE,
         )
 
+        choreographer = Choreographer.getInstance()
         val texture = SurfaceTexture(oesTextureId)
         texture.setDefaultBufferSize(captureWidth, captureHeight)
-        texture.setOnFrameAvailableListener { handler.post { drawFrame() } }
+        texture.setOnFrameAvailableListener {
+            if (encoderActive) {
+                // No coalescing on the record path: the encoder needs every
+                // camera frame, not just the newest one at the next vsync.
+                handler.post { if (started) drawFrame() }
+                return@setOnFrameAvailableListener
+            }
+            framePending = true
+            handler.post {
+                val vsync = choreographer ?: return@post
+                if (vsyncScheduled || !started) return@post
+                vsyncScheduled = true
+                vsync.postFrameCallback(vsyncCallback)
+            }
+        }
         surfaceTexture = texture
         cameraSurface = Surface(texture)
     }
@@ -800,6 +876,110 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
      */
     fun repeatLastFrame() {
         handler.post { drawFrame(updateTexture = false) }
+    }
+
+    /**
+     * Captures one upright RGBA frame through the calibration bypass: input
+     * EOTF and gamut conversion only, no input profile, look or overlays.
+     * The result is display-encoded BT.709, which the host linearises with
+     * [io.github.vishalsng112.slatecam.core.profile.ColorChecker] before fitting.
+     * Runs on the GL thread; the callback is invoked there as well.
+     */
+    fun captureCalibrationFrame(callback: (CalibrationCapture?) -> Unit) {
+        handler.post {
+            val frame = runCatching { captureCalibrationFrameLocked() }
+                .onFailure { Log.w(TAG, "calibration capture failed: ${it.message}") }
+                .getOrNull()
+            callback(frame)
+        }
+    }
+
+    private fun captureCalibrationFrameLocked(): CalibrationCapture? {
+        if (!started || cameraFrames == 0L || captureWidth <= 0 || captureHeight <= 0) {
+            return null
+        }
+        if (!EGL14.eglMakeCurrent(display, outputEglSurface, outputEglSurface, context)) {
+            return null
+        }
+
+        val aspect = captureWidth.toFloat() / captureHeight.toFloat()
+        val width = CALIBRATION_CAPTURE_WIDTH
+        val height = (width / aspect).roundToInt().coerceAtLeast(2)
+        val stride = width * 4
+        val byteCount = stride * height
+
+        val textures = IntArray(1)
+        val framebuffers = IntArray(1)
+        GLES20.glGenTextures(1, textures, 0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0])
+        GLES20.glTexImage2D(
+            GLES20.GL_TEXTURE_2D,
+            0,
+            GLES20.GL_RGBA,
+            width,
+            height,
+            0,
+            GLES20.GL_RGBA,
+            GLES20.GL_UNSIGNED_BYTE,
+            null,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_MIN_FILTER,
+            GLES20.GL_NEAREST,
+        )
+        GLES20.glTexParameteri(
+            GLES20.GL_TEXTURE_2D,
+            GLES20.GL_TEXTURE_MAG_FILTER,
+            GLES20.GL_NEAREST,
+        )
+
+        GLES20.glGenFramebuffers(1, framebuffers, 0)
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, framebuffers[0])
+        GLES20.glFramebufferTexture2D(
+            GLES20.GL_FRAMEBUFFER,
+            GLES20.GL_COLOR_ATTACHMENT0,
+            GLES20.GL_TEXTURE_2D,
+            textures[0],
+            0,
+        )
+        val complete = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) ==
+            GLES20.GL_FRAMEBUFFER_COMPLETE
+        if (!complete) {
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+            GLES20.glDeleteFramebuffers(1, framebuffers, 0)
+            GLES20.glDeleteTextures(1, textures, 0)
+            return null
+        }
+
+        GLES20.glViewport(0, 0, width, height)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        drawQuad(isPreview = true, overlay = false, calibrationBypass = true)
+
+        val buffer = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder())
+        GLES20.glReadPixels(
+            0,
+            0,
+            width,
+            height,
+            GLES20.GL_RGBA,
+            GLES20.GL_UNSIGNED_BYTE,
+            buffer,
+        )
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+
+        val raw = ByteArray(byteCount)
+        buffer.position(0)
+        buffer.get(raw)
+        val upright = ByteArray(byteCount)
+        for (row in 0 until height) {
+            System.arraycopy(raw, row * stride, upright, (height - 1 - row) * stride, stride)
+        }
+
+        GLES20.glDeleteFramebuffers(1, framebuffers, 0)
+        GLES20.glDeleteTextures(1, textures, 0)
+        return CalibrationCapture(width = width, height = height, rgba = upright)
     }
 
     private fun drawFrame(updateTexture: Boolean = true) {
@@ -857,7 +1037,11 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         onFrameRendered()
     }
 
-    private fun drawQuad(isPreview: Boolean, overlay: Boolean) {
+    private fun drawQuad(
+        isPreview: Boolean,
+        overlay: Boolean,
+        calibrationBypass: Boolean = false,
+    ) {
         GLES20.glUseProgram(program)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
@@ -867,6 +1051,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform1i(uLut, 1)
         GLES20.glUniform1i(uLutEnabled, if (lutEnabled) 1 else 0)
         GLES20.glUniform1f(uLutSize, if (lutSize > 0f) lutSize else 2f)
+        GLES20.glUniform1i(uCalibrationBypass, if (calibrationBypass) 1 else 0)
         GLES20.glUniform1i(uInputHlg, if (tenBitSource) 1 else 0)
         GLES20.glUniform1i(uOutputHlg, if (!isPreview && tenBitSource) 1 else 0)
         GLES20.glUniform1i(uIsPreview, if (isPreview) 1 else 0)
@@ -892,7 +1077,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniformMatrix3fv(uInputMatrix, 1, false, inputMatrix, 0)
         GLES20.glUniform1f(uInputExposure, inputExposure)
         GLES20.glUniform1f(uInputSaturation, inputSaturation)
-        GLES20.glUniform2f(uInputWb, inputWbR, inputWbB)
+        GLES20.glUniform2f(uInputWb, inputWbR * manualWbR, inputWbB * manualWbB)
         GLES20.glUniform1f(uInputShadowLift, inputShadowLift)
         GLES20.glUniform1i(uPeaking, if (overlay && peaking) 1 else 0)
         GLES20.glUniform1f(uPeakingThreshold, peakingThreshold)
@@ -1316,6 +1501,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
     private fun teardown() {
         started = false
+        encoderActive = false
+        framePending = false
+        vsyncScheduled = false
+        choreographer?.removeFrameCallback(vsyncCallback)
         detachEncoderInternal()
         cameraSurface?.release()
         cameraSurface = null
@@ -1439,6 +1628,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform sampler2D uLut;
             uniform int uLutEnabled;
             uniform float uLutSize;
+            uniform int uCalibrationBypass;
 
             float luma2020(vec3 c) {
                 return dot(c, vec3(0.2627, 0.6780, 0.0593));
@@ -1597,6 +1787,15 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                     c = bt709To2020(bt709ToLinear(src.rgb));
                 }
 
+                // Calibration measurement: stop before the input profile and
+                // creative look, but keep the same EOTF/gamut path. Output is
+                // display-referred BT.709 so the host can linearise it back.
+                if (uCalibrationBypass == 1) {
+                    c = linearToBt709(clamp(bt2020To709(c), 0.0, 1.0));
+                    gl_FragColor = vec4(c, 1.0);
+                    return;
+                }
+
                 // 2. Per-lens normalisation in linear working space.
                 c.r *= uInputWb.x;
                 c.b *= uInputWb.y;
@@ -1683,15 +1882,18 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
         const val ANALYSIS_WIDTH = 320
         const val ANALYSIS_HEIGHT = 180
+        const val CALIBRATION_CAPTURE_WIDTH = 960
         const val HISTOGRAM_BINS = 64
         const val WAVEFORM_COLUMNS = 64
         const val WAVEFORM_BINS = 16
         const val LUMA_GRID_WIDTH = 32
         const val LUMA_GRID_HEIGHT = 18
         const val FOCUS_ROI_FRACTION = 0.40f
-        // 15 Hz at 30 fps: metering and software AF need a faster signal than
-        // the monitoring UI does. The readback is still only 320x180.
-        const val ANALYSIS_INTERVAL = 2
+        // 10 Hz at 30 fps. Each analysis frame costs a synchronous glReadPixels
+        // stall on the render thread; the bridge only publishes metering and
+        // histogram at 5 Hz, so 15 Hz was spending that stall on frames nobody
+        // consumed.
+        const val ANALYSIS_INTERVAL = 3
 
         // Android EGL extension: marks a config usable as a MediaCodec input.
         const val EGL_RECORDABLE_ANDROID = 0x3142

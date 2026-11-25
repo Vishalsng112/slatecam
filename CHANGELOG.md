@@ -9,6 +9,248 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Added — Audio input, monitoring and metering (build 2140)
+- New **Audio** card in the console: input selection, pre-roll stereo
+  peak/RMS meter with peak hold and a latching clip indicator, and an
+  input-gain slider (−12…+24 dB, applied before the meter and encoder).
+- Inputs are enumerated live from `AudioManager` (built-in mics, USB,
+  wired, Bluetooth); telephony/dock/remote-submix pseudo-inputs are filtered
+  out. The selected device is persisted by a stable type/address/name key,
+  routed with `AudioRecord.setPreferredDevice`, and re-resolved on hotplug.
+- Audio is captured from the cleanest source the platform supports
+  (`unprocessed → camcorder → mic`). The console shows the route, rate,
+  channels and the actual source in use.
+- Pre-roll metering runs while the camera is open. The monitor releases the
+  microphone before recording and restarts after the take.
+- `AudioMeter`/`AudioLevel` in `:core:codec` compute gain-corrected peak and
+  RMS in dBFS and clamp/detect clipping; JVM tests cover silence, −6 dBFS,
+  full scale, mono, gain, clipping and partial buffers.
+- AAC audio is now 256 kbps at 48 kHz stereo (was 192 kbps). Recording still
+  works without microphone permission, with an explicit state/error instead of
+  silent omission.
+- Meter data is pushed on a separate `onAudio` channel at ~10 Hz, so it never
+  rebuilds the viewfinder or the full console.
+- See ADR 0028.
+
+### Added — In-app colour calibration (build 2130)
+- New **Calibrate colour…** action in the console (Picture profile → Input
+  calibration) opens a guided ColorChecker screen over the live preview.
+- The renderer gains a calibration bypass: input EOTF and gamut conversion
+  only, before the input profile, look, LUT and overlays. The capture is one
+  upright RGBA frame from the normal camera → GL path.
+- The frozen frame is shown with a draggable 6×4 perspective grid; the screen
+  averages the patches and Kotlin fits a per-lens 3×3 matrix, WB offsets and an
+  exposure trim in linear Rec.2020.
+- Results report mean/max ΔE2000 before and after. Rejected fits (no chart,
+  glare, black frame) show why and cannot be saved.
+- Saving writes the calibration to `files/device-database.json` under the
+  probe-stable lens key, bumps its version and applies it without restarting
+  the camera. Recording must be stopped before calibrating.
+- `ColorChecker` adds the published 24-patch references, BT.709/sRGB decode,
+  linear Rec.2020 conversion and CIEDE2000 (verified against Sharma pairs).
+- See ADR 0027.
+
+### Changed — Calibration solver domain
+- `ColorCalibration` now takes linear Rec.2020 samples (the domain the shader
+  applies the matrix in) and derives `wb_r_offset` / `wb_b_offset` from the
+  neutral patches. It returns the fit plus ΔE and an `accepted` flag instead of
+  a bare `InputProfile`.
+
+### Added — Playback and media library (build 2127)
+- The console header has a **Clips** action that opens a full-screen media
+  library. The camera closes while reviewing and reopens on return; recording
+  must be stopped first.
+- Library: clips from `Movies/SlateCam`, newest first, with lazy thumbnails,
+  duration, resolution, size, date and free-space. Empty/error states included.
+- Player: play/pause, scrub, mute, current/total time, name/size/date, plus
+  **Share** (system chooser) and **Delete** (confirmation; removes the MediaStore
+  entry and the gyro sidecar). Deleting refreshes the library.
+- New `MediaLibrary` in `:core:storage`; Pigeon media API
+  (`listMediaClips`, `mediaStorageInfo`, `mediaClipThumbnail`, `deleteMediaClip`,
+  `shareMediaClip`).
+- Flutter uses the official `video_player` plugin (ExoPlayer on Android); the
+  plugin subproject is explicitly allowlisted in the module graph.
+- See ADR 0026.
+
+### Changed — Vertical right-side zoom rail (build 2125)
+- The zoom panel moved from a bottom-left horizontal bar to a **vertical strip
+  on the preview's right edge**, centred between the top VF pill and the bottom
+  dock.
+- Lens chips are stacked at the top, followed by a vertical 48 lp track
+  (drag up = zoom in), zoom markers and the ratio readout. The track keeps the
+  full 48 lp touch target and the smooth camera ramp (ADR 0023).
+- Monitor cards moved back down into the space freed at the bottom-left.
+
+### Changed — Per-section console accents (build 2124)
+- Every `DeckCard` now takes an optional tint. The console uses one muted
+  pastel accent per section, applied as a 5.5% background wash, a tinted frame
+  and a tinted card title, so Recording mode, Shoot set & profiles, Exposure,
+  Picture profile, Focus, Monitoring, Processing, Device and Last clip are
+  visually distinguishable at a glance.
+- Accents: Recording = amber, Shoot set = green, Exposure = blue,
+  Picture profile = violet, Focus = cyan, Monitoring = pink,
+  Processing = orange, Device = slate, Last clip = lime.
+- Layout, controls and state are unchanged.
+
+### Added — User picture profiles (build 2122)
+- The Picture profile card can now **create, rename, delete and select multiple
+  saved looks**, alongside the read-only Standard and SlateLook built-ins.
+- Each custom row has a **per-parameter reset icon**; the card has **Reset all
+  parameters**. Edits persist immediately and each profile keeps independent
+  settings.
+- Profiles are stored in an ordered library in `shoot-profile` preferences. The
+  legacy single Custom look migrates to a user profile named **Custom** on first
+  load; a missing active id falls back to Standard.
+- Pigeon: `CameraState.pictureProfiles` replaces `profileNames`;
+  `createPictureProfile`, `renamePictureProfile`, `deletePictureProfile` and
+  `resetProfileParameter` added. See ADR 0025.
+
+### Fixed — Viewfinder judder from state-push rebuilds (build 2120)
+- The camera stream was never dropping frames: GL draws were a clean 33 ms,
+  while the viewfinder presentation had repeated **83–100 ms holds**. The cause
+  was the full `CameraState` snapshot and a whole-tree Flutter rebuild at
+  analysis/exposure rate.
+- Added a small `CameraTelemetry` Pigeon channel for live readouts. `onState` is
+  now only sent on configuration changes (open/close, camera, mode, profile,
+  recording start/stop); telemetry carries ISO, shutter, WB, zoom, record timer,
+  error, monitor flags and gated analysis arrays.
+- Flutter no longer rebuilds the preview and console on telemetry. Only the
+  status pills, bottom dock, zoom control, monitor cards, recording border and
+  the console's Exposure card listen through a `ValueNotifier`.
+- Histogram/waveform arrays are sent only when those cards are visible, at 2 Hz.
+- Measured on the Pad 3: idle viewfinder now **126/127 frames at 33.2–33.5 ms**
+  with no 83/100 ms holds; recording is mostly 33.3 ms; histogram-on has ~1
+  short hold/s. See ADR 0024.
+
+### Changed — Touch-friendly zoom control (build 2106)
+- The zoom control is now a two-row panel up to 560 lp wide: lens chips on top,
+  then a full-width 48 lp zoom strip with a 22 lp thumb.
+- The whole strip is an opaque tap/drag target — tap or drag anywhere on it, not
+  just the small thumb. The thumb tracks the finger during the gesture and holds
+  the target until the camera ramp catches up.
+- Removed the horizontal scroll view around the zoom bar; it was stealing
+  horizontal drags from the slider. Lens chips now wrap instead.
+- Enlarged lens chips to a 36 lp minimum touch height.
+- Fixed a single-tap zoom dropping immediately: the first ramp tick could see
+  `dt = 0` and stop before moving. A tap now starts and completes the ramp like a
+  drag.
+
+### Added — Smooth zoom in core camera (build 2100)
+- Slider and pinch zoom now feed a target; `core:camera`'s new `SmoothZoom`
+  eases the applied ratio on the camera thread instead of snapping each input
+  event into a capture request.
+- The ramp chases exponentially in log space (τ = 90 ms) with a 6 log-units/s
+  velocity cap, so small trims are immediate while a 1× → 10× move takes about
+  0.38 s instead of a cut. One step per 33 ms camera frame keeps the recorded
+  clip continuous.
+- The preview, encoder and analysis frames all see the same intermediate crop;
+  no second preview-only zoom path. The slider readout and thumb follow the
+  applied value as it settles.
+- Real-device evidence: Pad 3 build 2100 recorded 10× → 1× as
+  9.7, 8.9, 7.2, 3.8, 2.9, 2.3, 1.4, 1.2, 1.1, 1.0 across ~0.7 s, and a zoom
+  performed while recording is present in the saved MP4 frames.
+
+### Added — Recording border (build 2099)
+- While a clip is recording, a 3 lp danger-red border is drawn around the whole
+  viewfinder pane. It disappears when recording stops, making the recorder state
+  visible from any distance even when the REC timer is off-screen focus.
+
+### Changed — Creative LUT UI hidden (build 2098)
+- The **Creative LUT** dropdown and **Reload LUTs** action are removed from the
+  Picture profile card. LUT loading/creation is deferred; the native
+  `setCreativeLut` / `reloadLuts` paths remain in the bridge for later.
+- Picture profile now flows directly from the profile controls into White
+  balance.
+
+### Changed — Aspect-true guides and VF pill restored (build 2097)
+- Framing guides now paint inside the displayed image rectangle instead of the
+  whole preview pane, so the thirds align with the 4:3/16:9 frame even when the
+  preview is letterboxed with the deck open.
+- Guides draw only the thirds grid lines; the safe-frame rectangle and centre
+  crosshair are removed.
+- The compact `VF Full / 1080 / 720` preview-quality pill is restored at the
+  preview's top-right.
+
+### Changed — Debug viewfinder cleanup (build 2096)
+- The left/preview overlay now shows only what is needed for debugging:
+  compact **output format**, **REC timer/gyro** and **ERROR** pills at the
+  top-left, a flat exposure dock (record, P/S/M, ISO/shutter/WB), and the
+  lens/zoom bar. Brand, camera dropdown, MOVIE pill, WB pill and the wide glass
+  top bar are gone from the preview.
+- The left monitor rail and VF-quality pill are removed from the viewfinder.
+  Monitor toggles remain in the Control Deck's Monitoring card; histogram and
+  waveform cards still render bottom-left when enabled there.
+- The bottom dock is now a flat floating row with no enclosing panel, and the
+  preview no longer uses the top/bottom dark gradient.
+
+### Changed — 4:3 · 1080 · 30 fps default (build 2095)
+- A fresh open now selects **1440×1080 (4:3) at 30 fps**, preferring a
+  probe-verified 10-bit path, instead of 1920×1080 16:9. The same preference is
+  used when a lens switch invalidates the current mode.
+- Capability gating is unchanged: a camera without 1440×1080 still falls back to
+  an enabled 1080p mode, then to any enabled mode, so no unsupported size is
+  ever requested.
+
+### Changed — Viewfinder resolution and preview pacing (build 2094)
+- The **Full / 1080 / 720** preview-quality choice moved out of the console and
+  into the viewfinder: a `VF` pill at the preview's top-right opens a menu with
+  the exact preview output and a note that the recording stays at the mode
+  resolution. The console's Viewfinder card is gone.
+- Preview frames are now presented on the display vsync instead of on camera
+  arrival, and at most one draw is pending, so a slow frame is coalesced rather
+  than queued. Camera delivery is unchanged at exactly 30 fps.
+- The analysis pass (histogram, waveform, metering, software-AF score) runs at
+  10 Hz instead of 15 Hz. On the Pad 3 each analysis frame spent ~9 ms in a
+  synchronous `glReadPixels` on the render thread, and the bridge only publishes
+  monitoring data at 5 Hz.
+- Measured with a temporary per-frame colour probe: GL renders every camera
+  frame (1.3–1.5 ms, ~5 ms average at 10 Hz analysis), while the display held
+  frames irregularly — the remaining latency is the camera → Flutter texture →
+  compositor path, not the pixel pipeline (ADR 0022).
+
+### Fixed — first-run camera access (build 2093)
+- A fresh install (or cleared app data, which resets runtime permissions) no
+  longer tries to open the camera before the permission prompt is answered. The
+  launch screen asks for access first, refuses to open without it, and the
+  viewfinder opens automatically once access is granted.
+- A denied prompt now shows a plain explanation and a **Grant camera access**
+  action instead of a red `SecurityException: validateClientPermissionsLocked`
+  banner, and the choice can be retried without restarting the app.
+- `openCamera` is transactional: a failed attempt (permission, busy camera, bad
+  mode) closes the half-open session and resets the GL renderer, so a retry can
+  no longer wedge the app. Previously the first failed open left the preview
+  pipeline started and the next tap did nothing until the process restarted.
+- Pigeon adds `cameraPermissionGranted` and `requestCameraPermissions`.
+
+### Added — Manual white balance (build 2092)
+- White balance now includes a **Manual** control: 2000–10000 K in 100 K steps
+  plus a green/magenta tint from −100 to +100, shown as sliders in the Picture
+  profile card with a live `3500K` readout in the viewfinder bar.
+- Manual locks the HAL AWB preset nearest the requested temperature and applies
+  only the kelvin/tint residual in the existing scene-linear shader WB stage
+  (alongside per-lens input calibration). Measured on the Pad 3: the CCT mode
+  is not advertised (`availableModes [0,1,2]`), raw Camera2 gains leave a strong
+  green cast because they cannot neutralise the sensor's native white point, and
+  the reported sensor colour transforms do not compose to a usable CCM.
+- The temperature and tint sliders are always shown when the sensor offers a
+  preset; selecting a preset moves them to that preset's nominal CCT and tint 0
+  (daylight → 5500 K), and touching either slider switches to manual.
+- The preset follows the slider: crossing a preset boundary switches AWB in the
+  same request; kelvin/tint changes inside a preset update only the shader, so
+  dragging does not rebuild the capture request.
+- Manual is offered only when the sensor advertises a standard WB preset; the
+  raw `Off` chip is no longer shown, and a persisted stale `off` migrates to
+  manual.
+- The choice and its kelvin/tint persist in `shoot-profile` across restarts and
+  survive a lens switch when the new sensor advertises presets; otherwise the
+  mode falls back to auto.
+- `ManualWhiteBalance` is pure Kotlin (preset table, Tanner Helland black-body
+  approximation, green-normalised residual clamped 0.25–4) with 13 JVM tests.
+- Pigeon adds `whiteBalanceKelvin`, `whiteBalanceTint`,
+  `manualWhiteBalanceSupported` and `setManualWhiteBalance`.
+- Temperatures are approximate until measured per-lens calibration data ships;
+  absolute accuracy is the preset's nominal CCT plus the black-body model.
+
 ### Changed — Picture profiles (build 2091)
 - The Colour card is now **Picture profile** with three profiles:
   **Standard** (the camera's native look; identity, no creative processing),

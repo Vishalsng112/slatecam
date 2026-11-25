@@ -8,33 +8,49 @@ class DeckCard extends StatelessWidget {
     required this.title,
     required this.child,
     this.trailing,
+    this.tint,
   });
 
   final String title;
   final Widget child;
   final Widget? trailing;
 
+  /// Section accent. Tints the background, frame, left stripe and title so
+  /// cards read as distinct groups without leaving the dark console palette.
+  final Color? tint;
+
   @override
   Widget build(BuildContext context) {
+    final accent = tint;
+    final background = accent == null
+        ? UiTokens.surfaceRaised
+        : Color.alphaBlend(
+            accent.withValues(alpha: 0.055),
+            UiTokens.surfaceRaised,
+          );
+    final frame = accent == null
+        ? UiTokens.border
+        : Color.alphaBlend(accent.withValues(alpha: 0.30), UiTokens.border);
+    final titleStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: accent ?? UiTokens.muted,
+      letterSpacing: 0.8,
+    );
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: UiTokens.surfaceRaised,
+        color: background,
         borderRadius: BorderRadius.circular(UiTokens.radius),
-        border: Border.all(color: UiTokens.border),
+        border: Border.all(color: frame),
       ),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
-                child: Text(
-                  title.toUpperCase(),
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
+                child: Text(title.toUpperCase(), style: titleStyle),
               ),
               ?trailing,
             ],
@@ -58,6 +74,7 @@ class LabeledSlider extends StatelessWidget {
     this.divisions,
     this.onChanged,
     this.onChangeEnd,
+    this.onReset,
     this.enabled = true,
   });
 
@@ -69,6 +86,8 @@ class LabeledSlider extends StatelessWidget {
   final int? divisions;
   final ValueChanged<double>? onChanged;
   final ValueChanged<double>? onChangeEnd;
+  /// Shows a small reset-to-default action when provided.
+  final VoidCallback? onReset;
   final bool enabled;
 
   @override
@@ -82,6 +101,18 @@ class LabeledSlider extends StatelessWidget {
             Expanded(
               child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
             ),
+            if (onReset != null)
+              IconButton(
+                tooltip: 'Reset to default',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 22,
+                  height: 22,
+                ),
+                onPressed: onReset,
+                icon: const Icon(Icons.restart_alt, size: 14),
+              ),
             Text(
               valueLabel,
               style: Theme.of(context).textTheme.bodySmall,
@@ -167,50 +198,6 @@ class ReadoutChip extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class MonitorRailButton extends StatelessWidget {
-  const MonitorRailButton({
-    super.key,
-    required this.icon,
-    required this.tooltip,
-    required this.selected,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final bool selected;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Material(
-          color: selected
-              ? UiTokens.accent.withValues(alpha: 0.16)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: onPressed,
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: Icon(
-                icon,
-                size: 20,
-                color: selected ? UiTokens.accent : UiTokens.muted,
-              ),
-            ),
           ),
         ),
       ),

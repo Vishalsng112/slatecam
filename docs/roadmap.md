@@ -4,7 +4,7 @@ This is the canonical phase plan. Update it whenever phase order, scope or
 status changes. Shipped details live in [`CHANGELOG.md`](../CHANGELOG.md);
 detailed remaining work lives in [`backlog.md`](backlog.md).
 
-**Last updated:** 2026-11-23
+**Last updated:** 2026-11-25
 
 ## Status
 
@@ -13,10 +13,10 @@ detailed remaining work lives in [`backlog.md`](backlog.md).
 | 0 | Foundation | Done |
 | 1 | Prober | Done (schema 1.11.0, prober 1.10.0) |
 | 2 | Camera core + preview | Done |
-| 3 | Recording | Done on Pad 3 and POCO X6 Pro |
+| 3 | Recording | Done on Pad 3 and POCO X6 Pro; audio input selection, pre-roll metering and gain ship (ADR 0028) |
 | 4 | GPU + profiles | Done; scene-linear shader, picture profiles, FP16 encoder intermediate and dither shipped |
-| 5 | Advanced capture | Mostly done: shutter angle, gyro, focus shift, concurrent verification, metering patterns, AE response speed and software focus with scenarios. Phase-detect/hybrid AF has no Camera2 control |
-| **5.5** | **Shoot profiles / Movie-Vlog** | **Complete except measured colour data: verification, shoot set, profiles, console and seamless switch done** |
+| 5 | Advanced capture | Mostly done: shutter angle, gyro, focus shift, concurrent verification, metering patterns, AE response speed, software focus with scenarios and manual white balance. Phase-detect/hybrid AF has no Camera2 control |
+| **5.5** | **Shoot profiles / Movie-Vlog** | **Complete except shipped colour data: verification, shoot set, profiles, console, seamless switch and the in-app calibration flow are done** |
 | 6 | AI (optional) | Contract only |
 | 7 | Device database | Done |
 | 8 | Quality | Not started |
@@ -80,12 +80,13 @@ Phase 5.5 ──────► Phase 8 quality (cross-device stress)
   direct chips for all primary choices; no tab or menu needed to switch a lens.
 - Seamless switch: the encoder keeps receiving repeated frames while the new
   session starts; Pad back→front measured 5,969 frames with one 122 ms pause.
-- Colour: `ColorCalibration` solver and tests are in place; shipping matrices
-  needs captured 24-patch data for each lens.
+- Colour: `ColorCalibration`/`ColorChecker` run in linear Rec.2020, the in-app
+  ColorChecker flow captures, fits (with ΔE2000) and saves per lens (ADR 0027).
+  Shipping matrices still need a physical chart measurement for each lens.
 
 ## Next phase
 
-Finish the remaining Phase 5.5 scope (measured colour matrices, seamless
+Finish the remaining Phase 5.5 scope (capture shipping colour data, seamless
 switch), then Phase 5
 remaining items (hybrid AF) or Phase 6 AI. Phase 8/9 after cross-device
 Phase 3 + 5.5 sign-off.

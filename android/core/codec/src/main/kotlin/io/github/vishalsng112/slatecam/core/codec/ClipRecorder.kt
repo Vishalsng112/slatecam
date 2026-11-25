@@ -4,13 +4,11 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
-import android.media.MediaRecorder
 import android.view.Surface
 import io.github.vishalsng112.slatecam.core.common.HevcSps
 import java.nio.ByteBuffer
@@ -19,16 +17,45 @@ import java.nio.ByteBuffer
  * Phase 3 recorder: HEVC video from a GL surface plus AAC audio, muxed to MP4.
  *
  * Video frames arrive through the encoder input surface, so the GPU pipeline
- * stays the only producer. Audio is optional and silently omitted when the
- * RECORD_AUDIO permission is missing.
+ * stays the only producer. Audio uses the selected input and software gain;
+ * missing permission or a failed input is reported by the bridge instead of
+ * silently pretending the track exists.
  */
 class ClipRecorder(private val context: Context) {
+
+    /** Input and gain for this take; selected by the console and persisted. */
+    data class AudioConfig(
+        val inputKey: String = AudioInputs.DEFAULT_KEY,
+        val gainDb: Float = 0f,
+    )
 
     @Volatile
     private var running = false
 
     @Volatile
     var lastError: String? = null
+        private set
+
+    @Volatile
+    private var audioInputKey: String = AudioInputs.DEFAULT_KEY
+
+    @Volatile
+    private var audioGainDb = 0f
+
+    /** Meter callback from the audio thread, already gain-corrected. */
+    @Volatile
+    var onAudioLevel: ((AudioLevel) -> Unit)? = null
+
+    @Volatile
+    var onAudioFailure: ((String) -> Unit)? = null
+
+    @Volatile
+    var audioStarted: Boolean = false
+        private set
+
+    /** Platform source used for this take, e.g. `unprocessed`. */
+    @Volatile
+    var audioSource: String? = null
         private set
 
     private var muxer: MediaMuxer? = null
@@ -78,9 +105,13 @@ class ClipRecorder(private val context: Context) {
         tenBitHlg: Boolean,
         muxer: MediaMuxer,
         orientationHint: Int = 0,
+        audio: AudioConfig = AudioConfig(),
     ): Surface {
         check(!running) { "already recording" }
         lastError = null
+        audioStarted = false
+        audioInputKey = audio.inputKey
+        audioGainDb = audio.gainDb
         videoEos = false
         audioEos = false
         muxerStarted = false
@@ -161,6 +192,8 @@ class ClipRecorder(private val context: Context) {
     fun stop(): Boolean {
         if (!running && drainThread == null) return false
         running = false
+        audioStarted = false
+        audioSource = null
 
         runCatching { videoEncoder?.signalEndOfInputStream() }
         runCatching { audioRecord?.stop() }
@@ -190,8 +223,8 @@ class ClipRecorder(private val context: Context) {
     private fun startAudio() {
         val format = MediaFormat.createAudioFormat(
             MediaFormat.MIMETYPE_AUDIO_AAC,
-            SAMPLE_RATE,
-            CHANNELS,
+            AudioSpec.SAMPLE_RATE,
+            AudioSpec.CHANNELS,
         ).apply {
             setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
             setInteger(MediaFormat.KEY_BIT_RATE, AUDIO_BITRATE)
@@ -206,68 +239,59 @@ class ClipRecorder(private val context: Context) {
         audioEncoder = encoder
 
         val minBuffer = AudioRecord.getMinBufferSize(
-            SAMPLE_RATE,
+            AudioSpec.SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_STEREO,
             AudioFormat.ENCODING_PCM_16BIT,
         )
-        val record = createAudioRecord(maxOf(minBuffer * 2, 8192))
+        val handle = AudioInputs.openRecord(
+            context = context,
+            key = audioInputKey,
+            sampleRate = AudioSpec.SAMPLE_RATE,
+            channelConfig = AudioFormat.CHANNEL_IN_STEREO,
+            encoding = AudioFormat.ENCODING_PCM_16BIT,
+            bufferSize = maxOf(minBuffer * 2, 8192),
+        ) ?: error("no usable audio input")
+        val record = handle.record
         record.startRecording()
         audioRecord = record
+        audioSource = handle.source
+        audioStarted = true
 
         audioThread = Thread(::audioLoop, "slatecam-audio").apply { start() }
     }
 
-    /**
-     * Prefers a clean source: UNPROCESSED where the platform supports it, then
-     * CAMCORDER, then MIC. Noise suppression and AGC are deliberately not
-     * attached; they are destructive and belong in post-processing.
-     */
-    private fun createAudioRecord(bufferSize: Int): AudioRecord {
-        val audioManager =
-            context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val unprocessed = audioManager
-            .getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED)
-            ?.toBoolean() == true
-
-        val sources = buildList {
-            if (unprocessed) add(MediaRecorder.AudioSource.UNPROCESSED)
-            add(MediaRecorder.AudioSource.CAMCORDER)
-            add(MediaRecorder.AudioSource.MIC)
-        }
-
-        for (source in sources) {
-            val record = AudioRecord(
-                source,
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_STEREO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize,
-            )
-            if (record.state == AudioRecord.STATE_INITIALIZED) {
-                android.util.Log.i("SlateCam", "audio source=${sourceName(source)}")
-                return record
-            }
-            runCatching { record.release() }
-        }
-        error("no usable audio input source")
-    }
-
-    private fun sourceName(source: Int): String = when (source) {
-        MediaRecorder.AudioSource.UNPROCESSED -> "unprocessed"
-        MediaRecorder.AudioSource.CAMCORDER -> "camcorder"
-        MediaRecorder.AudioSource.MIC -> "mic"
-        else -> "source_$source"
+    /** Gain changes take effect on the next PCM buffer, including mid-take. */
+    fun setAudioGain(gainDb: Float) {
+        audioGainDb = gainDb
     }
 
     private fun audioLoop() {
         val encoder = audioEncoder ?: return
         val record = audioRecord ?: return
         val pcm = ByteArray(4096)
+        var lastLevelMs = 0L
 
         try {
             while (running) {
                 val read = record.read(pcm, 0, pcm.size)
-                if (read <= 0) continue
+                if (read < 0) {
+                    onAudioFailure?.invoke("audio read failed ($read)")
+                    break
+                }
+                if (read == 0) continue
+
+                val level = AudioMeter.process(
+                    pcm,
+                    read,
+                    AudioSpec.CHANNELS,
+                    audioGainDb,
+                )
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastLevelMs >= 80L) {
+                    lastLevelMs = now
+                    onAudioLevel?.invoke(level)
+                }
+
                 var offset = 0
                 while (offset < read) {
                     val index = encoder.dequeueInputBuffer(10_000)
@@ -299,6 +323,7 @@ class ClipRecorder(private val context: Context) {
             }
         } catch (t: Throwable) {
             lastError = "audio: ${t.message}"
+            onAudioFailure?.invoke(lastError ?: "audio failed")
         }
     }
 
@@ -561,8 +586,6 @@ class ClipRecorder(private val context: Context) {
     }
 
     private companion object {
-        const val SAMPLE_RATE = 48_000
-        const val CHANNELS = 2
-        const val AUDIO_BITRATE = 192_000
+        const val AUDIO_BITRATE = 256_000
     }
 }
