@@ -520,6 +520,7 @@ class CameraTelemetry {
     required this.tenBit,
     required this.hlgAvailable,
     required this.hlgReason,
+    this.activePhysicalCameraId,
     required this.histogram,
     required this.waveform,
     required this.waveformColumns,
@@ -550,6 +551,8 @@ class CameraTelemetry {
   bool tenBit;
   bool hlgAvailable;
   String hlgReason;
+  /// Physical sensor behind a logical camera, when the HAL reports it.
+  String? activePhysicalCameraId;
   List<int> histogram;
   List<int> waveform;
   int waveformColumns;

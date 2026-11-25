@@ -68,6 +68,7 @@ AF handling). Remaining:
 | `logicalZoomHandoff` verdict | Implemented: stream sweep checks gaps, exposure/WB jumps and active physical IDs; runs last in the probe |
 | Hidden logical fallback | POCO hidden logical `4` survives front→back once hidden macro is excluded; other hidden round trips still need verdict coverage |
 | Hidden lens stability | Opening hidden macro `3` on the POCO invalidates the camera list for the process; hidden macro is excluded from the UI until a reopen/identity verdict exists |
+| Logical handoff FOV calibration | The POCO HAL hands off ultra↔main at roughly 0.86×/1.37× with hysteresis; mark and calibrate the actual thresholds per device so the same ratio does not imply a different sensor/FOV |
 | Dual-session implementation | Implemented for exposed pairs with a passing verdict and matching mode; Pad 3 front↔back verified |
 | `dualSessionSwitch` verdict | Implemented: concurrent streams + joined boundary; runtime additionally requires the active mode and exposed IDs |
 

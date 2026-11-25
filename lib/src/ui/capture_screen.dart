@@ -142,6 +142,7 @@ class _CaptureScreenState extends State<CaptureScreen>
     state.tenBit = telemetry.tenBit;
     state.hlgAvailable = telemetry.hlgAvailable;
     state.hlgReason = telemetry.hlgReason;
+    state.activePhysicalCameraId = telemetry.activePhysicalCameraId;
     state.histogram = telemetry.histogram;
     state.waveform = telemetry.waveform;
     state.waveformColumns = telemetry.waveformColumns;

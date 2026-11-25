@@ -1405,6 +1405,8 @@ data class CameraTelemetry (
   val tenBit: Boolean,
   val hlgAvailable: Boolean,
   val hlgReason: String,
+  /** Physical sensor behind a logical camera, when the HAL reports it. */
+  val activePhysicalCameraId: String? = null,
   val histogram: List<Long>,
   val waveform: List<Long>,
   val waveformColumns: Long,
@@ -1437,11 +1439,12 @@ data class CameraTelemetry (
       val tenBit = pigeonVar_list[21] as Boolean
       val hlgAvailable = pigeonVar_list[22] as Boolean
       val hlgReason = pigeonVar_list[23] as String
-      val histogram = pigeonVar_list[24] as List<Long>
-      val waveform = pigeonVar_list[25] as List<Long>
-      val waveformColumns = pigeonVar_list[26] as Long
-      val waveformBins = pigeonVar_list[27] as Long
-      return CameraTelemetry(iso, shutterNs, shutterAngle, focusDiopters, whiteBalanceMode, whiteBalanceKelvin, whiteBalanceTint, zoomRatio, isRecording, recordingSeconds, clipPath, recordingError, frameRate, gyroSampleCount, exposureMode, meteringSpeed, zebra, falseColor, peaking, peakingSensitivity, peakingStrength, tenBit, hlgAvailable, hlgReason, histogram, waveform, waveformColumns, waveformBins)
+      val activePhysicalCameraId = pigeonVar_list[24] as String?
+      val histogram = pigeonVar_list[25] as List<Long>
+      val waveform = pigeonVar_list[26] as List<Long>
+      val waveformColumns = pigeonVar_list[27] as Long
+      val waveformBins = pigeonVar_list[28] as Long
+      return CameraTelemetry(iso, shutterNs, shutterAngle, focusDiopters, whiteBalanceMode, whiteBalanceKelvin, whiteBalanceTint, zoomRatio, isRecording, recordingSeconds, clipPath, recordingError, frameRate, gyroSampleCount, exposureMode, meteringSpeed, zebra, falseColor, peaking, peakingSensitivity, peakingStrength, tenBit, hlgAvailable, hlgReason, activePhysicalCameraId, histogram, waveform, waveformColumns, waveformBins)
     }
   }
   fun toList(): List<Any?> {
@@ -1470,6 +1473,7 @@ data class CameraTelemetry (
       tenBit,
       hlgAvailable,
       hlgReason,
+      activePhysicalCameraId,
       histogram,
       waveform,
       waveformColumns,
@@ -1484,7 +1488,7 @@ data class CameraTelemetry (
       return true
     }
     val other = other as CameraTelemetry
-    return SlateCamPigeonPigeonUtils.deepEquals(this.iso, other.iso) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterNs, other.shutterNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterAngle, other.shutterAngle) && SlateCamPigeonPigeonUtils.deepEquals(this.focusDiopters, other.focusDiopters) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceMode, other.whiteBalanceMode) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceKelvin, other.whiteBalanceKelvin) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceTint, other.whiteBalanceTint) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomRatio, other.zoomRatio) && SlateCamPigeonPigeonUtils.deepEquals(this.isRecording, other.isRecording) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingSeconds, other.recordingSeconds) && SlateCamPigeonPigeonUtils.deepEquals(this.clipPath, other.clipPath) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingError, other.recordingError) && SlateCamPigeonPigeonUtils.deepEquals(this.frameRate, other.frameRate) && SlateCamPigeonPigeonUtils.deepEquals(this.gyroSampleCount, other.gyroSampleCount) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureMode, other.exposureMode) && SlateCamPigeonPigeonUtils.deepEquals(this.meteringSpeed, other.meteringSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.zebra, other.zebra) && SlateCamPigeonPigeonUtils.deepEquals(this.falseColor, other.falseColor) && SlateCamPigeonPigeonUtils.deepEquals(this.peaking, other.peaking) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingSensitivity, other.peakingSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingStrength, other.peakingStrength) && SlateCamPigeonPigeonUtils.deepEquals(this.tenBit, other.tenBit) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgAvailable, other.hlgAvailable) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgReason, other.hlgReason) && SlateCamPigeonPigeonUtils.deepEquals(this.histogram, other.histogram) && SlateCamPigeonPigeonUtils.deepEquals(this.waveform, other.waveform) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformColumns, other.waveformColumns) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformBins, other.waveformBins)
+    return SlateCamPigeonPigeonUtils.deepEquals(this.iso, other.iso) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterNs, other.shutterNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterAngle, other.shutterAngle) && SlateCamPigeonPigeonUtils.deepEquals(this.focusDiopters, other.focusDiopters) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceMode, other.whiteBalanceMode) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceKelvin, other.whiteBalanceKelvin) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceTint, other.whiteBalanceTint) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomRatio, other.zoomRatio) && SlateCamPigeonPigeonUtils.deepEquals(this.isRecording, other.isRecording) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingSeconds, other.recordingSeconds) && SlateCamPigeonPigeonUtils.deepEquals(this.clipPath, other.clipPath) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingError, other.recordingError) && SlateCamPigeonPigeonUtils.deepEquals(this.frameRate, other.frameRate) && SlateCamPigeonPigeonUtils.deepEquals(this.gyroSampleCount, other.gyroSampleCount) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureMode, other.exposureMode) && SlateCamPigeonPigeonUtils.deepEquals(this.meteringSpeed, other.meteringSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.zebra, other.zebra) && SlateCamPigeonPigeonUtils.deepEquals(this.falseColor, other.falseColor) && SlateCamPigeonPigeonUtils.deepEquals(this.peaking, other.peaking) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingSensitivity, other.peakingSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingStrength, other.peakingStrength) && SlateCamPigeonPigeonUtils.deepEquals(this.tenBit, other.tenBit) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgAvailable, other.hlgAvailable) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgReason, other.hlgReason) && SlateCamPigeonPigeonUtils.deepEquals(this.activePhysicalCameraId, other.activePhysicalCameraId) && SlateCamPigeonPigeonUtils.deepEquals(this.histogram, other.histogram) && SlateCamPigeonPigeonUtils.deepEquals(this.waveform, other.waveform) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformColumns, other.waveformColumns) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformBins, other.waveformBins)
   }
 
   override fun hashCode(): Int {
@@ -1513,6 +1517,7 @@ data class CameraTelemetry (
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.tenBit)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.hlgAvailable)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.hlgReason)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.activePhysicalCameraId)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.histogram)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.waveform)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.waveformColumns)
@@ -1520,7 +1525,7 @@ data class CameraTelemetry (
     return result
   }
   override fun toString(): String {
-    return "CameraTelemetry(iso=$iso, shutterNs=$shutterNs, shutterAngle=$shutterAngle, focusDiopters=$focusDiopters, whiteBalanceMode=$whiteBalanceMode, whiteBalanceKelvin=$whiteBalanceKelvin, whiteBalanceTint=$whiteBalanceTint, zoomRatio=$zoomRatio, isRecording=$isRecording, recordingSeconds=$recordingSeconds, clipPath=$clipPath, recordingError=$recordingError, frameRate=$frameRate, gyroSampleCount=$gyroSampleCount, exposureMode=$exposureMode, meteringSpeed=$meteringSpeed, zebra=$zebra, falseColor=$falseColor, peaking=$peaking, peakingSensitivity=$peakingSensitivity, peakingStrength=$peakingStrength, tenBit=$tenBit, hlgAvailable=$hlgAvailable, hlgReason=$hlgReason, histogram=$histogram, waveform=$waveform, waveformColumns=$waveformColumns, waveformBins=$waveformBins)"
+    return "CameraTelemetry(iso=$iso, shutterNs=$shutterNs, shutterAngle=$shutterAngle, focusDiopters=$focusDiopters, whiteBalanceMode=$whiteBalanceMode, whiteBalanceKelvin=$whiteBalanceKelvin, whiteBalanceTint=$whiteBalanceTint, zoomRatio=$zoomRatio, isRecording=$isRecording, recordingSeconds=$recordingSeconds, clipPath=$clipPath, recordingError=$recordingError, frameRate=$frameRate, gyroSampleCount=$gyroSampleCount, exposureMode=$exposureMode, meteringSpeed=$meteringSpeed, zebra=$zebra, falseColor=$falseColor, peaking=$peaking, peakingSensitivity=$peakingSensitivity, peakingStrength=$peakingStrength, tenBit=$tenBit, hlgAvailable=$hlgAvailable, hlgReason=$hlgReason, activePhysicalCameraId=$activePhysicalCameraId, histogram=$histogram, waveform=$waveform, waveformColumns=$waveformColumns, waveformBins=$waveformBins)"
   }
 }
 private open class SlateCamPigeonPigeonCodec : StandardMessageCodec() {

@@ -9,6 +9,13 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Lens-handoff viewfinder jitter (build 2169)
+- `LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID` now travels on the lightweight
+  telemetry channel instead of forcing a full `CameraState` rebuild at the
+  physical handoff. The preview Texture and the whole console are no longer
+  recreated while the HAL switches sensors.
+- The zoom rail's active-sensor dot still updates, now from telemetry.
+
 ### Changed — Cleaner zoom rail (build 2168)
 - Lens name chips no longer sit above the zoom strip. The rail now shows the
   minimum at the bottom and the maximum at the top, with a tick at every lens

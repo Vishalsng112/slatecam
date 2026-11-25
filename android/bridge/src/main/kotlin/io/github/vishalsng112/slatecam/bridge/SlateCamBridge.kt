@@ -2424,6 +2424,7 @@ class SlateCamBridge private constructor(
             tenBit = state.isTenBit || (recorder.isRecording && activeRecordingTenBit),
             hlgAvailable = grant.available,
             hlgReason = grant.reason,
+            activePhysicalCameraId = state.activePhysicalCameraId,
             histogram = if (analysisOverlayVisible && analysis) {
                 histogramBins.map { it.toLong() }
             } else {

@@ -1525,6 +1525,7 @@ class CameraTelemetry {
     required this.tenBit,
     required this.hlgAvailable,
     required this.hlgReason,
+    this.activePhysicalCameraId,
     required this.histogram,
     required this.waveform,
     required this.waveformColumns,
@@ -1579,6 +1580,9 @@ class CameraTelemetry {
 
   String hlgReason;
 
+  /// Physical sensor behind a logical camera, when the HAL reports it.
+  String? activePhysicalCameraId;
+
   List<int> histogram;
 
   List<int> waveform;
@@ -1613,6 +1617,7 @@ class CameraTelemetry {
       tenBit,
       hlgAvailable,
       hlgReason,
+      activePhysicalCameraId,
       histogram,
       waveform,
       waveformColumns,
@@ -1650,10 +1655,11 @@ class CameraTelemetry {
       tenBit: result[21]! as bool,
       hlgAvailable: result[22]! as bool,
       hlgReason: result[23]! as String,
-      histogram: (result[24]! as List<Object?>).cast<int>(),
-      waveform: (result[25]! as List<Object?>).cast<int>(),
-      waveformColumns: result[26]! as int,
-      waveformBins: result[27]! as int,
+      activePhysicalCameraId: result[24] as String?,
+      histogram: (result[25]! as List<Object?>).cast<int>(),
+      waveform: (result[26]! as List<Object?>).cast<int>(),
+      waveformColumns: result[27]! as int,
+      waveformBins: result[28]! as int,
     );
   }
 
@@ -1666,7 +1672,7 @@ class CameraTelemetry {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(iso, other.iso) && _deepEquals(shutterNs, other.shutterNs) && _deepEquals(shutterAngle, other.shutterAngle) && _deepEquals(focusDiopters, other.focusDiopters) && _deepEquals(whiteBalanceMode, other.whiteBalanceMode) && _deepEquals(whiteBalanceKelvin, other.whiteBalanceKelvin) && _deepEquals(whiteBalanceTint, other.whiteBalanceTint) && _deepEquals(zoomRatio, other.zoomRatio) && _deepEquals(isRecording, other.isRecording) && _deepEquals(recordingSeconds, other.recordingSeconds) && _deepEquals(clipPath, other.clipPath) && _deepEquals(recordingError, other.recordingError) && _deepEquals(frameRate, other.frameRate) && _deepEquals(gyroSampleCount, other.gyroSampleCount) && _deepEquals(exposureMode, other.exposureMode) && _deepEquals(meteringSpeed, other.meteringSpeed) && _deepEquals(zebra, other.zebra) && _deepEquals(falseColor, other.falseColor) && _deepEquals(peaking, other.peaking) && _deepEquals(peakingSensitivity, other.peakingSensitivity) && _deepEquals(peakingStrength, other.peakingStrength) && _deepEquals(tenBit, other.tenBit) && _deepEquals(hlgAvailable, other.hlgAvailable) && _deepEquals(hlgReason, other.hlgReason) && _deepEquals(histogram, other.histogram) && _deepEquals(waveform, other.waveform) && _deepEquals(waveformColumns, other.waveformColumns) && _deepEquals(waveformBins, other.waveformBins);
+    return _deepEquals(iso, other.iso) && _deepEquals(shutterNs, other.shutterNs) && _deepEquals(shutterAngle, other.shutterAngle) && _deepEquals(focusDiopters, other.focusDiopters) && _deepEquals(whiteBalanceMode, other.whiteBalanceMode) && _deepEquals(whiteBalanceKelvin, other.whiteBalanceKelvin) && _deepEquals(whiteBalanceTint, other.whiteBalanceTint) && _deepEquals(zoomRatio, other.zoomRatio) && _deepEquals(isRecording, other.isRecording) && _deepEquals(recordingSeconds, other.recordingSeconds) && _deepEquals(clipPath, other.clipPath) && _deepEquals(recordingError, other.recordingError) && _deepEquals(frameRate, other.frameRate) && _deepEquals(gyroSampleCount, other.gyroSampleCount) && _deepEquals(exposureMode, other.exposureMode) && _deepEquals(meteringSpeed, other.meteringSpeed) && _deepEquals(zebra, other.zebra) && _deepEquals(falseColor, other.falseColor) && _deepEquals(peaking, other.peaking) && _deepEquals(peakingSensitivity, other.peakingSensitivity) && _deepEquals(peakingStrength, other.peakingStrength) && _deepEquals(tenBit, other.tenBit) && _deepEquals(hlgAvailable, other.hlgAvailable) && _deepEquals(hlgReason, other.hlgReason) && _deepEquals(activePhysicalCameraId, other.activePhysicalCameraId) && _deepEquals(histogram, other.histogram) && _deepEquals(waveform, other.waveform) && _deepEquals(waveformColumns, other.waveformColumns) && _deepEquals(waveformBins, other.waveformBins);
   }
 
   @override
@@ -1675,7 +1681,7 @@ class CameraTelemetry {
 
   @override
   String toString() {
-    return 'CameraTelemetry(iso: $iso, shutterNs: $shutterNs, shutterAngle: $shutterAngle, focusDiopters: $focusDiopters, whiteBalanceMode: $whiteBalanceMode, whiteBalanceKelvin: $whiteBalanceKelvin, whiteBalanceTint: $whiteBalanceTint, zoomRatio: $zoomRatio, isRecording: $isRecording, recordingSeconds: $recordingSeconds, clipPath: $clipPath, recordingError: $recordingError, frameRate: $frameRate, gyroSampleCount: $gyroSampleCount, exposureMode: $exposureMode, meteringSpeed: $meteringSpeed, zebra: $zebra, falseColor: $falseColor, peaking: $peaking, peakingSensitivity: $peakingSensitivity, peakingStrength: $peakingStrength, tenBit: $tenBit, hlgAvailable: $hlgAvailable, hlgReason: $hlgReason, histogram: $histogram, waveform: $waveform, waveformColumns: $waveformColumns, waveformBins: $waveformBins)';
+    return 'CameraTelemetry(iso: $iso, shutterNs: $shutterNs, shutterAngle: $shutterAngle, focusDiopters: $focusDiopters, whiteBalanceMode: $whiteBalanceMode, whiteBalanceKelvin: $whiteBalanceKelvin, whiteBalanceTint: $whiteBalanceTint, zoomRatio: $zoomRatio, isRecording: $isRecording, recordingSeconds: $recordingSeconds, clipPath: $clipPath, recordingError: $recordingError, frameRate: $frameRate, gyroSampleCount: $gyroSampleCount, exposureMode: $exposureMode, meteringSpeed: $meteringSpeed, zebra: $zebra, falseColor: $falseColor, peaking: $peaking, peakingSensitivity: $peakingSensitivity, peakingStrength: $peakingStrength, tenBit: $tenBit, hlgAvailable: $hlgAvailable, hlgReason: $hlgReason, activePhysicalCameraId: $activePhysicalCameraId, histogram: $histogram, waveform: $waveform, waveformColumns: $waveformColumns, waveformBins: $waveformBins)';
   }
 }
 
