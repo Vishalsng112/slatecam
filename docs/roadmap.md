@@ -82,6 +82,8 @@ Phase 5.5 ──────► Phase 8 quality (cross-device stress)
   session starts; Pad back→front measured 5,969 frames with one 122 ms pause.
 - Colour: `ColorCalibration` solver and tests are in place; shipping matrices
   needs captured 24-patch data for each lens.
+- Logical zoom handoff: discovery and the exposed-camera controller ship; the
+  `logicalZoomHandoff` recording verdict and hidden-camera handling remain.
 
 ## Next phase
 

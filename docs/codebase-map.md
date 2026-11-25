@@ -217,8 +217,9 @@ when testing camera access. Probe launch:
   RGBA8888, but the encoded stream is Main10/HLG and SPS-checked. Pad movie mode
   is 10-bit; POCO stays SDR because its encoder fails Main10.
 - Colour matching depends on measured per-camera matrices (not shipped).
-- Logical zoom handoff stops are discovered from the probe; the controller path
-  and `logicalZoomHandoff` verdict are not implemented yet (ADR 0029).
+- Logical zoom handoff is implemented for exposed logical cameras; hidden
+  logical IDs are discovery-only. The `logicalZoomHandoff` verdict is pending
+  (ADR 0029).
 - Audio capture uses PCM16 48 kHz stereo; input selection and gain are data.
   Headphone monitoring, 24-bit capture and a limiter are not implemented.
 - Manual white balance anchors on the nearest HAL AWB preset and applies the

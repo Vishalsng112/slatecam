@@ -75,6 +75,8 @@ data class CameraUiState(
     val zoomRatio: Float = 1f,
     val zoomMin: Float = 1f,
     val zoomMax: Float = 1f,
+    /** Physical sensor chosen by a logical multi-camera handoff. */
+    val activePhysicalCameraId: String? = null,
     val isTenBit: Boolean = false,
     val shutterAngle: Float = 0f,
     val frameRate: Int = 30,
@@ -130,6 +132,7 @@ class CameraController(private val context: Context) {
     private var errorMessage: String? = null
     private var cameraId = "0"
     private var preferredCameraId: String? = null
+    private var activePhysicalCameraId: String? = null
     private var availableCameraIds: List<String> = emptyList()
     private var availableCameraLabels: List<String> = emptyList()
 
@@ -253,6 +256,7 @@ class CameraController(private val context: Context) {
                 val switchingCamera = selectedId != cameraId
                 cameraId = selectedId
                 preferredCameraId = selectedId
+                activePhysicalCameraId = null
                 val characteristics = manager.getCameraCharacteristics(selectedId)
                 currentCharacteristics = characteristics
                 readCapabilities(characteristics)
@@ -1455,6 +1459,7 @@ class CameraController(private val context: Context) {
         device = null
         builder = null
         previewSurface = null
+        activePhysicalCameraId = null
         open = false
     }
 
@@ -1499,6 +1504,7 @@ class CameraController(private val context: Context) {
             zoomRatio = zoomRamp.value,
             zoomMin = zoomMin,
             zoomMax = zoomMax,
+            activePhysicalCameraId = activePhysicalCameraId,
             isTenBit = tenBitActive,
             shutterAngle = ShutterAngle.degrees(shutterNs, frameRate),
             frameRate = frameRate,
@@ -1554,6 +1560,17 @@ class CameraController(private val context: Context) {
             request: CaptureRequest,
             result: TotalCaptureResult,
         ) {
+            result.get(CaptureResult.LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID)?.let {
+                if (it != activePhysicalCameraId) {
+                    activePhysicalCameraId = it
+                    android.util.Log.i(
+                        "SlateCamLens",
+                        "camera=$cameraId activePhysical=$it zoom=${zoomRamp.value}",
+                    )
+                    emit()
+                }
+            }
+
             // While the HAL owns exposure, keep a recent reading of what it
             // chose. Entering S then starts from the live exposure instead of
             // the last manual value (which may be minutes old).

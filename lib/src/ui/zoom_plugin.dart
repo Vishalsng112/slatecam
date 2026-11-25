@@ -22,7 +22,12 @@ class ZoomPlugin extends StatelessWidget {
     if (lenses.isEmpty && !canZoom) return const SizedBox.shrink();
 
     final active = _activeLens(lenses);
-    final effective = ((active?.zoomRatio ?? 1.0) * state.zoomRatio)
+    final logicalActive = lenses.any(
+      (lens) => lens.logical && lens.id == state.cameraId,
+    );
+    final effective = (logicalActive
+            ? state.zoomRatio
+            : (active?.zoomRatio ?? 1.0) * state.zoomRatio)
         .clamp(0.1, 999.0)
         .toDouble();
 
@@ -39,8 +44,11 @@ class ZoomPlugin extends StatelessWidget {
           for (final lens in lenses) ...[
             _LensChip(
               lens: lens,
-              selected: lens.id == state.cameraId,
-              onTap: () => host.selectLens(lens.id),
+              selected: _isSelected(lens),
+              activePhysical: _isActivePhysical(lens),
+              onTap: () => lens.logical
+                  ? host.selectLensStop(lens.id, lens.stopRatio)
+                  : host.selectLens(lens.id),
             ),
             const SizedBox(height: 6),
           ],
@@ -85,9 +93,24 @@ class ZoomPlugin extends StatelessWidget {
     );
   }
 
+  bool _isSelected(LensOption lens) {
+    if (lens.logical) {
+      return lens.id == state.cameraId &&
+          (state.zoomRatio - lens.stopRatio).abs() < 0.06;
+    }
+    return lens.id == state.cameraId;
+  }
+
+  bool _isActivePhysical(LensOption lens) {
+    final physical = state.activePhysicalCameraId;
+    return physical != null &&
+        lens.physicalCameraId.isNotEmpty &&
+        lens.physicalCameraId == physical;
+  }
+
   LensOption? _activeLens(List<LensOption> lenses) {
     for (final lens in lenses) {
-      if (lens.id == state.cameraId) return lens;
+      if (!lens.logical && lens.id == state.cameraId) return lens;
     }
     return null;
   }
@@ -103,11 +126,13 @@ class _LensChip extends StatelessWidget {
   const _LensChip({
     required this.lens,
     required this.selected,
+    required this.activePhysical,
     required this.onTap,
   });
 
   final LensOption lens;
   final bool selected;
+  final bool activePhysical;
   final VoidCallback onTap;
 
   @override
@@ -118,7 +143,8 @@ class _LensChip extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: 'Lens ${lens.label}, $hint',
+      label: 'Lens ${lens.label}, $hint'
+          '${activePhysical ? ', active sensor' : ''}',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -142,6 +168,17 @@ class _LensChip extends StatelessWidget {
                     Icons.visibility_off_outlined,
                     size: 11,
                     color: selected ? Colors.black : UiTokens.muted,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                if (activePhysical) ...[
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: selected ? Colors.black : UiTokens.success,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                   const SizedBox(width: 4),
                 ],

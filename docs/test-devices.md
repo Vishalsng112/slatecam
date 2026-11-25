@@ -1378,3 +1378,24 @@ run. The physical front camera and the non-logical cameras are unchanged.
 
 `LogicalZoomTest` covers eligible, non-logical, range-above-1.0, uncovered,
 duplicate-ratio, missing-metadata and missing-range cases (8 tests).
+
+## Logical zoom controller (POCO X6 Pro 5G, build 2157)
+
+The controller mechanics were exercised first with the vendor-hidden logical
+camera `4` (physical `0`/`2`, stops 0.621 and 1.0) on build 2152/2154:
+
+| Check | Result |
+|---|---|
+| Initial session | App opened logical camera `4`; lens chips were logical stops, not physical camera IDs |
+| 0.6× chip | Same camera `4`; `CONTROL_ZOOM_RATIO` eased to 0.621; `activePhysical=2`; no camera reopen |
+| 1.0× chip | Same camera `4`; ratio 1.0; `activePhysical=0`; no camera reopen |
+| Recording | A 7.9 s take switched 1.0×→0.6×→1.0× while recording; video PTS max delta was 34 ms (no gap), audio 7.86 s, video 7.90 s |
+| Fallback round trip | Macro is a separate camera `3`; after opening it, vendor logical ID `4` returned `getCameraCharacteristics: unknown device` until process restart |
+| Hidden macro | Camera `3` is also vendor-hidden. Opening it invalidates the camera list in the same process; returning to camera `0` or `4` fails until restart. The ultrawide camera `2` round trip to `0` works. Hidden lenses therefore need a stability verdict, not just `openable` |
+
+Because the hidden logical ID cannot be reopened after a macro/front session,
+the controller now enables the zoom path only for **exposed** logical cameras.
+The POCO has no exposed eligible logical camera, so build 2156 stays on the
+existing session-switch path there and macro works normally. The hidden result
+is recorded as evidence for the step-3 verdict, which must cover the fallback
+round trip before hidden IDs are enabled.

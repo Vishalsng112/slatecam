@@ -1,6 +1,7 @@
 # ADR 0029 — Logical-camera zoom handoff
 
-- **Status:** Accepted for step 1 (discovery); controller and verdict pending
+- **Status:** Accepted for step 1 (discovery) and step 2 (exposed controller);
+  verdict and hidden-camera handling pending
 - **Date:** 2026-11-25
 - **Phase:** 5.5 (shoot profiles / Movie-Vlog)
 - **Depends on:** ADR 0005 (colour pipeline), ADR 0023 (smooth zoom),
@@ -41,15 +42,26 @@ logical session cannot reach.
    `LogicalZoom` is a pure Kotlin evaluator with JVM tests; `CameraSource` only
    feeds it characteristics. No UI, Pigeon, or controller code is added in
    step 1.
-2. **Controller path (next step).** When the active camera has an eligible
-   `logical_zoom` and the requested stop is inside its range, select that
-   camera ID and drive `CONTROL_ZOOM_RATIO`; do not reopen the session. Lens
-   chips, pinch and the zoom rail all resolve to the same ratio targets through
-   `SmoothZoom`. `SwitchFramePump` remains for the front/back switch, macro and
-   any `uncovered_ratios`.
+2. **Controller path (implemented for exposed logical cameras).** A logical
+   stop selects the logical camera ID when it is not active, then drives
+   `CONTROL_ZOOM_RATIO`; it never reopens the session for a stop inside the
+   range. Lens chips call `selectLensStop`, and pinch/slider use the same ratio
+   targets through `SmoothZoom`. The first open prefers the logical camera when
+   it covers the current lens, so a take starts on the handoff session.
+   `SwitchFramePump` remains for the front/back switch, macro and any
+   `uncovered_ratios`.
+   **Hidden logical cameras are excluded from this path.** They may open once
+   but are removed from the vendor camera list after another session starts:
+   on the POCO, opening macro removes logical camera `4` until process restart,
+   so returning to it cannot be made seamless. Hidden macro `3` also invalidates
+   the exposed camera list for the process. Exposed logical cameras are safe to
+   switch away from and back; hidden candidates stay discovery-only until a
+   verdict that includes the fallback round trip exists.
 3. **Active lens is read, not assumed.** Surface
    `LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID` from capture results in state so
-   the lens badge reflects what the HAL actually chose during the handoff.
+   the lens badge reflects what the HAL actually chose during the handoff. The
+   logical stop chip is selected by the requested ratio; the physical chip dot
+   shows the sensor the HAL reports.
 4. **The verdict gates the path.** A `logicalZoomHandoff` verification records
    a clip while sweeping across the discovered stops, then checks:
    - camera-to-camera timestamp/PTS continuity (no frame gap),
@@ -71,7 +83,12 @@ logical session cannot reach.
 - POCO X6 Pro: logical camera `4` (physical `0`/`2`) reports an eligible range
   0.6–10 with stops at 0.621 and 1.0; logical camera `5` is rejected because
   its range starts at 1.0. The ultra-wide is reachable through zoom on camera 4
-  and nowhere through camera 5.
+  and nowhere through camera 5. Because camera `4` is vendor-hidden, the final
+  build keeps the POCO on the session-switch path; the exposed-only gate is a
+  deliberate safety decision, not a model check.
+- Exposed logical cameras can switch to macro/front and return. Hidden logical
+  cameras cannot, so enabling them would violate the fallback requirement.
+  Step 3 must test the fallback round trip before relaxing this gate.
 - The zoom path only covers stops the logical range reaches. A 5× tele outside
   a 4× range remains a session switch; the fallback must stay healthy.
 - The 0.6× stop is the HAL's ratio, not a marketing label. UI labels should

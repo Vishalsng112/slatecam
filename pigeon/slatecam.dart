@@ -11,9 +11,13 @@ class LensOption {
     required this.focalLength35mm,
     required this.openable,
     required this.exposed,
+    required this.logical,
+    required this.stopRatio,
+    required this.physicalCameraId,
   });
 
   /// Camera2 ID; may be absent from cameraIdList on vendor-hidden lenses.
+  /// For a logical stop this is the logical multi-camera ID.
   String id;
   /// Short UI label, e.g. `0.6x - 16mm`, `1x - 25mm`, `MACRO`.
   String label;
@@ -28,6 +32,12 @@ class LensOption {
   bool openable;
   /// True when the ID appears in CameraManager.cameraIdList.
   bool exposed;
+  /// True when this option is a zoom stop on a logical multi-camera.
+  bool logical;
+  /// Target CONTROL_ZOOM_RATIO for a logical stop; 0 for a physical lens.
+  double stopRatio;
+  /// Physical sensor behind the option; empty when unknown.
+  String physicalCameraId;
 }
 
 /// One recording mode offered by the selected camera.
@@ -229,6 +239,7 @@ class CameraState {
     required this.isOpen,
     required this.error,
     required this.cameraId,
+    this.activePhysicalCameraId,
     required this.cameraIds,
     required this.cameraLabels,
     required this.iso,
@@ -336,6 +347,8 @@ class CameraState {
   bool isOpen;
   String? error;
   String cameraId;
+  /// LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID of the latest result.
+  String? activePhysicalCameraId;
   List<String> cameraIds;
   List<String> cameraLabels;
   int iso;
@@ -592,6 +605,10 @@ abstract class SlateCamHostApi {
   /// Selects a lens from the probe report. Hidden lenses are allowed when the
   /// probe marked them openable.
   void selectLens(String id);
+
+  /// Selects a logical-camera zoom stop atomically (switch if needed, then
+  /// drive CONTROL_ZOOM_RATIO). Used by the 0.6x/1x/... lens chips.
+  void selectLensStop(String id, double ratio);
 
   /// Applies a zoom ratio to the active camera (optical or digital).
   void setZoom(double ratio);

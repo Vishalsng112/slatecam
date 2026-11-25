@@ -140,6 +140,8 @@ class SlateCamBridge private constructor(
     private var lastCameraId: String? = null
     private var switchPump: SwitchFramePump? = null
     private var switchPumpTarget: String? = null
+    private var pendingZoom: Pair<String, Float>? = null
+    private var failedLogicalId: String? = null
     private var lastAppliedProfile: InputProfile = InputProfile.IDENTITY
     private var appliedQuirkIds: Set<String> = emptySet()
     private var deviceReportRunning = false
@@ -263,9 +265,26 @@ class SlateCamBridge private constructor(
                     previous.eisEnabled != state.eisEnabled ||
                     previous.frameRate != state.frameRate ||
                     previous.previewWidth != state.previewWidth ||
-                    previous.previewHeight != state.previewHeight
+                    previous.previewHeight != state.previewHeight ||
+                    previous.activePhysicalCameraId != state.activePhysicalCameraId
                 )
             lastState = state
+            if (!state.isOpen) {
+                // A failed logical-camera switch must not leave `opened` stale:
+                // the launch screen's Open camera action would otherwise be a no-op.
+                opened = false
+                pendingZoom?.let { (id, _) ->
+                    failedLogicalId = id
+                    pendingZoom = null
+                }
+            } else {
+                pendingZoom?.let { (id, ratio) ->
+                    if (state.cameraId == id) {
+                        pendingZoom = null
+                        controller.setZoomRatio(ratio)
+                    }
+                }
+            }
             if (cameraChanged) {
                 lastCameraId = state.cameraId
                 refreshDeviceSnapshot(state.cameraId)
@@ -364,6 +383,7 @@ class SlateCamBridge private constructor(
                     width,
                     height,
                     tenBit = mode.tenBit,
+                    cameraIdOverride = openingCameraId(),
                 )
             } catch (error: Throwable) {
                 // A failed attempt (denied permission, busy camera, bad mode)
@@ -501,9 +521,35 @@ class SlateCamBridge private constructor(
      * rather than in device code.
      */
     override fun selectLens(id: String) {
-        val option = lensOptions().firstOrNull { it.id == id }
+        val option = lensOptions().firstOrNull { it.id == id && !it.logical }
         if (option != null && (!option.exposed && !option.openable)) return
         requestLensSwitch(id, allowUnlisted = option != null && !option.exposed)
+    }
+
+    /**
+     * A logical-camera stop switches the session only when the logical camera
+     * is not active, then drives CONTROL_ZOOM_RATIO. Once the logical camera is
+     * active the HAL hands off between physical lenses with no session work.
+     */
+    override fun selectLensStop(id: String, ratio: Double) {
+        val option = lensOptions().firstOrNull {
+            it.logical && it.id == id && kotlin.math.abs(it.stopRatio - ratio) < 0.01
+        } ?: return
+        if (lastState?.cameraId == id) {
+            android.util.Log.i(
+                "SlateCam",
+                "lens stop camera=$id ratio=${option.stopRatio} active=${lastState?.cameraId}",
+            )
+            controller.setZoomRatio(option.stopRatio.toFloat())
+            return
+        }
+        android.util.Log.i(
+            "SlateCam",
+            "lens stop switch camera=$id ratio=${option.stopRatio}",
+        )
+        if (requestLensSwitch(id, allowUnlisted = true)) {
+            pendingZoom = id to option.stopRatio.toFloat()
+        }
     }
 
     /**
@@ -512,13 +558,13 @@ class SlateCamBridge private constructor(
      * recorder; in single mode a switch while recording is rejected instead of
      * silently ending the clip.
      */
-    private fun requestLensSwitch(id: String, allowUnlisted: Boolean) {
-        if (id == lastState?.cameraId) return
+    private fun requestLensSwitch(id: String, allowUnlisted: Boolean): Boolean {
+        if (id == lastState?.cameraId) return false
         val caps = CameraCapabilitiesReader.read(context, id)
         if (caps == null) {
             recordingError = "cannot read capabilities for camera $id"
             pushState()
-            return
+            return false
         }
 
         val current = activeMode()
@@ -529,23 +575,23 @@ class SlateCamBridge private constructor(
             if (shootMode != SHOOT_MOVIE) {
                 recordingError = "stop recording or enable Movie mode to switch lenses"
                 pushState()
-                return
+                return false
             }
             if (id !in shootCameraIds()) {
                 recordingError = "lens $id is not part of the movie lens set"
                 pushState()
-                return
+                return false
             }
             if (compatible == null) {
                 recordingError = "lens $id cannot match ${current.label}"
                 pushState()
-                return
+                return false
             }
             recordingError = null
             beginSwitchPump(id)
             controller.setCameraId(id, allowUnlisted = true)
             pushState()
-            return
+            return true
         }
 
         // Not recording: switch the mode with the lens when the current one is
@@ -569,7 +615,7 @@ class SlateCamBridge private constructor(
             if (fallback == null) {
                 recordingError = "camera $id has no usable recording mode"
                 pushState()
-                return
+                return false
             }
             selectedModeId = fallback.id
             if (opened) {
@@ -584,11 +630,12 @@ class SlateCamBridge private constructor(
             )
             recordingError = null
             pushState()
-            return
+            return true
         }
         recordingError = null
         controller.setCameraId(id, allowUnlisted)
         pushState()
+        return true
     }
 
     override fun setZoom(ratio: Double) {
@@ -1543,19 +1590,101 @@ class SlateCamBridge private constructor(
     }
 
     /**
-     * Back lenses offered by the zoom control. This reads the probe report, so
-     * the list is capability evidence rather than a brand/model table. Logical
-     * variants that resolve to the same role and 35 mm equivalent collapse into
-     * one entry, preferring the exposed camera first.
+     * One selectable logical camera. The primary is the eligible back logical
+     * camera with the widest range; a physical camera duplicate is never
+     * preferred over its logical parent.
+     */
+    private fun primaryLogicalCamera(): CameraInfo? {
+        val cameras = deviceSnapshot.probeReport?.cameras ?: return null
+        return cameras
+            .asSequence()
+            // Hidden logical IDs may open once but disappear after another
+            // session starts; only an exposed logical camera is safe to drive
+            // the no-reopen path. A hidden candidate needs the verdict first.
+            .filter { it.facing == "back" && it.exposed }
+            .filter { it.id != failedLogicalId }
+            .filter { it.logicalZoom?.handoffEligible == true }
+            .maxWithOrNull(
+                compareBy<CameraInfo> { if (it.role == "default") 1 else 0 }
+                    .thenBy {
+                        (it.logicalZoom?.ratioRange?.max ?: 0f) -
+                            (it.logicalZoom?.ratioRange?.min ?: 0f)
+                    }
+                    .thenBy { it.id },
+            )
+    }
+
+    /**
+     * On first open prefer the logical camera so the lens chips and recording
+     * start on the session that can hand off without reopening. A physical
+     * lens already covered by that session migrates to it; macro and other
+     * uncovered lenses keep their own session.
+     */
+    private fun openingCameraId(): String? {
+        val logical = primaryLogicalCamera()
+        val current = lastCameraId
+        if (logical == null) {
+            return if (current != null && current == failedLogicalId) {
+                fallbackBackCameraId()
+            } else {
+                null
+            }
+        }
+        if (current == null) return logical.id
+        if (current == logical.id) return null
+        val covered = logical.logicalZoom?.stops.orEmpty().any {
+            it.physicalId == current
+        }
+        return if (covered) logical.id else null
+    }
+
+    /**
+     * Back lenses offered by the zoom control. A logical multi-camera becomes
+     * one option per reachable zoom stop; physical lenses it covers are not
+     * duplicated. Macro and uncovered lenses stay as session-switch fallbacks.
      */
     private fun lensOptions(): List<LensOption> {
         val cameras = deviceSnapshot.probeReport?.cameras ?: return emptyList()
+        val logical = primaryLogicalCamera()
+        val covered = mutableSetOf<String>()
+        val options = mutableListOf<LensOption>()
+
+        if (logical != null) {
+            logical.logicalZoom?.stops.orEmpty()
+                .filter { it.role != "macro" }
+                .sortedBy { it.ratio }
+                .forEach { stop ->
+                    if (stop.physicalId.isNotBlank()) covered += stop.physicalId
+                    val physical = logical.physicalCameras.firstOrNull {
+                        it.id == stop.physicalId
+                    }
+                    val focal = physical?.focalLength35mmEquiv
+                        ?: if (stop.role == "default") logical.focalLength35mmEquiv else null
+                    options += LensOption(
+                        id = logical.id,
+                        label = lensStopLabel(stop.ratio, focal),
+                        role = stop.role,
+                        facing = logical.facing,
+                        zoomRatio = stop.ratio,
+                        focalLength35mm = focal ?: 0.0,
+                        openable = logical.openable ?: logical.exposed,
+                        exposed = logical.exposed,
+                        logical = true,
+                        stopRatio = stop.ratio,
+                        physicalCameraId = stop.physicalId,
+                    )
+                }
+        }
+
         val seen = mutableSetOf<String>()
-        return cameras
+        cameras
             .asSequence()
             .filter { it.facing == "back" }
             .filter { it.role in LENS_ROLES }
             .filter { it.exposed || it.openable == true }
+            .filter { it.id !in covered }
+            .filter { it.id != logical?.id }
+            .filter { !it.logicalMultiCamera }
             .sortedWith(
                 compareBy<CameraInfo> { if (it.role == "macro") 1 else 0 }
                     .thenBy { it.intrinsicZoomRatio ?: 1.0 },
@@ -1565,8 +1694,8 @@ class SlateCamBridge private constructor(
                     ((camera.focalLength35mmEquiv ?: 0.0).roundToInt())
                 seen.add(key)
             }
-            .map { camera ->
-                LensOption(
+            .forEach { camera ->
+                options += LensOption(
                     id = camera.id,
                     label = lensLabel(camera),
                     role = camera.role,
@@ -1575,9 +1704,41 @@ class SlateCamBridge private constructor(
                     focalLength35mm = camera.focalLength35mmEquiv ?: 0.0,
                     openable = camera.openable ?: camera.exposed,
                     exposed = camera.exposed,
+                    logical = false,
+                    stopRatio = 0.0,
+                    physicalCameraId = camera.id,
                 )
             }
-            .toList()
+
+        return options.sortedWith(
+            compareBy<LensOption> { if (it.role == "macro") 1 else 0 }
+                .thenBy { it.zoomRatio },
+        )
+    }
+
+    private fun fallbackBackCameraId(): String? {
+        val cameras = deviceSnapshot.probeReport?.cameras ?: return null
+        return cameras
+            .asSequence()
+            .filter { it.facing == "back" && it.exposed }
+            .filter { it.role != "macro" }
+            .sortedWith(
+                compareBy<CameraInfo> { if (it.role == "default") 0 else 1 }
+                    .thenBy { kotlin.math.abs((it.intrinsicZoomRatio ?: 1.0) - 1.0) }
+                    .thenBy { it.id },
+            )
+            .firstOrNull()
+            ?.id
+    }
+
+    private fun lensStopLabel(ratio: Double, focalMm: Double?): String {
+        val ratioText = if (ratio >= 10.0) {
+            "${ratio.roundToInt()}×"
+        } else {
+            String.format(Locale.US, "%.1f×", ratio)
+        }
+        val millimeters = focalMm?.roundToInt() ?: 0
+        return if (millimeters > 0) "$ratioText · ${millimeters}mm" else ratioText
     }
 
     private fun lensLabel(camera: CameraInfo): String {
@@ -2148,6 +2309,7 @@ class SlateCamBridge private constructor(
         isOpen = isOpen,
         error = error,
         cameraId = cameraId,
+        activePhysicalCameraId = activePhysicalCameraId,
         cameraIds = cameraIds,
         cameraLabels = cameraLabels,
         iso = iso.toLong(),

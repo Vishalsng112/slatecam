@@ -9,6 +9,23 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Added — Logical zoom controller (build 2157)
+- Eligible **exposed** logical multi-cameras now drive lens chips through
+  `CONTROL_ZOOM_RATIO` in one session: `selectLensStop` switches to the logical
+  camera only when needed, then hands 0.6×/1× stops to `SmoothZoom`; pinch and
+  slider use the same ratio target. No session recreation and no frame pump
+  inside the logical zoom range.
+- The first open prefers the logical camera when it covers the current lens, so
+  recording starts on the handoff session. Macro and uncovered lenses remain on
+  the existing session-switch + `SwitchFramePump` fallback.
+- `LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID` is read from capture results and
+  surfaces in `CameraState`; the active sensor gets a dot on its lens chip.
+- Hidden logical cameras stay discovery-only. POCO X6 Pro's logical camera `4`
+  is vendor-hidden; it opens once but its ID disappears after opening macro
+  until the process restarts, so enabling it broke macro→main. Only exposed
+  logical cameras use the new path until a verdict covers the fallback round
+  trip.
+
 ### Added — Logical zoom handoff discovery (build 2150)
 - The probe now detects logical multi-cameras whose `CONTROL_ZOOM_RATIO` range
   reaches below 1.0 and records the reachable physical lens stops in
