@@ -9,6 +9,14 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — Cleaner zoom rail (build 2167)
+- Lens name chips no longer sit above the zoom strip. The rail now shows the
+  minimum at the bottom and the maximum at the top, with a tick at every lens
+  switch point.
+- The current zoom is printed inside the draggable thumb in `x.xx×` form.
+- The rail uses a logarithmic ratio scale, so 0.6×→1× and 1×→10× get useful
+  travel instead of crowding the wide end near the bottom.
+
 ### Added — Dual-session lens switching (build 2165)
 - Two exposed cameras can run concurrently during a take. The renderer holds
   two OES textures but selects exactly one active source for preview, analysis

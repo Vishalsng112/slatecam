@@ -88,10 +88,11 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
 5. **Bottom dock** — a flat floating row with no enclosing panel: record
    button, P/S/M selector, ISO/shutter/white-balance readout chips and the
    Control Deck toggle.
-6. **Right zoom rail** — lens chips, a vertical 48 lp zoom strip, zoom in/out
-   markers and the active ratio, pinned to the preview's right edge and centred
-   vertically. Tap or drag anywhere on the strip; the camera ramp keeps the
-   move smooth. It clears the top-right VF pill and the bottom dock.
+6. **Right zoom rail** — a single vertical strip pinned to the preview's right
+   edge: maximum at the top, minimum at the bottom, ticks at lens-switch
+   ratios, and the current ratio inside the draggable thumb. Tap or drag
+   anywhere on the strip; the scale is logarithmic so wide-angle travel is not
+   compressed. It clears the top-right VF pill and the bottom dock.
 7. **Control Console** — a docked, collapsible right panel with no tabs. A fixed
    header holds a circular RECORD/STOP button, circular S/M shoot-mode buttons
    and one circular lens badge per camera (`B0`, `F1`, …), plus a compact mode
@@ -221,7 +222,7 @@ position without opening a menu.
 | WB chip | opens the console | Current |
 | Control Deck toggle | opens/closes the deck | Current |
 | Photo shutter | not in native API | Future |
-| Zoom / lens selector | lens chips + vertical 48 lp zoom strip on the preview's right edge, tap or drag anywhere; continuous ramp | **Current** (`ZoomPlugin`) |
+| Zoom / lens selector | vertical log-scale zoom rail: min/max labels, lens-switch ticks, thumb readout; tap or drag anywhere | **Current** (`ZoomPlugin`) |
 | Headphone monitoring | capture meters ship; no playback monitor path | Future |
 
 ### 5.3 Recording mode card

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../pigeon/slatecam.g.dart';
@@ -5,10 +7,9 @@ import 'ui_tokens.dart';
 
 /// Lens + zoom control driven entirely by the probe report.
 ///
-/// The chip row lists the back lenses the prober verified (including
-/// vendor-hidden lenses it could open). The slider applies a continuous zoom
-/// ratio to the active camera, and the readout is normalised to the default
-/// lens so `0.62x` means the same thing on every phone.
+/// The rail is a single vertical strip: min/max zoom at the ends, lens switch
+/// points marked on the track, and the current zoom printed inside the thumb.
+/// Lens names are no longer repeated above the bar.
 class ZoomPlugin extends StatelessWidget {
   const ZoomPlugin({super.key, required this.state, required this.host});
 
@@ -19,20 +20,20 @@ class ZoomPlugin extends StatelessWidget {
   Widget build(BuildContext context) {
     final lenses = state.lenses.where((lens) => lens.facing == 'back').toList();
     final canZoom = state.zoomMax > state.zoomMin + 0.01;
-    if (lenses.isEmpty && !canZoom) return const SizedBox.shrink();
+    if (!canZoom) return const SizedBox.shrink();
 
-    final active = _activeLens(lenses);
     final logicalActive = lenses.any(
       (lens) => lens.logical && lens.id == state.cameraId,
     );
-    final effective = (logicalActive
-            ? state.zoomRatio
-            : (active?.zoomRatio ?? 1.0) * state.zoomRatio)
-        .clamp(0.1, 999.0)
-        .toDouble();
+    final activePhysical = _activePhysical(lenses);
+    final base = logicalActive ? 1.0 : (activePhysical?.zoomRatio ?? 1.0);
+    final min = state.zoomMin * base;
+    final max = state.zoomMax * base;
+    final value = (state.zoomRatio * base).clamp(min, max).toDouble();
+    final marks = _lensMarks(lenses, min, max);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: UiTokens.surfaceGlass,
         borderRadius: BorderRadius.circular(22),
@@ -41,161 +42,83 @@ class ZoomPlugin extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final lens in lenses) ...[
-            _LensChip(
-              lens: lens,
-              selected: _isSelected(lens),
-              activePhysical: _isActivePhysical(lens),
-              onTap: () => lens.logical
-                  ? host.selectLensStop(lens.id, lens.stopRatio)
-                  : host.selectLens(lens.id),
+          Text(
+            _formatZoom(max),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: UiTokens.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              fontFeatures: [FontFeature.tabularFigures()],
             ),
-            const SizedBox(height: 6),
-          ],
-          if (canZoom) ...[
-            if (lenses.isNotEmpty)
-              Container(width: 28, height: 1, color: UiTokens.border),
-            const SizedBox(height: 6),
-            const Icon(Icons.zoom_in, size: 16, color: UiTokens.muted),
-            const SizedBox(height: 4),
-            RotatedBox(
-              quarterTurns: 3,
-              child: SizedBox(
-                width: 210,
-                height: 48,
-                child: _ZoomTrack(
-                  min: state.zoomMin,
-                  max: state.zoomMax,
-                  value: state.zoomRatio
-                      .clamp(state.zoomMin, state.zoomMax)
-                      .toDouble(),
-                  valueLabel: '${_formatZoom(effective)}×',
-                  onChanged: host.setZoom,
-                ),
+          ),
+          const SizedBox(height: 5),
+          RotatedBox(
+            quarterTurns: 3,
+            child: SizedBox(
+              width: 210,
+              height: 48,
+              child: _ZoomTrack(
+                min: min,
+                max: max,
+                value: value,
+                valueLabel: _formatZoom(value),
+                marks: marks,
+                onChanged: (effective) {
+                  final ratio = (effective / base).clamp(
+                    state.zoomMin,
+                    state.zoomMax,
+                  );
+                  host.setZoom(ratio.toDouble());
+                },
               ),
             ),
-            const SizedBox(height: 4),
-            const Icon(Icons.zoom_out, size: 16, color: UiTokens.muted),
-            const SizedBox(height: 6),
-            Text(
-              '${_formatZoom(effective)}×',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: UiTokens.accent,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            _formatZoom(min),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: UiTokens.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              fontFeatures: [FontFeature.tabularFigures()],
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  bool _isSelected(LensOption lens) {
-    if (lens.logical) {
-      return lens.id == state.cameraId &&
-          (state.zoomRatio - lens.stopRatio).abs() < 0.06;
-    }
-    return lens.id == state.cameraId;
-  }
-
-  bool _isActivePhysical(LensOption lens) {
-    final physical = state.activePhysicalCameraId;
-    return physical != null &&
-        lens.physicalCameraId.isNotEmpty &&
-        lens.physicalCameraId == physical;
-  }
-
-  LensOption? _activeLens(List<LensOption> lenses) {
+  LensOption? _activePhysical(List<LensOption> lenses) {
     for (final lens in lenses) {
       if (!lens.logical && lens.id == state.cameraId) return lens;
     }
     return null;
   }
 
-  String _formatZoom(double value) {
-    if (value < 1.0) return value.toStringAsFixed(2);
-    if (value < 10.0) return value.toStringAsFixed(1);
-    return value.round().toString();
+  /// Absolute ratios of every lens stop inside the current zoom range.
+  List<double> _lensMarks(
+    List<LensOption> lenses,
+    double min,
+    double max,
+  ) {
+    final seen = <int>{};
+    final marks = <double>[];
+    for (final lens in lenses) {
+      final ratio = lens.logical ? lens.stopRatio : lens.zoomRatio;
+      if (ratio < min - 0.01 || ratio > max + 0.01) continue;
+      final key = (ratio * 100).round();
+      if (seen.add(key)) marks.add(ratio.clamp(min, max).toDouble());
+    }
+    marks.sort();
+    return marks;
   }
-}
 
-class _LensChip extends StatelessWidget {
-  const _LensChip({
-    required this.lens,
-    required this.selected,
-    required this.activePhysical,
-    required this.onTap,
-  });
-
-  final LensOption lens;
-  final bool selected;
-  final bool activePhysical;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final hint = lens.exposed
-        ? lens.role
-        : '${lens.role} — probe-verified hidden lens';
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: 'Lens ${lens.label}, $hint'
-          '${activePhysical ? ', active sensor' : ''}',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 36),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: selected ? UiTokens.accent : UiTokens.surfaceRaised,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: selected ? UiTokens.accent : UiTokens.border,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!lens.exposed) ...[
-                  Icon(
-                    Icons.visibility_off_outlined,
-                    size: 11,
-                    color: selected ? Colors.black : UiTokens.muted,
-                  ),
-                  const SizedBox(width: 4),
-                ],
-                if (activePhysical) ...[
-                  Container(
-                    width: 5,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: selected ? Colors.black : UiTokens.success,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-                Text(
-                  lens.label,
-                  style: TextStyle(
-                    color: selected ? Colors.black : UiTokens.muted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  String _formatZoom(double value) {
+    if (value < 1.0) return '${value.toStringAsFixed(2)}×';
+    if (value < 10.0) return '${value.toStringAsFixed(1)}×';
+    return '${value.round()}×';
   }
 }
 
@@ -211,6 +134,7 @@ class _ZoomTrack extends StatefulWidget {
     required this.max,
     required this.value,
     required this.valueLabel,
+    required this.marks,
     required this.onChanged,
   });
 
@@ -218,6 +142,7 @@ class _ZoomTrack extends StatefulWidget {
   final double max;
   final double value;
   final String valueLabel;
+  final List<double> marks;
   final ValueChanged<double> onChanged;
 
   @override
@@ -239,17 +164,32 @@ class _ZoomTrackState extends State<_ZoomTrack> {
     }
   }
 
+  double _fraction(double value) {
+    if (widget.max <= widget.min || widget.min <= 0) return 0;
+    return (math.log(value / widget.min) /
+            math.log(widget.max / widget.min))
+        .clamp(0.0, 1.0)
+        .toDouble();
+  }
+
+  double _valueAt(double fraction) {
+    if (widget.max <= widget.min || widget.min <= 0) return widget.min;
+    return widget.min *
+        math.pow(widget.max / widget.min, fraction.clamp(0.0, 1.0));
+  }
+
   void _seek(Offset local, double width) {
     if (width <= 0 || widget.max <= widget.min) return;
     final fraction = (local.dx / width).clamp(0.0, 1.0);
-    final value = widget.min + fraction * (widget.max - widget.min);
+    final value = _valueAt(fraction);
     setState(() => _dragValue = value);
     widget.onChanged(value);
   }
 
   void _step(double direction) {
-    final step = (widget.max - widget.min) / 20;
-    final value = (widget.value + direction * step)
+    // A constant ratio per step feels even across a 0.6-10x rail.
+    final factor = math.pow(widget.max / widget.min, 1 / 20).toDouble();
+    final value = (widget.value * (direction > 0 ? factor : 1 / factor))
         .clamp(widget.min, widget.max);
     setState(() => _dragValue = value);
     widget.onChanged(value);
@@ -260,13 +200,8 @@ class _ZoomTrackState extends State<_ZoomTrack> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final fraction = widget.max > widget.min
-            ? ((_shown - widget.min) / (widget.max - widget.min)).clamp(
-                0.0,
-                1.0,
-              )
-            : 0.0;
-        const thumbSize = 22.0;
+        final fraction = _fraction(_shown);
+        const thumbSize = 34.0;
         final trackWidth = (width - thumbSize).clamp(0.0, double.infinity);
         return Semantics(
           label: 'Zoom',
@@ -308,18 +243,48 @@ class _ZoomTrackState extends State<_ZoomTrack> {
                       ),
                     ),
                   ),
+                  for (final mark in widget.marks)
+                    Positioned(
+                        left: thumbSize / 2 + _fraction(mark) * trackWidth - 1,
+                        top: 14,
+                        width: 2,
+                        height: 20,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: UiTokens.text.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ),
                   Positioned(
                     left: fraction * trackWidth,
                     top: (48 - thumbSize) / 2,
                     width: thumbSize,
                     height: thumbSize,
                     child: Container(
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: UiTokens.accent,
                         border: Border.all(
                           color: UiTokens.background,
                           width: 2,
+                        ),
+                      ),
+                      child: RotatedBox(
+                        quarterTurns: 1,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            widget.valueLabel,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
                         ),
                       ),
                     ),
