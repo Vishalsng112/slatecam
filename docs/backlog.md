@@ -68,8 +68,8 @@ AF handling). Remaining:
 | `logicalZoomHandoff` verdict | Implemented: stream sweep checks gaps, exposure/WB jumps and active physical IDs; runs last in the probe |
 | Hidden logical fallback | POCO hidden logical `4` survives front→back once hidden macro is excluded; other hidden round trips still need verdict coverage |
 | Hidden lens stability | Opening hidden macro `3` on the POCO invalidates the camera list for the process; hidden macro is excluded from the UI until a reopen/identity verdict exists |
-| Dual-session switch | ADR/design only after the logical-zoom path is verified; no concurrent-session code yet |
-| Dual-session seamless switch | The frame pump hides the session gap; a true no-freeze switch needs concurrent sessions and a probe verdict |
+| Dual-session implementation | ADR 0030 accepted; no code until a `dualSessionSwitch` verdict passes on a real pair/mode |
+| `dualSessionSwitch` verdict | Open both cameras at the recording mode, switch A→B→A while recording, and reject on timestamp gaps, 3A jumps or a lost session |
 
 ## Audio
 

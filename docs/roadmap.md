@@ -84,6 +84,8 @@ Phase 5.5 ──────► Phase 8 quality (cross-device stress)
   needs captured 24-patch data for each lens.
 - Logical zoom handoff: discovery, controller and `logicalZoomHandoff` verdict
   ship; hidden macro stability remains a backlog item.
+- Dual-session switch: design complete (ADR 0030); implementation is gated on a
+  per-pair `dualSessionSwitch` recording verdict.
 
 ## Next phase
 

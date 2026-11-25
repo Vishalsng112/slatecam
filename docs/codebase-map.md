@@ -220,6 +220,8 @@ when testing camera access. Probe launch:
 - Logical zoom handoff is implemented and gated by the recorded
   `logicalZoomHandoff` probe verdict; hidden macro lenses remain excluded
   (ADR 0029).
+- Dual-session lens switching is design-only (ADR 0030); the current fallback
+  remains session recreation + `SwitchFramePump`.
 - Audio capture uses PCM16 48 kHz stereo; input selection and gain are data.
   Headphone monitoring, 24-bit capture and a limiter are not implemented.
 - Manual white balance anchors on the nearest HAL AWB preset and applies the

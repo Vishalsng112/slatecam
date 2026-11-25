@@ -9,6 +9,16 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Designed — Dual-session lens switching (ADR 0030)
+- Two concurrently open Camera2 sessions, each with its own OES texture; the
+  renderer selects one active texture, so preview, analysis and the single
+  encoder timeline still use one pixel path.
+- Standby session is prewarmed with copied 3A/zoom/lens controls and switched
+  at an encoder frame boundary; the recorder is never torn down.
+- Gated per camera pair and recording mode by a future `dualSessionSwitch`
+  verdict. Design only — no concurrent-session code is added until a real
+  device passes that check. Logical zoom (ADR 0029) remains preferred.
+
 ### Added — Logical zoom controller and verdict (build 2160)
 - Eligible **exposed** logical multi-cameras now drive lens chips through
   `CONTROL_ZOOM_RATIO` in one session: `selectLensStop` switches to the logical
