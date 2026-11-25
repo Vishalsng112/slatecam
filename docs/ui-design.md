@@ -90,9 +90,11 @@ Landscape only. The app keeps the `sensorLandscape` manifest behaviour.
    Control Deck toggle.
 6. **Right zoom rail** — a single vertical strip pinned to the preview's right
    edge: maximum at the top, minimum at the bottom, ticks at lens-switch
-   ratios, and the current ratio inside the draggable thumb. Tap or drag
-   anywhere on the strip; the scale is logarithmic so wide-angle travel is not
-   compressed. It clears the top-right VF pill and the bottom dock.
+   ratios, and the current ratio inside the draggable thumb. There is no
+   background panel; labels use a shadow and the strip floats over the video.
+   Tap or drag anywhere on the strip; the scale is logarithmic so wide-angle
+   travel is not compressed. It clears the top-right VF pill and the bottom
+   dock.
 7. **Control Console** — a docked, collapsible right panel with no tabs. A fixed
    header holds a circular RECORD/STOP button, circular S/M shoot-mode buttons
    and one circular lens badge per camera (`B0`, `F1`, …), plus a compact mode

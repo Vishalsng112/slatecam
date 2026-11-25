@@ -36,8 +36,9 @@ class _CaptureScreenState extends State<CaptureScreen>
   bool _showWaveform = false;
   final ValueNotifier<CameraTelemetry?> _telemetry =
       ValueNotifier<CameraTelemetry?>(null);
-  final ValueNotifier<AudioTelemetry?> _audio =
-      ValueNotifier<AudioTelemetry?>(null);
+  final ValueNotifier<AudioTelemetry?> _audio = ValueNotifier<AudioTelemetry?>(
+    null,
+  );
 
   String? _lastClipPath;
   String? _lastError;
@@ -50,9 +51,7 @@ class _CaptureScreenState extends State<CaptureScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    SlateCamFlutterApi.setUp(
-      _StateListener(_onState, _onTelemetry, _onAudio),
-    );
+    SlateCamFlutterApi.setUp(_StateListener(_onState, _onTelemetry, _onAudio));
     _autoOpenTimer = Timer(const Duration(milliseconds: 600), _autoOpen);
   }
 
@@ -97,9 +96,7 @@ class _CaptureScreenState extends State<CaptureScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // The permission prompt pauses and resumes the activity; re-checking here
     // is what makes the first-run flow recover after the user taps Allow.
-    if (state == AppLifecycleState.resumed &&
-        _textureId == null &&
-        !_busy) {
+    if (state == AppLifecycleState.resumed && _textureId == null && !_busy) {
       _autoOpen(prompt: false);
     }
     if (state == AppLifecycleState.resumed && _textureId != null) {
@@ -357,9 +354,8 @@ class _CaptureScreenState extends State<CaptureScreen>
                   FilledButton.icon(
                     onPressed: _busy
                         ? null
-                        : () => _permissionMissing
-                            ? _autoOpen()
-                            : _openCamera(),
+                        : () =>
+                              _permissionMissing ? _autoOpen() : _openCamera(),
                     icon: _busy
                         ? const SizedBox(
                             width: 16,
@@ -375,8 +371,8 @@ class _CaptureScreenState extends State<CaptureScreen>
                       _busy
                           ? 'Opening…'
                           : _permissionMissing
-                              ? 'Grant camera access'
-                              : 'Open camera',
+                          ? 'Grant camera access'
+                          : 'Open camera',
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -479,9 +475,9 @@ class _CaptureScreenState extends State<CaptureScreen>
   Widget _zoomControl(CameraState state) {
     return Positioned(
       top: 64,
-      right: 8,
+      right: 4,
       bottom: 76,
-      width: 100,
+      width: 76,
       child: Center(
         child: FittedBox(
           fit: BoxFit.scaleDown,
@@ -553,11 +549,7 @@ class _CaptureScreenState extends State<CaptureScreen>
                   color: UiTokens.muted,
                 ),
               ),
-              const Icon(
-                Icons.expand_more,
-                size: 13,
-                color: UiTokens.muted,
-              ),
+              const Icon(Icons.expand_more, size: 13, color: UiTokens.muted),
             ],
           ),
         ),
@@ -640,9 +632,7 @@ class _CaptureScreenState extends State<CaptureScreen>
                     child: texture,
                   ),
                   if (_showGuides)
-                    IgnorePointer(
-                      child: CustomPaint(painter: GuidesPainter()),
-                    ),
+                    IgnorePointer(child: CustomPaint(painter: GuidesPainter())),
                   if (_focusReticle != null)
                     Positioned(
                       left: _focusReticle!.dx - 16,

@@ -32,24 +32,25 @@ class ZoomPlugin extends StatelessWidget {
     final value = (state.zoomRatio * base).clamp(min, max).toDouble();
     final marks = _lensMarks(lenses, min, max);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: UiTokens.surfaceGlass,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: UiTokens.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             _formatZoom(max),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: UiTokens.muted,
+            style: TextStyle(
+              color: UiTokens.text,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               fontFeatures: [FontFeature.tabularFigures()],
+              shadows: [
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.9),
+                  blurRadius: 4,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 5),
@@ -78,11 +79,17 @@ class ZoomPlugin extends StatelessWidget {
           Text(
             _formatZoom(min),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: UiTokens.muted,
+            style: TextStyle(
+              color: UiTokens.text,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               fontFeatures: [FontFeature.tabularFigures()],
+              shadows: [
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.9),
+                  blurRadius: 4,
+                ),
+              ],
             ),
           ),
         ],
@@ -98,11 +105,7 @@ class ZoomPlugin extends StatelessWidget {
   }
 
   /// Absolute ratios of every lens stop inside the current zoom range.
-  List<double> _lensMarks(
-    List<LensOption> lenses,
-    double min,
-    double max,
-  ) {
+  List<double> _lensMarks(List<LensOption> lenses, double min, double max) {
     final seen = <int>{};
     final marks = <double>[];
     for (final lens in lenses) {
@@ -166,8 +169,7 @@ class _ZoomTrackState extends State<_ZoomTrack> {
 
   double _fraction(double value) {
     if (widget.max <= widget.min || widget.min <= 0) return 0;
-    return (math.log(value / widget.min) /
-            math.log(widget.max / widget.min))
+    return (math.log(value / widget.min) / math.log(widget.max / widget.min))
         .clamp(0.0, 1.0)
         .toDouble();
   }
@@ -189,8 +191,10 @@ class _ZoomTrackState extends State<_ZoomTrack> {
   void _step(double direction) {
     // A constant ratio per step feels even across a 0.6-10x rail.
     final factor = math.pow(widget.max / widget.min, 1 / 20).toDouble();
-    final value = (widget.value * (direction > 0 ? factor : 1 / factor))
-        .clamp(widget.min, widget.max);
+    final value = (widget.value * (direction > 0 ? factor : 1 / factor)).clamp(
+      widget.min,
+      widget.max,
+    );
     setState(() => _dragValue = value);
     widget.onChanged(value);
   }
@@ -226,7 +230,7 @@ class _ZoomTrackState extends State<_ZoomTrack> {
                     height: 6,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: UiTokens.border,
+                        color: Colors.black.withValues(alpha: 0.55),
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -245,17 +249,17 @@ class _ZoomTrackState extends State<_ZoomTrack> {
                   ),
                   for (final mark in widget.marks)
                     Positioned(
-                        left: thumbSize / 2 + _fraction(mark) * trackWidth - 1,
-                        top: 14,
-                        width: 2,
-                        height: 20,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: UiTokens.text.withValues(alpha: 0.55),
-                            borderRadius: BorderRadius.circular(1),
-                          ),
+                      left: thumbSize / 2 + _fraction(mark) * trackWidth - 1,
+                      top: 14,
+                      width: 2,
+                      height: 20,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: UiTokens.text.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(1),
                         ),
                       ),
+                    ),
                   Positioned(
                     left: fraction * trackWidth,
                     top: (48 - thumbSize) / 2,
@@ -270,6 +274,12 @@ class _ZoomTrackState extends State<_ZoomTrack> {
                           color: UiTokens.background,
                           width: 2,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            blurRadius: 6,
+                          ),
+                        ],
                       ),
                       child: RotatedBox(
                         quarterTurns: 1,
