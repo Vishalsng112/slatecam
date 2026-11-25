@@ -67,7 +67,7 @@ AF handling). Remaining:
 | Logical zoom handoff controller | Implemented for exposed logical cameras; hidden logical IDs wait for a verdict that includes the fallback round trip |
 | `logicalZoomHandoff` verdict | Record while sweeping across handoff stops and across a fallback lens and back; reject on timestamp gaps, exposure/WB jumps or a lost camera ID |
 | Hidden logical reopen | Vendor-hidden logical IDs disappear after another session starts and need a process restart; investigate a safe reopen or keep them discovery-only |
-| Hidden lens stability | Opening hidden macro `3` on the POCO invalidates the camera list for the process; hidden lenses need a reopen/identity verdict beyond `openable` |
+| Hidden lens stability | Opening hidden macro `3` on the POCO invalidates the camera list for the process; hidden macro is excluded from the UI until a reopen/identity verdict exists |
 | Dual-session switch | ADR/design only after the logical-zoom path is verified; no concurrent-session code yet |
 | Dual-session seamless switch | The frame pump hides the session gap; a true no-freeze switch needs concurrent sessions and a probe verdict |
 

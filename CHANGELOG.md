@@ -9,7 +9,7 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
-### Added — Logical zoom controller (build 2157)
+### Added — Logical zoom controller (build 2158)
 - Eligible **exposed** logical multi-cameras now drive lens chips through
   `CONTROL_ZOOM_RATIO` in one session: `selectLensStop` switches to the logical
   camera only when needed, then hands 0.6×/1× stops to `SmoothZoom`; pinch and
@@ -25,6 +25,9 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   until the process restarts, so enabling it broke macro→main. Only exposed
   logical cameras use the new path until a verdict covers the fallback round
   trip.
+- Hidden macro lenses are excluded from the session-switch UI: opening POCO
+  camera `3` invalidates the vendor camera list until process restart. Hidden
+  ultrawide/tele remain eligible; macro needs a stability verdict.
 
 ### Added — Logical zoom handoff discovery (build 2150)
 - The probe now detects logical multi-cameras whose `CONTROL_ZOOM_RATIO` range

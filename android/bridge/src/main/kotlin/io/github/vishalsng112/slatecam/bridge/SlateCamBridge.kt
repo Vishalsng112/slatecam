@@ -1681,7 +1681,11 @@ class SlateCamBridge private constructor(
             .asSequence()
             .filter { it.facing == "back" }
             .filter { it.role in LENS_ROLES }
-            .filter { it.exposed || it.openable == true }
+            // A hidden macro is a secondary fixed-focus sensor. Opening it
+            // invalidates the vendor camera list for the process (POCO X6 Pro
+            // camera 3); keep it out of the session-switch UI until a stability
+            // verdict exists. Hidden ultrawide/tele remain eligible.
+            .filter { it.exposed || (it.openable == true && it.role != "macro") }
             .filter { it.id !in covered }
             .filter { it.id != logical?.id }
             .filter { !it.logicalMultiCamera }
