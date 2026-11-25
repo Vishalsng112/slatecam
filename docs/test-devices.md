@@ -1364,3 +1364,24 @@ available during the run.
 Test clips created for the audio evidence were removed from MediaStore and the
 app was left live with the default input at 0.0 dB, microphone permission
 granted, and no colour calibration saved.
+
+## Pad 3 smoke test (build 2145)
+
+OnePlus Pad 3 (`OPD2415`, device `OP6190L1`), Android SDK 37, fresh install
+from the pushed commit.
+
+| Check | Result |
+|---|---|
+| Cold launch | Camera opened, deck and preview rendered; process stayed alive |
+| Console | Deck scrolled to Audio; input chips, source, gain and meter rendered |
+| Calibration | Opened, captured a frame through the bypass, showed the 4-corner grid; Solve correctly rejected a non-chart frame and disabled Save |
+| Clips | Library listed existing clips with thumbnails and free space |
+| Playback | A 0:28 clip opened and played |
+| Recording | 3 s take produced HEVC + AAC; both tracks finalized and the clip played back |
+| Crash check | No `FATAL EXCEPTION`, `ANR in`, or force-finish for the app across the smoke run |
+
+The built-in microphone was very quiet on this unit: the monitor reported
+`SILENT INPUT` in the room and the 3 s test clip measured around −80 dBFS RMS.
+The AAC track exists and is not digital silence; no USB or wired mic was
+available to distinguish room/mic gain from a routing issue. The test clip was
+removed; the app was left live.
