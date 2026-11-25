@@ -855,195 +855,6 @@ data class AudioTelemetry (
 }
 
 /**
- * One sampled ColorChecker patch, values in encoded BT.709 (0..1).
- *
- * Generated class from Pigeon that represents data sent in messages.
- */
-data class CalibrationPatch (
-  val r: Double,
-  val g: Double,
-  val b: Double
-)
- {
-  companion object {
-    fun fromList(pigeonVar_list: List<Any?>): CalibrationPatch {
-      val r = pigeonVar_list[0] as Double
-      val g = pigeonVar_list[1] as Double
-      val b = pigeonVar_list[2] as Double
-      return CalibrationPatch(r, g, b)
-    }
-  }
-  fun toList(): List<Any?> {
-    return listOf(
-      r,
-      g,
-      b,
-    )
-  }
-  override fun equals(other: Any?): Boolean {
-    if (other == null || other.javaClass != javaClass) {
-      return false
-    }
-    if (this === other) {
-      return true
-    }
-    val other = other as CalibrationPatch
-    return SlateCamPigeonPigeonUtils.deepEquals(this.r, other.r) && SlateCamPigeonPigeonUtils.deepEquals(this.g, other.g) && SlateCamPigeonPigeonUtils.deepEquals(this.b, other.b)
-  }
-
-  override fun hashCode(): Int {
-    var result = javaClass.hashCode()
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.r)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.g)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.b)
-    return result
-  }
-  override fun toString(): String {
-    return "CalibrationPatch(r=$r, g=$g, b=$b)"
-  }
-}
-
-/**
- * One upright frame captured through the calibration bypass.
- *
- * Generated class from Pigeon that represents data sent in messages.
- */
-data class CalibrationFrame (
-  val width: Long,
-  val height: Long,
-  val rgba: ByteArray,
-  val cameraId: String,
-  val lensKey: String? = null
-)
- {
-  companion object {
-    fun fromList(pigeonVar_list: List<Any?>): CalibrationFrame {
-      val width = pigeonVar_list[0] as Long
-      val height = pigeonVar_list[1] as Long
-      val rgba = pigeonVar_list[2] as ByteArray
-      val cameraId = pigeonVar_list[3] as String
-      val lensKey = pigeonVar_list[4] as String?
-      return CalibrationFrame(width, height, rgba, cameraId, lensKey)
-    }
-  }
-  fun toList(): List<Any?> {
-    return listOf(
-      width,
-      height,
-      rgba,
-      cameraId,
-      lensKey,
-    )
-  }
-  override fun equals(other: Any?): Boolean {
-    if (other == null || other.javaClass != javaClass) {
-      return false
-    }
-    if (this === other) {
-      return true
-    }
-    val other = other as CalibrationFrame
-    return SlateCamPigeonPigeonUtils.deepEquals(this.width, other.width) && SlateCamPigeonPigeonUtils.deepEquals(this.height, other.height) && SlateCamPigeonPigeonUtils.deepEquals(this.rgba, other.rgba) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraId, other.cameraId) && SlateCamPigeonPigeonUtils.deepEquals(this.lensKey, other.lensKey)
-  }
-
-  override fun hashCode(): Int {
-    var result = javaClass.hashCode()
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.width)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.height)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.rgba)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.cameraId)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.lensKey)
-    return result
-  }
-  override fun toString(): String {
-    return "CalibrationFrame(width=$width, height=$height, rgba=${rgba.contentToString()}, cameraId=$cameraId, lensKey=$lensKey)"
-  }
-}
-
-/**
- * Fitted per-lens calibration plus measured error.
- *
- * Generated class from Pigeon that represents data sent in messages.
- */
-data class CalibrationSolution (
-  /** Row-major 3x3 CCM into linear Rec.2020. */
-  val matrix: List<Double>,
-  /** False when the fit was rejected (no chart, glare, black frame). */
-  val accepted: Boolean,
-  val exposureTrim: Double,
-  val wbROffset: Double,
-  val wbBOffset: Double,
-  val deltaEBefore: Double,
-  val deltaEAfter: Double,
-  val deltaEMaxAfter: Double,
-  val patchDeltaEAfter: List<Double>,
-  val cameraId: String,
-  val lensKey: String? = null
-)
- {
-  companion object {
-    fun fromList(pigeonVar_list: List<Any?>): CalibrationSolution {
-      val matrix = pigeonVar_list[0] as List<Double>
-      val accepted = pigeonVar_list[1] as Boolean
-      val exposureTrim = pigeonVar_list[2] as Double
-      val wbROffset = pigeonVar_list[3] as Double
-      val wbBOffset = pigeonVar_list[4] as Double
-      val deltaEBefore = pigeonVar_list[5] as Double
-      val deltaEAfter = pigeonVar_list[6] as Double
-      val deltaEMaxAfter = pigeonVar_list[7] as Double
-      val patchDeltaEAfter = pigeonVar_list[8] as List<Double>
-      val cameraId = pigeonVar_list[9] as String
-      val lensKey = pigeonVar_list[10] as String?
-      return CalibrationSolution(matrix, accepted, exposureTrim, wbROffset, wbBOffset, deltaEBefore, deltaEAfter, deltaEMaxAfter, patchDeltaEAfter, cameraId, lensKey)
-    }
-  }
-  fun toList(): List<Any?> {
-    return listOf(
-      matrix,
-      accepted,
-      exposureTrim,
-      wbROffset,
-      wbBOffset,
-      deltaEBefore,
-      deltaEAfter,
-      deltaEMaxAfter,
-      patchDeltaEAfter,
-      cameraId,
-      lensKey,
-    )
-  }
-  override fun equals(other: Any?): Boolean {
-    if (other == null || other.javaClass != javaClass) {
-      return false
-    }
-    if (this === other) {
-      return true
-    }
-    val other = other as CalibrationSolution
-    return SlateCamPigeonPigeonUtils.deepEquals(this.matrix, other.matrix) && SlateCamPigeonPigeonUtils.deepEquals(this.accepted, other.accepted) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureTrim, other.exposureTrim) && SlateCamPigeonPigeonUtils.deepEquals(this.wbROffset, other.wbROffset) && SlateCamPigeonPigeonUtils.deepEquals(this.wbBOffset, other.wbBOffset) && SlateCamPigeonPigeonUtils.deepEquals(this.deltaEBefore, other.deltaEBefore) && SlateCamPigeonPigeonUtils.deepEquals(this.deltaEAfter, other.deltaEAfter) && SlateCamPigeonPigeonUtils.deepEquals(this.deltaEMaxAfter, other.deltaEMaxAfter) && SlateCamPigeonPigeonUtils.deepEquals(this.patchDeltaEAfter, other.patchDeltaEAfter) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraId, other.cameraId) && SlateCamPigeonPigeonUtils.deepEquals(this.lensKey, other.lensKey)
-  }
-
-  override fun hashCode(): Int {
-    var result = javaClass.hashCode()
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.matrix)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.accepted)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.exposureTrim)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.wbROffset)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.wbBOffset)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deltaEBefore)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deltaEAfter)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.deltaEMaxAfter)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.patchDeltaEAfter)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.cameraId)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.lensKey)
-    return result
-  }
-  override fun toString(): String {
-    return "CalibrationSolution(matrix=$matrix, accepted=$accepted, exposureTrim=$exposureTrim, wbROffset=$wbROffset, wbBOffset=$wbBOffset, deltaEBefore=$deltaEBefore, deltaEAfter=$deltaEAfter, deltaEMaxAfter=$deltaEMaxAfter, patchDeltaEAfter=$patchDeltaEAfter, cameraId=$cameraId, lensKey=$lensKey)"
-  }
-}
-
-/**
  * Immutable camera snapshot. Kotlin owns this state; Dart only renders it.
  *
  * Generated class from Pigeon that represents data sent in messages.
@@ -1744,25 +1555,10 @@ private open class SlateCamPigeonPigeonCodec : StandardMessageCodec() {
       }
       139.toByte() -> {
         (readValue(buffer) as? List<Any?>)?.let {
-          CalibrationPatch.fromList(it)
-        }
-      }
-      140.toByte() -> {
-        (readValue(buffer) as? List<Any?>)?.let {
-          CalibrationFrame.fromList(it)
-        }
-      }
-      141.toByte() -> {
-        (readValue(buffer) as? List<Any?>)?.let {
-          CalibrationSolution.fromList(it)
-        }
-      }
-      142.toByte() -> {
-        (readValue(buffer) as? List<Any?>)?.let {
           CameraState.fromList(it)
         }
       }
-      143.toByte() -> {
+      140.toByte() -> {
         (readValue(buffer) as? List<Any?>)?.let {
           CameraTelemetry.fromList(it)
         }
@@ -1812,24 +1608,12 @@ private open class SlateCamPigeonPigeonCodec : StandardMessageCodec() {
         stream.write(138)
         writeValue(stream, value.toList())
       }
-      is CalibrationPatch -> {
+      is CameraState -> {
         stream.write(139)
         writeValue(stream, value.toList())
       }
-      is CalibrationFrame -> {
-        stream.write(140)
-        writeValue(stream, value.toList())
-      }
-      is CalibrationSolution -> {
-        stream.write(141)
-        writeValue(stream, value.toList())
-      }
-      is CameraState -> {
-        stream.write(142)
-        writeValue(stream, value.toList())
-      }
       is CameraTelemetry -> {
-        stream.write(143)
+        stream.write(140)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -1951,15 +1735,6 @@ interface SlateCamHostApi {
   fun deleteMediaClip(id: String): Boolean
   /** Opens the system share sheet for a clip. */
   fun shareMediaClip(id: String): Boolean
-  /**
-   * Captures one upright calibration frame. The answer arrives through
-   * [SlateCamFlutterApi.onCalibrationFrame] or `onCalibrationError`.
-   */
-  fun captureCalibrationFrame()
-  /** Fits a per-lens input profile from ColorChecker patch samples. */
-  fun solveCalibration(patches: List<CalibrationPatch>, cameraId: String, lensKey: String?): CalibrationSolution
-  /** Persists the solution into `files/device-database.json` and applies it. */
-  fun saveCalibration(solution: CalibrationSolution)
   /** Live audio inputs, with a synthetic `default` route first. */
   fun listAudioInputs(): List<AudioInputOption>
   /** Persists the input choice and restarts the monitor. Ignored while recording. */
@@ -3047,59 +2822,6 @@ interface SlateCamHostApi {
         }
       }
       run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.captureCalibrationFrame$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { _, reply ->
-            val wrapped: List<Any?> = try {
-              api.captureCalibrationFrame()
-              listOf(null)
-            } catch (exception: Throwable) {
-              SlateCamPigeonPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.solveCalibration$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val patchesArg = args[0] as List<CalibrationPatch>
-            val cameraIdArg = args[1] as String
-            val lensKeyArg = args[2] as String?
-            val wrapped: List<Any?> = try {
-              listOf(api.solveCalibration(patchesArg, cameraIdArg, lensKeyArg))
-            } catch (exception: Throwable) {
-              SlateCamPigeonPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.saveCalibration$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val solutionArg = args[0] as CalibrationSolution
-            val wrapped: List<Any?> = try {
-              api.saveCalibration(solutionArg)
-              listOf(null)
-            } catch (exception: Throwable) {
-              SlateCamPigeonPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.listAudioInputs$separatedMessageChannelSuffix", codec)
         if (api != null) {
           channel.setMessageHandler { _, reply ->
@@ -3204,46 +2926,6 @@ class SlateCamFlutterApi(private val binaryMessenger: BinaryMessenger, private v
       val channelName = "dev.flutter.pigeon.slatecam.SlateCamFlutterApi.onTelemetry$separatedMessageChannelSuffix"
       val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
       channel.send(listOf(telemetryArg)) {
-        if (it is List<*>) {
-          if (it.size > 1) {
-            continuation.resumeWithException(FlutterError(it[0] as String, it[1] as String, it[2] as String?))
-          } else {
-            continuation.resume(Unit)
-          }
-        } else {
-          continuation.resumeWithException(SlateCamPigeonPigeonUtils.createConnectionError(channelName))
-        }
-      }
-    }
-  }
-  /** One calibration frame, captured on the GL thread. */
-  suspend fun onCalibrationFrame(frameArg: CalibrationFrame)
-{
-    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
-    return suspendCancellableCoroutine { continuation ->
-      val channelName = "dev.flutter.pigeon.slatecam.SlateCamFlutterApi.onCalibrationFrame$separatedMessageChannelSuffix"
-      val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
-      channel.send(listOf(frameArg)) {
-        if (it is List<*>) {
-          if (it.size > 1) {
-            continuation.resumeWithException(FlutterError(it[0] as String, it[1] as String, it[2] as String?))
-          } else {
-            continuation.resume(Unit)
-          }
-        } else {
-          continuation.resumeWithException(SlateCamPigeonPigeonUtils.createConnectionError(channelName))
-        }
-      }
-    }
-  }
-  /** Capture failed (camera closed, recording, or no rendered frame). */
-  suspend fun onCalibrationError(messageArg: String)
-{
-    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
-    return suspendCancellableCoroutine { continuation ->
-      val channelName = "dev.flutter.pigeon.slatecam.SlateCamFlutterApi.onCalibrationError$separatedMessageChannelSuffix"
-      val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
-      channel.send(listOf(messageArg)) {
         if (it is List<*>) {
           if (it.size > 1) {
             continuation.resumeWithException(FlutterError(it[0] as String, it[1] as String, it[2] as String?))

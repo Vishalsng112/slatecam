@@ -62,9 +62,6 @@ WB/tone-map path.
 - Per-lens schema, `InputProfile` trims and probe fields are covered by JVM
   tests; the picture-profile look math is covered by `PictureProfileTest`.
 - No UI or device behaviour changes unless a calibration entry is added.
-- `ColorCalibration` samples are linear Rec.2020, matching where the shader
-  applies `uInputMatrix`; the neutral patches now derive the WB offsets. The
-  in-app capture/solve flow is ADR 0027.
 - The live `ColorScienceTuning` trim was removed in ADR 0020; the Custom
   picture profile is now the single creative tone/colour path and is not a
   substitute for per-lens calibration.

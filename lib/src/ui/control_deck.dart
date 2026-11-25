@@ -63,7 +63,6 @@ class ControlDeck extends StatefulWidget {
     required this.onClose,
     required this.onCloseCamera,
     required this.onOpenClips,
-    required this.onOpenCalibration,
     required this.showGuides,
     required this.onGuidesChanged,
     required this.showHistogram,
@@ -79,7 +78,6 @@ class ControlDeck extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback onCloseCamera;
   final VoidCallback onOpenClips;
-  final VoidCallback onOpenCalibration;
   final bool showGuides;
   final ValueChanged<bool> onGuidesChanged;
   final bool showHistogram;
@@ -1786,20 +1784,6 @@ class _ControlDeckState extends State<ControlDeck> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           Text(calibration, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: widget.state.isRecording
-                  ? null
-                  : widget.onOpenCalibration,
-              icon: const Icon(Icons.tune, size: 15),
-              label: const Text(
-                'Calibrate colour…',
-                style: TextStyle(fontSize: 11),
-              ),
-            ),
-          ),
         ],
       ),
     );

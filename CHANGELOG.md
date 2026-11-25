@@ -9,6 +9,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Removed — In-app colour calibration (build 2147)
+- Removed the guided ColorChecker screen, calibration bypass capture, solver
+  API and save path. The per-lens `InputProfile`/`CalibrationEntry` loader
+  stays identity; no calibration matrix is applied by the removed flow.
+
 ### Changed — Console card balance (build 2146)
 - In the two-column console, Processing now sits in the right column beside
   Focus & Stabilisation instead of stacking below it, removing the empty
@@ -36,30 +41,6 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 - Meter data is pushed on a separate `onAudio` channel at ~10 Hz, so it never
   rebuilds the viewfinder or the full console.
 - See ADR 0028.
-
-### Added — In-app colour calibration (build 2130)
-- New **Calibrate colour…** action in the console (Picture profile → Input
-  calibration) opens a guided ColorChecker screen over the live preview.
-- The renderer gains a calibration bypass: input EOTF and gamut conversion
-  only, before the input profile, look, LUT and overlays. The capture is one
-  upright RGBA frame from the normal camera → GL path.
-- The frozen frame is shown with a draggable 6×4 perspective grid; the screen
-  averages the patches and Kotlin fits a per-lens 3×3 matrix, WB offsets and an
-  exposure trim in linear Rec.2020.
-- Results report mean/max ΔE2000 before and after. Rejected fits (no chart,
-  glare, black frame) show why and cannot be saved.
-- Saving writes the calibration to `files/device-database.json` under the
-  probe-stable lens key, bumps its version and applies it without restarting
-  the camera. Recording must be stopped before calibrating.
-- `ColorChecker` adds the published 24-patch references, BT.709/sRGB decode,
-  linear Rec.2020 conversion and CIEDE2000 (verified against Sharma pairs).
-- See ADR 0027.
-
-### Changed — Calibration solver domain
-- `ColorCalibration` now takes linear Rec.2020 samples (the domain the shader
-  applies the matrix in) and derives `wb_r_offset` / `wb_b_offset` from the
-  neutral patches. It returns the fit plus ΔE and an `accepted` flag instead of
-  a bare `InputProfile`.
 
 ### Added — Playback and media library (build 2127)
 - The console header has a **Clips** action that opens a full-screen media

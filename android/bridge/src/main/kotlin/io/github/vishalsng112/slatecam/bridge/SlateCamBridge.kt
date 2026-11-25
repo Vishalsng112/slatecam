@@ -23,9 +23,6 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.view.TextureRegistry
 import io.github.vishalsng112.slatecam.bridge.pigeon.CameraState
 import io.github.vishalsng112.slatecam.bridge.pigeon.CameraTelemetry
-import io.github.vishalsng112.slatecam.bridge.pigeon.CalibrationFrame
-import io.github.vishalsng112.slatecam.bridge.pigeon.CalibrationPatch
-import io.github.vishalsng112.slatecam.bridge.pigeon.CalibrationSolution
 import io.github.vishalsng112.slatecam.bridge.pigeon.AudioInputOption
 import io.github.vishalsng112.slatecam.bridge.pigeon.AudioTelemetry
 import io.github.vishalsng112.slatecam.bridge.pigeon.LensOption
@@ -53,15 +50,12 @@ import io.github.vishalsng112.slatecam.core.codec.AudioSpec
 import io.github.vishalsng112.slatecam.core.codec.ClipRecorder
 import io.github.vishalsng112.slatecam.core.codec.GyroRecorder
 import io.github.vishalsng112.slatecam.core.device.CapabilityGates
-import io.github.vishalsng112.slatecam.core.device.CalibrationEntry
 import io.github.vishalsng112.slatecam.core.device.DeviceDatabaseRepository
 import io.github.vishalsng112.slatecam.core.device.DeviceDatabaseSnapshot
 import io.github.vishalsng112.slatecam.core.device.FeatureGate
 import io.github.vishalsng112.slatecam.core.device.QuirkActions
 import io.github.vishalsng112.slatecam.core.gpu.GlPreviewRenderer
 import io.github.vishalsng112.slatecam.core.profile.BlackGammaRange
-import io.github.vishalsng112.slatecam.core.profile.ColorCalibration
-import io.github.vishalsng112.slatecam.core.profile.ColorChecker
 import io.github.vishalsng112.slatecam.core.profile.ColorMode
 import io.github.vishalsng112.slatecam.core.profile.GammaPreset
 import io.github.vishalsng112.slatecam.core.profile.InputProfile
@@ -915,104 +909,6 @@ class SlateCamBridge private constructor(
 
     override fun shareMediaClip(id: String): Boolean = mediaLibrary.share(id)
 
-    override fun captureCalibrationFrame() {
-        if (recorder.isRecording) {
-            publishCalibrationError("Stop recording before calibrating.")
-            return
-        }
-        if (!opened) {
-            publishCalibrationError("Open the camera before calibrating.")
-            return
-        }
-        val cameraId = lastCameraId ?: ""
-        val lens = currentLensKey()
-        renderer.captureCalibrationFrame { capture ->
-            mainHandler.post {
-                if (capture == null) {
-                    publishCalibrationError("No camera frame available.")
-                    return@post
-                }
-                val api = flutterApi ?: return@post
-                scope.launch {
-                    runCatching {
-                        api.onCalibrationFrame(
-                            CalibrationFrame(
-                                width = capture.width.toLong(),
-                                height = capture.height.toLong(),
-                                rgba = capture.rgba,
-                                cameraId = cameraId,
-                                lensKey = lens,
-                            ),
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Fits in the linear Rec.2020 domain the shader applies the matrix in.
-     * Flutter sends encoded BT.709 samples from the bypass frame.
-     */
-    override fun solveCalibration(
-        patches: List<CalibrationPatch>,
-        cameraId: String,
-        lensKey: String?,
-    ): CalibrationSolution {
-        require(patches.size == ColorChecker.CLASSIC_24_SRGB.size) {
-            "expected 24 ColorChecker patches, got ${patches.size}"
-        }
-        val references = ColorChecker.referenceLinear2020()
-        val samples = patches.mapIndexed { index, patch ->
-            ColorCalibration.Sample(
-                ColorChecker.observedFromEncoded(
-                    patch.r.toFloat(),
-                    patch.g.toFloat(),
-                    patch.b.toFloat(),
-                ),
-                references[index],
-            )
-        }
-        val neutrals = ColorChecker.NEUTRAL_INDICES.map { samples[it] }
-        val result = ColorCalibration.solve(samples, neutrals)
-        return CalibrationSolution(
-            matrix = result.profile.matrix.map { it.toDouble() },
-            accepted = result.accepted,
-            exposureTrim = result.profile.exposureTrim.toDouble(),
-            wbROffset = result.profile.wbROffset.toDouble(),
-            wbBOffset = result.profile.wbBOffset.toDouble(),
-            deltaEBefore = result.deltaEBefore.toDouble(),
-            deltaEAfter = result.deltaEAfter.toDouble(),
-            deltaEMaxAfter = result.deltaEMaxAfter.toDouble(),
-            patchDeltaEAfter = result.patchDeltaEAfter.map { it.toDouble() },
-            cameraId = cameraId,
-            lensKey = lensKey,
-        )
-    }
-
-    override fun saveCalibration(solution: CalibrationSolution) {
-        if (solution.matrix.size != 9) {
-            throw IllegalArgumentException("calibration matrix must be 3x3")
-        }
-        val cameraId = solution.cameraId.ifBlank { lastCameraId ?: "" }
-        val entry = CalibrationEntry(
-            deviceKey = deviceSnapshot.identity.deviceKey,
-            cameraId = cameraId.ifBlank { io.github.vishalsng112.slatecam.core.device.DeviceDatabase.WILDCARD_CAMERA },
-            lensKey = solution.lensKey,
-            matrix = solution.matrix.map { it.toFloat() },
-            exposureTrim = solution.exposureTrim.toFloat(),
-            saturationTrim = 1f,
-            wbROffset = solution.wbROffset.toFloat(),
-            wbBOffset = solution.wbBOffset.toFloat(),
-            source = "in-app ColorChecker",
-        )
-        deviceDatabase.saveCalibration(entry)
-        deviceSnapshot = snapshotFor(lastCameraId ?: cameraId)
-        deviceReportPath = deviceSnapshot.lastReportPath
-        applyDeviceSnapshot(deviceSnapshot)
-        pushState()
-    }
-
     override fun listAudioInputs(): List<AudioInputOption> {
         refreshAudioOptions()
         return audioInputOptions
@@ -1143,18 +1039,6 @@ class SlateCamBridge private constructor(
             active = audioActive,
         )
         scope.launch { runCatching { api.onAudio(telemetry) } }
-    }
-
-    private fun currentLensKey(): String? = deviceDatabase.latestReport()
-        ?.cameras
-        ?.firstOrNull { it.id == lastCameraId }
-        ?.let(::lensKey)
-
-    private fun publishCalibrationError(message: String) {
-        val api = flutterApi ?: return
-        scope.launch {
-            runCatching { api.onCalibrationError(message) }
-        }
     }
 
     fun setProbeMode(enabled: Boolean) {

@@ -4,8 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../pigeon/slatecam.g.dart';
-import 'calibration_channel.dart';
-import 'calibration_screen.dart';
 import 'control_deck.dart';
 import 'painters.dart';
 import 'playback_screen.dart';
@@ -249,30 +247,6 @@ class _CaptureScreenState extends State<CaptureScreen>
     if (mounted) _autoOpen(prompt: false);
   }
 
-  Future<void> _openCalibration() async {
-    final state = _state;
-    if (state == null || _textureId == null) return;
-    if (state.isRecording) {
-      _showSnack('Stop recording before calibrating.', UiTokens.danger);
-      return;
-    }
-    final width = state.previewOutputWidth > 0
-        ? state.previewOutputWidth
-        : state.previewWidth;
-    final height = state.previewOutputHeight > 0
-        ? state.previewOutputHeight
-        : state.previewHeight;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => CalibrationScreen(
-          host: _host,
-          textureId: _textureId!,
-          aspectRatio: width > 0 && height > 0 ? width / height : 4 / 3,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -303,7 +277,6 @@ class _CaptureScreenState extends State<CaptureScreen>
               onClose: () => setState(() => _deckOpen = false),
               onCloseCamera: _closeCamera,
               onOpenClips: _openClips,
-              onOpenCalibration: _openCalibration,
               showGuides: _showGuides,
               onGuidesChanged: (value) => setState(() => _showGuides = value),
               showHistogram: _showHistogram,
@@ -947,14 +920,6 @@ class _StateListener implements SlateCamFlutterApi {
 
   @override
   Future<void> onAudio(AudioTelemetry audio) async => _onAudio(audio);
-
-  @override
-  Future<void> onCalibrationFrame(CalibrationFrame frame) async =>
-      CalibrationChannel.pushFrame(frame);
-
-  @override
-  Future<void> onCalibrationError(String message) async =>
-      CalibrationChannel.pushError(message);
 }
 
 class _RecordButton extends StatelessWidget {

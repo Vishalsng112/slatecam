@@ -63,14 +63,7 @@ AF handling). Remaining:
 | Item | Notes |
 |---|---|
 | Manual focus UI | The MF slider, tap-to-focus and pinch zoom ship in the Focus card; **focus/AE lock** remains and is not implemented |
-| Measured colour data | In-app capture/solve/save ships (ADR 0027); each shipping lens still needs a good chart measurement, and the bundled database has none |
-| Per-illuminant matrices | One CCM per lens is illuminant-specific; add CCT-indexed entries or interpolation |
-| HLG calibration entry | SDR and HLG share one matrix today; verify and store per transfer function |
-| Calibration capture lock | AE/AWB run as-is during capture; add optional lock once neutral-patch trims are proven on device |
-| Chart auto-detection | Corners are dragged manually; auto-detect the 24-patch quad and reject low-contrast patches |
-| Higher-precision capture | The bypass frame is RGBA8888; a 16-bit readback would raise shadow precision |
-| Clear calibration | Remove the current lens's user entry from the UI; today only the file can be replaced |
-| Calibration history | Entries are versioned but the UI shows only the active one |
+| Measured colour matrices | `ColorCalibration` solves a 3×3 matrix + trim; capture 24 patches per lens and add the result to the device database |
 | Dual-session seamless switch | The frame pump hides the session gap; a true no-freeze switch needs concurrent sessions and a probe verdict |
 
 ## Audio
@@ -97,8 +90,7 @@ GL frame handoff, opt-in UI, optional local assistant.
 ## Phase 7 — device database
 
 The database, quirks, overrides, opt-in reports and loader are implemented.
-Remaining: captured ColorChecker data for shipping lenses, calibration
-invalidation by firmware fingerprint, and new quirk entries from real device
+Remaining: measured ColorChecker matrices, and new quirk entries from real device
 reports (including the Pad's hidden-lens policy). See
 [`device-database.md`](device-database.md).
 

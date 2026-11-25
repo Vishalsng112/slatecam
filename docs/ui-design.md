@@ -178,20 +178,7 @@ position without opening a menu.
   gyro sidecar, then refreshes the grid.
 - Clips are app-owned in `Movies/SlateCam`; the library never uploads anything.
 
-### 4.6 Colour calibration
-
-- **Calibrate colour…** sits under Input calibration in the Picture profile
-  card and is disabled while recording.
-- The route keeps the camera open. A bypass badge marks the live preview; a
-  6×4 guide shows where the chart should sit.
-- Capture freezes one frame. The user drags the four corners onto the chart;
-  Solve fits a per-lens matrix and shows mean/max ΔE2000, WB offsets, exposure
-  trim, lens key and the matrix.
-- A rejected fit is red, explains why and disables Save. A good fit can be
-  saved to the device database and is applied immediately.
-- Retake returns to framing; Another lens / Done appears after saving.
-
-### 4.7 Audio
+### 4.6 Audio
 
 - An **Audio** card sits under Exposure: live input chips, the routed
   source/rate/channels, a stereo post-gain meter and an input-gain slider.
@@ -338,8 +325,7 @@ restarts. There is no face or eye tracking.
 | Rename / delete the active user profile | `renamePictureProfile`, `deletePictureProfile` | Current |
 | White balance mode | `setWhiteBalanceMode` | Current |
 | Manual white balance (2000–10000 K, tint ±100), sliders snap to the chosen preset; dragging enters manual | `setManualWhiteBalance` | Current |
-| Input calibration status | device database / InputProfile | Current |
-| In-app ColorChecker calibration | `captureCalibrationFrame`, `solveCalibration`, `saveCalibration` | Current (ADR 0027) |
+| Input calibration status | device database / InputProfile | Current (display only) |
 | Creative LUT selection / reload | `setCreativeLut`, `reloadLuts` | Future (native path exists, UI hidden) |
 | LUT SAF picker | requires plugin/native picker | Future |
 | Detail controls (V/H, crispening, highlight) | spatial detail pass | Future |

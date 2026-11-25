@@ -9,7 +9,6 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import java.io.File
 import java.text.SimpleDateFormat
-import java.time.Instant
 import java.util.Date
 import java.util.Locale
 
@@ -149,45 +148,6 @@ class DeviceDatabaseRepository(
         userDatabaseFile().apply { parentFile?.mkdirs() }.writeText(jsonText)
         cachedDatabase = null
         return database()
-    }
-
-    /**
-     * Writes one measured calibration into the user database and reloads the
-     * merged view. The key is the probe-stable lens key when present, so a
-     * renumbered Camera2 id does not create a duplicate entry.
-     */
-    fun saveCalibration(entry: CalibrationEntry): CalibrationEntry {
-        val user = readUserDatabase()
-        val existing = (user.calibrations + database().calibrations)
-            .filter { it.key == entry.key }
-        val version = (existing.maxOfOrNull { it.version } ?: 0) + 1
-        val saved = entry.copy(
-            version = version,
-            createdAt = entry.createdAt ?: Instant.now().toString(),
-        )
-        val updated = user.copy(
-            version = maxOf(user.version, database().version),
-            calibrations = user.calibrations.filter { it.key != saved.key } + saved,
-        )
-        val problems = updated.validate()
-        require(problems.isEmpty()) {
-            "invalid calibration: ${problems.joinToString("; ")}"
-        }
-        userDatabaseFile().apply { parentFile?.mkdirs() }.writeText(updated.toJson())
-        cachedDatabase = null
-        return saved
-    }
-
-    private fun readUserDatabase(): DeviceDatabase {
-        val file = userDatabaseFile()
-        if (!file.isFile) return DeviceDatabase.EMPTY
-        val text = file.readText()
-        val database = DeviceDatabase.fromJson(text)
-        val problems = database.validate()
-        require(problems.isEmpty()) {
-            "invalid user device database: ${problems.joinToString("; ")}"
-        }
-        return database
     }
 
     private fun archiveReport(json: String): File {

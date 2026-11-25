@@ -69,7 +69,7 @@ root is `android/`, not the repository root.
 | Viewfinder tap-to-focus / pinch | `lib/src/ui/capture_screen.dart`, `:core:gpu` transform, `:core:camera` AF region | `GlPreviewRenderer.viewfinderToBuffer`, `CameraController.setFocusPoint` |
 | Picture profiles / look pipeline | `:core:profile` | `PictureProfile.kt`, `PictureProfileLibrary.kt`, `SlateCamBridge.applyProfile` |
 | Custom profile persistence | `:bridge` | `setProfileSettings`, `encodeSettings`/`decodeSettings` |
-| Per-lens calibration / WB / shadow | `:core:device`, `:core:profile` | `CalibrationEntry`, `DeviceDatabase.calibrationFor`, `InputProfile`, `ColorChecker` |
+| Per-lens calibration / WB / shadow | `:core:device` | `CalibrationEntry`, `DeviceDatabase.calibrationFor`, `InputProfile` |
 | Independent viewfinder resolution | `:core:gpu`, `:bridge`, Flutter | `GlPreviewRenderer` capture/preview sizes, `SlateCamBridge.previewOutputFor` |
 | OIS / EIS requests | `:core:camera` | `CameraController.readCapabilities/applyControls` |
 | Frame rendering, shader, overlays | `:core:gpu` | `GlPreviewRenderer.kt` |
@@ -83,8 +83,8 @@ root is `android/`, not the repository root.
 | Flutter state/commands | `:bridge` | `SlateCamBridge.kt`, generated Pigeon |
 | Control surface | `lib/src/ui` | `capture_screen.dart` preview/dock, `control_deck.dart` console |
 | Lens-switch encoder continuity | `:bridge` | `SwitchFramePump.kt`, `GlPreviewRenderer.repeatLastFrame` |
-| Colour calibration math | `:core:profile` | `ColorCalibration.kt`, `ColorChecker.kt` |
-| UI | `lib/src/ui` | `capture_screen.dart`, `control_deck.dart`, `calibration_screen.dart`, `zoom_plugin.dart` |
+| Colour calibration math | `:core:profile` | `ColorCalibration.kt` |
+| UI | `lib/src/ui` | `capture_screen.dart`, `control_deck.dart`, `zoom_plugin.dart` |
 
 ## Flows
 
@@ -123,16 +123,6 @@ The monitor and recorder are mutually exclusive: the monitor stops before the
 recorder opens its own `AudioRecord` and restarts after finalize. Metering runs
 on its own channel so it never rebuilds camera state. See ADR 0028.
 
-### Colour calibration
-`Calibration screen → Pigeon captureCalibrationFrame → GlPreviewRenderer bypass FBO
-→ 24 patch samples → SlateCamBridge.solveCalibration (linear Rec.2020)
-→ ColorCalibration/ColorChecker → Pigeon solution → saveCalibration
-→ files/device-database.json → InputProfile → shader input stage`
-
-The camera stays open; recording must be stopped. The bypass exposes the ISP
-signal before the input profile, so a measured matrix is not fitted against
-itself. See ADR 0027.
-
 ### Probe
 `DeviceReport UI or --ez run_probe → ProbeRunner → sources + verifiers
 → files/probe.json (+ opt-in archive) → DeviceDatabaseRepository snapshot
@@ -166,9 +156,6 @@ on camera change`
   Pigeon 30 emits `Uint8List` in generated code but omits it from the
   `dart:typed_data` show-list; add it (and the `unnecessary_import` ignore) after
   regenerating, and strip trailing whitespace in the Kotlin callbacks.
-- **Calibration API:** `captureCalibrationFrame` (async via
-  `onCalibrationFrame`/`onCalibrationError`), `solveCalibration`,
-  `saveCalibration`; ADR 0027.
 - **Audio API:** `listAudioInputs`, `setAudioInput`, `setAudioGain`,
   `refreshAudioInputs`; meter snapshots arrive via `onAudio` (ADR 0028).
 - **Probe JSON:** schema 1.11.0, `docs/probe-schema.md`.
@@ -229,9 +216,7 @@ when testing camera access. Probe launch:
 - True 10-bit GL intermediate is not available; HLG encoder surface is
   RGBA8888, but the encoded stream is Main10/HLG and SPS-checked. Pad movie mode
   is 10-bit; POCO stays SDR because its encoder fails Main10.
-- Colour matching depends on measured per-camera matrices. The in-app capture,
-  solve and save flow ships (ADR 0027); the bundled database still has no
-  measured data, and one matrix per lens is not yet illuminant-interpolated.
+- Colour matching depends on measured per-camera matrices (not shipped).
 - Audio capture uses PCM16 48 kHz stereo; input selection and gain are data.
   Headphone monitoring, 24-bit capture and a limiter are not implemented.
 - Manual white balance anchors on the nearest HAL AWB preset and applies the

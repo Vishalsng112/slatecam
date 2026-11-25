@@ -223,63 +223,6 @@ class AudioTelemetry {
   bool active;
 }
 
-/// One sampled ColorChecker patch, values in encoded BT.709 (0..1).
-class CalibrationPatch {
-  CalibrationPatch({required this.r, required this.g, required this.b});
-
-  double r;
-  double g;
-  double b;
-}
-
-/// One upright frame captured through the calibration bypass.
-class CalibrationFrame {
-  CalibrationFrame({
-    required this.width,
-    required this.height,
-    required this.rgba,
-    required this.cameraId,
-    required this.lensKey,
-  });
-
-  int width;
-  int height;
-  Uint8List rgba;
-  String cameraId;
-  String? lensKey;
-}
-
-/// Fitted per-lens calibration plus measured error.
-class CalibrationSolution {
-  CalibrationSolution({
-    required this.matrix,
-    required this.accepted,
-    required this.exposureTrim,
-    required this.wbROffset,
-    required this.wbBOffset,
-    required this.deltaEBefore,
-    required this.deltaEAfter,
-    required this.deltaEMaxAfter,
-    required this.patchDeltaEAfter,
-    required this.cameraId,
-    required this.lensKey,
-  });
-
-  /// Row-major 3x3 CCM into linear Rec.2020.
-  List<double> matrix;
-  /// False when the fit was rejected (no chart, glare, black frame).
-  bool accepted;
-  double exposureTrim;
-  double wbROffset;
-  double wbBOffset;
-  double deltaEBefore;
-  double deltaEAfter;
-  double deltaEMaxAfter;
-  List<double> patchDeltaEAfter;
-  String cameraId;
-  String? lensKey;
-}
-
 /// Immutable camera snapshot. Kotlin owns this state; Dart only renders it.
 class CameraState {
   CameraState({
@@ -765,20 +708,6 @@ abstract class SlateCamHostApi {
   /// Opens the system share sheet for a clip.
   bool shareMediaClip(String id);
 
-  /// Captures one upright calibration frame. The answer arrives through
-  /// [SlateCamFlutterApi.onCalibrationFrame] or `onCalibrationError`.
-  void captureCalibrationFrame();
-
-  /// Fits a per-lens input profile from ColorChecker patch samples.
-  CalibrationSolution solveCalibration(
-    List<CalibrationPatch> patches,
-    String cameraId,
-    String? lensKey,
-  );
-
-  /// Persists the solution into `files/device-database.json` and applies it.
-  void saveCalibration(CalibrationSolution solution);
-
   /// Live audio inputs, with a synthetic `default` route first.
   List<AudioInputOption> listAudioInputs();
 
@@ -798,12 +727,6 @@ abstract class SlateCamFlutterApi {
 
   /// Fast-changing readouts; merges into the last [CameraState] on the Dart side.
   void onTelemetry(CameraTelemetry telemetry);
-
-  /// One calibration frame, captured on the GL thread.
-  void onCalibrationFrame(CalibrationFrame frame);
-
-  /// Capture failed (camera closed, recording, or no rendered frame).
-  void onCalibrationError(String message);
 
   /// Audio meter snapshot, pushed at ~10 Hz.
   void onAudio(AudioTelemetry audio);

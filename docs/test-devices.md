@@ -1324,47 +1324,6 @@ Pad 3 (`71f186d3`), Android 17 / SDK 37, 1440×1080 · 30p.
 | Camera handoff | Clips closed the camera; returning reopened the preview with the same mode and lens |
 | Empty/error states | present in code; no failure to report on this device |
 
-## Colour calibration (Xiaomi Pad 6, build 2130)
-
-Device `71f186d3`, Xiaomi Pad 6 (`23043RP34I`, device key `xiaomi/pipa`),
-Android 14 / SDK 34, 1440×1080 · 30p SDR.
-
-| Check | Result |
-|---|---|
-| Entry point | Picture profile → Input calibration → **Calibrate colour…** opened the route over the live preview; recording state disables it |
-| Bypass capture | Capture returned one upright 960×720 frame through the bypass, shown frozen with a 6×4 grid and four draggable handles |
-| Alignment | Handles dragged independently; the quad is sampled with a perspective bilinear mapping |
-| Solve without a chart | Correctly rejected: mean ΔE2000 32.2 → 32.17, max 59.56, red explanation, Save disabled (identity matrix) |
-| Save path | A saved calibration (build 2128) wrote `files/device-database.json` with `lens_key: back:default:28`, `source: in-app ColorChecker`, version 1; the deck immediately showed `in-app ColorChecker` |
-| Restore | Removed the user database and restarted; calibration returned to `identity · no measured data` |
-| Unit tests | `ColorCalibrationTest`/`ColorCheckerTest` cover the linear-domain fit, WB offsets, rejected fits and CIEDE2000 against Sharma pairs; a synthetic BT.709–8-bit camera transform is recovered with mean ΔE < 1 |
-
-Not yet verified on device: a real physical ColorChecker under controlled light,
-and the resulting ΔE improvement in the preview/clip. The plumbing, rejection
-path, persistence and application are exercised.
-
-## Audio input, monitoring and metering (Xiaomi Pad 6, build 2140)
-
-Device `71f186d3`, Xiaomi Pad 6 (`23043RP34I`, device key `xiaomi/pipa`),
-Android 14 / SDK 34, 1440×1080 · 30p SDR. No USB or wired microphone was
-available during the run.
-
-| Check | Result |
-|---|---|
-| Input enumeration | `AudioManager` reported built-in bottom/back mics, telephony, dock and a 48 kHz pseudo-input; telephony/dock/remote-submix were filtered, leaving `System default`, `Built-in mic · back`, `Built-in mic · bottom` |
-| Monitor start | `audio source=unprocessed input=default preferred=false rate=48000` on camera open; pre-roll meter showed live levels (−45…−53 dBFS in the room) |
-| Input switch | Selecting the back mic restarted the monitor with `input=23043RP34I preferred=true`; selecting bottom restored signal. The back mic was effectively silent, and the UI showed `SILENT INPUT` + the no-signal hint after two seconds |
-| Gain | +15 dB raised the recorded RMS from about −60 dBFS (0 dB take) to −46 dBFS; the meter and CLIP latch responded post-gain |
-| Recording | Input chips lock, gain stays live, status changes to `Recording audio · meter is post-gain`; the monitor restarts after finalize |
-| Encoded audio | `ffprobe`: AAC, 48 kHz, 2 ch, 255.8 kbps; `astats` showed non-silent per-channel peaks/RMS, no flat-factor clipping on the 0 dB take |
-| Permission denied | Revoking `RECORD_AUDIO` showed the permission error and Grant action; meter showed NO SIGNAL. Granting and resuming (without closing the camera) re-enumerated inputs and restarted the monitor; a relaunch also restores it |
-| Hotplug | `AudioDeviceCallback` path compiles and refreshes/falls back; not exercised with physical USB hardware |
-| Unit tests | `:core:codec:testDebugUnitTest` covers silence, −6 dBFS, full scale, mono duplication, gain, clamped clipping, zero-gain clip detection and partial buffers |
-
-Test clips created for the audio evidence were removed from MediaStore and the
-app was left live with the default input at 0.0 dB, microphone permission
-granted, and no colour calibration saved.
-
 ## Pad 3 smoke test (build 2145)
 
 OnePlus Pad 3 (`OPD2415`, device `OP6190L1`), Android SDK 37, fresh install
@@ -1374,7 +1333,6 @@ from the pushed commit.
 |---|---|
 | Cold launch | Camera opened, deck and preview rendered; process stayed alive |
 | Console | Deck scrolled to Audio; input chips, source, gain and meter rendered |
-| Calibration | Opened, captured a frame through the bypass, showed the 4-corner grid; Solve correctly rejected a non-chart frame and disabled Save |
 | Clips | Library listed existing clips with thumbnails and free space |
 | Playback | A 0:28 clip opened and played |
 | Recording | 3 s take produced HEVC + AAC; both tracks finalized and the clip played back |

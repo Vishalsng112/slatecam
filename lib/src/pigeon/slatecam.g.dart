@@ -868,226 +868,6 @@ class AudioTelemetry {
   }
 }
 
-/// One sampled ColorChecker patch, values in encoded BT.709 (0..1).
-class CalibrationPatch {
-  CalibrationPatch({
-    required this.r,
-    required this.g,
-    required this.b,
-  });
-
-  double r;
-
-  double g;
-
-  double b;
-
-  List<Object?> _toList() {
-    return <Object?>[
-      r,
-      g,
-      b,
-    ];
-  }
-
-  Object encode() {
-    return _toList();  }
-
-  static CalibrationPatch decode(Object result) {
-    result as List<Object?>;
-    return CalibrationPatch(
-      r: result[0]! as double,
-      g: result[1]! as double,
-      b: result[2]! as double,
-    );
-  }
-
-  @override
-  // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  bool operator ==(Object other) {
-    if (other is! CalibrationPatch || other.runtimeType != runtimeType) {
-      return false;
-    }
-    if (identical(this, other)) {
-      return true;
-    }
-    return _deepEquals(r, other.r) && _deepEquals(g, other.g) && _deepEquals(b, other.b);
-  }
-
-  @override
-  // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
-
-  @override
-  String toString() {
-    return 'CalibrationPatch(r: $r, g: $g, b: $b)';
-  }
-}
-
-/// One upright frame captured through the calibration bypass.
-class CalibrationFrame {
-  CalibrationFrame({
-    required this.width,
-    required this.height,
-    required this.rgba,
-    required this.cameraId,
-    this.lensKey,
-  });
-
-  int width;
-
-  int height;
-
-  Uint8List rgba;
-
-  String cameraId;
-
-  String? lensKey;
-
-  List<Object?> _toList() {
-    return <Object?>[
-      width,
-      height,
-      rgba,
-      cameraId,
-      lensKey,
-    ];
-  }
-
-  Object encode() {
-    return _toList();  }
-
-  static CalibrationFrame decode(Object result) {
-    result as List<Object?>;
-    return CalibrationFrame(
-      width: result[0]! as int,
-      height: result[1]! as int,
-      rgba: result[2]! as Uint8List,
-      cameraId: result[3]! as String,
-      lensKey: result[4] as String?,
-    );
-  }
-
-  @override
-  // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  bool operator ==(Object other) {
-    if (other is! CalibrationFrame || other.runtimeType != runtimeType) {
-      return false;
-    }
-    if (identical(this, other)) {
-      return true;
-    }
-    return _deepEquals(width, other.width) && _deepEquals(height, other.height) && _deepEquals(rgba, other.rgba) && _deepEquals(cameraId, other.cameraId) && _deepEquals(lensKey, other.lensKey);
-  }
-
-  @override
-  // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
-
-  @override
-  String toString() {
-    return 'CalibrationFrame(width: $width, height: $height, rgba: $rgba, cameraId: $cameraId, lensKey: $lensKey)';
-  }
-}
-
-/// Fitted per-lens calibration plus measured error.
-class CalibrationSolution {
-  CalibrationSolution({
-    required this.matrix,
-    required this.accepted,
-    required this.exposureTrim,
-    required this.wbROffset,
-    required this.wbBOffset,
-    required this.deltaEBefore,
-    required this.deltaEAfter,
-    required this.deltaEMaxAfter,
-    required this.patchDeltaEAfter,
-    required this.cameraId,
-    this.lensKey,
-  });
-
-  /// Row-major 3x3 CCM into linear Rec.2020.
-  List<double> matrix;
-
-  /// False when the fit was rejected (no chart, glare, black frame).
-  bool accepted;
-
-  double exposureTrim;
-
-  double wbROffset;
-
-  double wbBOffset;
-
-  double deltaEBefore;
-
-  double deltaEAfter;
-
-  double deltaEMaxAfter;
-
-  List<double> patchDeltaEAfter;
-
-  String cameraId;
-
-  String? lensKey;
-
-  List<Object?> _toList() {
-    return <Object?>[
-      matrix,
-      accepted,
-      exposureTrim,
-      wbROffset,
-      wbBOffset,
-      deltaEBefore,
-      deltaEAfter,
-      deltaEMaxAfter,
-      patchDeltaEAfter,
-      cameraId,
-      lensKey,
-    ];
-  }
-
-  Object encode() {
-    return _toList();  }
-
-  static CalibrationSolution decode(Object result) {
-    result as List<Object?>;
-    return CalibrationSolution(
-      matrix: (result[0]! as List<Object?>).cast<double>(),
-      accepted: result[1]! as bool,
-      exposureTrim: result[2]! as double,
-      wbROffset: result[3]! as double,
-      wbBOffset: result[4]! as double,
-      deltaEBefore: result[5]! as double,
-      deltaEAfter: result[6]! as double,
-      deltaEMaxAfter: result[7]! as double,
-      patchDeltaEAfter: (result[8]! as List<Object?>).cast<double>(),
-      cameraId: result[9]! as String,
-      lensKey: result[10] as String?,
-    );
-  }
-
-  @override
-  // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  bool operator ==(Object other) {
-    if (other is! CalibrationSolution || other.runtimeType != runtimeType) {
-      return false;
-    }
-    if (identical(this, other)) {
-      return true;
-    }
-    return _deepEquals(matrix, other.matrix) && _deepEquals(accepted, other.accepted) && _deepEquals(exposureTrim, other.exposureTrim) && _deepEquals(wbROffset, other.wbROffset) && _deepEquals(wbBOffset, other.wbBOffset) && _deepEquals(deltaEBefore, other.deltaEBefore) && _deepEquals(deltaEAfter, other.deltaEAfter) && _deepEquals(deltaEMaxAfter, other.deltaEMaxAfter) && _deepEquals(patchDeltaEAfter, other.patchDeltaEAfter) && _deepEquals(cameraId, other.cameraId) && _deepEquals(lensKey, other.lensKey);
-  }
-
-  @override
-  // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  int get hashCode => _deepHash(<Object?>[runtimeType, ..._toList()]);
-
-  @override
-  String toString() {
-    return 'CalibrationSolution(matrix: $matrix, accepted: $accepted, exposureTrim: $exposureTrim, wbROffset: $wbROffset, wbBOffset: $wbBOffset, deltaEBefore: $deltaEBefore, deltaEAfter: $deltaEAfter, deltaEMaxAfter: $deltaEMaxAfter, patchDeltaEAfter: $patchDeltaEAfter, cameraId: $cameraId, lensKey: $lensKey)';
-  }
-}
-
 /// Immutable camera snapshot. Kotlin owns this state; Dart only renders it.
 class CameraState {
   CameraState({
@@ -1912,20 +1692,11 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is AudioTelemetry) {
       buffer.putUint8(138);
       writeValue(buffer, value.encode());
-    }    else if (value is CalibrationPatch) {
+    }    else if (value is CameraState) {
       buffer.putUint8(139);
       writeValue(buffer, value.encode());
-    }    else if (value is CalibrationFrame) {
-      buffer.putUint8(140);
-      writeValue(buffer, value.encode());
-    }    else if (value is CalibrationSolution) {
-      buffer.putUint8(141);
-      writeValue(buffer, value.encode());
-    }    else if (value is CameraState) {
-      buffer.putUint8(142);
-      writeValue(buffer, value.encode());
     }    else if (value is CameraTelemetry) {
-      buffer.putUint8(143);
+      buffer.putUint8(140);
       writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
@@ -1956,14 +1727,8 @@ class _PigeonCodec extends StandardMessageCodec {
       case 138:
         return AudioTelemetry.decode(readValue(buffer)!);
       case 139:
-        return CalibrationPatch.decode(readValue(buffer)!);
-      case 140:
-        return CalibrationFrame.decode(readValue(buffer)!);
-      case 141:
-        return CalibrationSolution.decode(readValue(buffer)!);
-      case 142:
         return CameraState.decode(readValue(buffer)!);
-      case 143:
+      case 140:
         return CameraTelemetry.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
@@ -3075,62 +2840,6 @@ class SlateCamHostApi {
     return pigeonVar_replyValue! as bool;
   }
 
-  /// Captures one upright calibration frame. The answer arrives through
-  /// [SlateCamFlutterApi.onCalibrationFrame] or `onCalibrationError`.
-  Future<void> captureCalibrationFrame() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.captureCalibrationFrame$pigeonVar_messageChannelSuffix';
-    final pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
-    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
-    _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
-  }
-
-  /// Fits a per-lens input profile from ColorChecker patch samples.
-  Future<CalibrationSolution> solveCalibration(List<CalibrationPatch> patches, String cameraId, String? lensKey) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.solveCalibration$pigeonVar_messageChannelSuffix';
-    final pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[patches, cameraId, lensKey]);
-    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
-    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
-    return pigeonVar_replyValue! as CalibrationSolution;
-  }
-
-  /// Persists the solution into `files/device-database.json` and applies it.
-  Future<void> saveCalibration(CalibrationSolution solution) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.saveCalibration$pigeonVar_messageChannelSuffix';
-    final pigeonVar_channel = BasicMessageChannel<Object?>(
-      pigeonVar_channelName,
-      pigeonChannelCodec,
-      binaryMessenger: pigeonVar_binaryMessenger,
-    );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[solution]);
-    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
-    _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
-  }
-
   /// Live audio inputs, with a synthetic `default` route first.
   Future<List<AudioInputOption>> listAudioInputs() async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.listAudioInputs$pigeonVar_messageChannelSuffix';
@@ -3213,12 +2922,6 @@ abstract class SlateCamFlutterApi {
   /// Fast-changing readouts; merges into the last [CameraState] on the Dart side.
   void onTelemetry(CameraTelemetry telemetry);
 
-  /// One calibration frame, captured on the GL thread.
-  void onCalibrationFrame(CalibrationFrame frame);
-
-  /// Capture failed (camera closed, recording, or no rendered frame).
-  void onCalibrationError(String message);
-
   /// Audio meter snapshot, pushed at ~10 Hz.
   void onAudio(AudioTelemetry audio);
 
@@ -3261,48 +2964,6 @@ abstract class SlateCamFlutterApi {
           final CameraTelemetry arg_telemetry = args[0]! as CameraTelemetry;
           try {
             api.onTelemetry(arg_telemetry);
-            return wrapResponse(empty: true);
-          } on PlatformException catch (e) {
-            return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
-          }
-        });
-      }
-    }
-    {
-      final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.slatecam.SlateCamFlutterApi.onCalibrationFrame$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
-      if (api == null) {
-        pigeonVar_channel.setMessageHandler(null);
-      } else {
-        pigeonVar_channel.setMessageHandler((Object? message) async {
-          final List<Object?> args = message! as List<Object?>;
-          final CalibrationFrame arg_frame = args[0]! as CalibrationFrame;
-          try {
-            api.onCalibrationFrame(arg_frame);
-            return wrapResponse(empty: true);
-          } on PlatformException catch (e) {
-            return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
-          }
-        });
-      }
-    }
-    {
-      final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.slatecam.SlateCamFlutterApi.onCalibrationError$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
-      if (api == null) {
-        pigeonVar_channel.setMessageHandler(null);
-      } else {
-        pigeonVar_channel.setMessageHandler((Object? message) async {
-          final List<Object?> args = message! as List<Object?>;
-          final String arg_message = args[0]! as String;
-          try {
-            api.onCalibrationError(arg_message);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

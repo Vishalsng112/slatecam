@@ -16,9 +16,8 @@ Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
 
 > **Status: Phase 3 complete on both test devices. Phase 5.5 per-lens
 > verification, the shoot-set editor and named shoot profiles are complete (Pad
-> 10-bit HLG movie mode across lenses); the in-app ColorChecker flow ships, so
-> remaining work is capturing/shipping colour data and seamless switching. The
-> audio control surface (input selection, pre-roll meters, gain) is current.**
+> 10-bit HLG movie mode across lenses); remaining work is colour matrices and
+> seamless switching. The audio control surface is current.**
 > Phases 0–4 are complete: preview, manual and P/S/M exposure, 8-bit SDR and
 > **10-bit HLG** recording via MediaStore, recording modes (16:9/4:3,
 > 24/30 fps), profiles, LUTs, and monitoring tools. Phase 5 adds shutter angle,

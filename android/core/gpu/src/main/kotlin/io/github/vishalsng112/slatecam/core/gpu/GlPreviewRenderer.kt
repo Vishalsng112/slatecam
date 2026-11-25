@@ -22,14 +22,6 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlin.math.roundToInt
-
-/** One captured calibration frame: upright, top-down, RGBA8888. */
-data class CalibrationCapture(
-    val width: Int,
-    val height: Int,
-    val rgba: ByteArray,
-)
 
 /**
  * Phase 2 preview pipeline: camera OES texture -> simple shader -> the surface
@@ -90,7 +82,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var uLut = 0
     private var uLutEnabled = 0
     private var uLutSize = 0
-    private var uCalibrationBypass = 0
 
     private var lutTexture = 0
     private var lutSize = 0f
@@ -809,7 +800,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         uLut = GLES20.glGetUniformLocation(program, "uLut")
         uLutEnabled = GLES20.glGetUniformLocation(program, "uLutEnabled")
         uLutSize = GLES20.glGetUniformLocation(program, "uLutSize")
-        uCalibrationBypass = GLES20.glGetUniformLocation(program, "uCalibrationBypass")
 
         GLES20.glDeleteShader(vertex)
         GLES20.glDeleteShader(fragment)
@@ -878,110 +868,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         handler.post { drawFrame(updateTexture = false) }
     }
 
-    /**
-     * Captures one upright RGBA frame through the calibration bypass: input
-     * EOTF and gamut conversion only, no input profile, look or overlays.
-     * The result is display-encoded BT.709, which the host linearises with
-     * [io.github.vishalsng112.slatecam.core.profile.ColorChecker] before fitting.
-     * Runs on the GL thread; the callback is invoked there as well.
-     */
-    fun captureCalibrationFrame(callback: (CalibrationCapture?) -> Unit) {
-        handler.post {
-            val frame = runCatching { captureCalibrationFrameLocked() }
-                .onFailure { Log.w(TAG, "calibration capture failed: ${it.message}") }
-                .getOrNull()
-            callback(frame)
-        }
-    }
-
-    private fun captureCalibrationFrameLocked(): CalibrationCapture? {
-        if (!started || cameraFrames == 0L || captureWidth <= 0 || captureHeight <= 0) {
-            return null
-        }
-        if (!EGL14.eglMakeCurrent(display, outputEglSurface, outputEglSurface, context)) {
-            return null
-        }
-
-        val aspect = captureWidth.toFloat() / captureHeight.toFloat()
-        val width = CALIBRATION_CAPTURE_WIDTH
-        val height = (width / aspect).roundToInt().coerceAtLeast(2)
-        val stride = width * 4
-        val byteCount = stride * height
-
-        val textures = IntArray(1)
-        val framebuffers = IntArray(1)
-        GLES20.glGenTextures(1, textures, 0)
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[0])
-        GLES20.glTexImage2D(
-            GLES20.GL_TEXTURE_2D,
-            0,
-            GLES20.GL_RGBA,
-            width,
-            height,
-            0,
-            GLES20.GL_RGBA,
-            GLES20.GL_UNSIGNED_BYTE,
-            null,
-        )
-        GLES20.glTexParameteri(
-            GLES20.GL_TEXTURE_2D,
-            GLES20.GL_TEXTURE_MIN_FILTER,
-            GLES20.GL_NEAREST,
-        )
-        GLES20.glTexParameteri(
-            GLES20.GL_TEXTURE_2D,
-            GLES20.GL_TEXTURE_MAG_FILTER,
-            GLES20.GL_NEAREST,
-        )
-
-        GLES20.glGenFramebuffers(1, framebuffers, 0)
-        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, framebuffers[0])
-        GLES20.glFramebufferTexture2D(
-            GLES20.GL_FRAMEBUFFER,
-            GLES20.GL_COLOR_ATTACHMENT0,
-            GLES20.GL_TEXTURE_2D,
-            textures[0],
-            0,
-        )
-        val complete = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) ==
-            GLES20.GL_FRAMEBUFFER_COMPLETE
-        if (!complete) {
-            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
-            GLES20.glDeleteFramebuffers(1, framebuffers, 0)
-            GLES20.glDeleteTextures(1, textures, 0)
-            return null
-        }
-
-        GLES20.glViewport(0, 0, width, height)
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        drawQuad(isPreview = true, overlay = false, calibrationBypass = true)
-
-        val buffer = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder())
-        GLES20.glReadPixels(
-            0,
-            0,
-            width,
-            height,
-            GLES20.GL_RGBA,
-            GLES20.GL_UNSIGNED_BYTE,
-            buffer,
-        )
-        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
-
-        val raw = ByteArray(byteCount)
-        buffer.position(0)
-        buffer.get(raw)
-        val upright = ByteArray(byteCount)
-        for (row in 0 until height) {
-            System.arraycopy(raw, row * stride, upright, (height - 1 - row) * stride, stride)
-        }
-
-        GLES20.glDeleteFramebuffers(1, framebuffers, 0)
-        GLES20.glDeleteTextures(1, textures, 0)
-        return CalibrationCapture(width = width, height = height, rgba = upright)
-    }
-
     private fun drawFrame(updateTexture: Boolean = true) {
         val texture = surfaceTexture ?: return
 
@@ -1037,11 +923,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         onFrameRendered()
     }
 
-    private fun drawQuad(
-        isPreview: Boolean,
-        overlay: Boolean,
-        calibrationBypass: Boolean = false,
-    ) {
+    private fun drawQuad(isPreview: Boolean, overlay: Boolean) {
         GLES20.glUseProgram(program)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
@@ -1051,7 +933,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glUniform1i(uLut, 1)
         GLES20.glUniform1i(uLutEnabled, if (lutEnabled) 1 else 0)
         GLES20.glUniform1f(uLutSize, if (lutSize > 0f) lutSize else 2f)
-        GLES20.glUniform1i(uCalibrationBypass, if (calibrationBypass) 1 else 0)
         GLES20.glUniform1i(uInputHlg, if (tenBitSource) 1 else 0)
         GLES20.glUniform1i(uOutputHlg, if (!isPreview && tenBitSource) 1 else 0)
         GLES20.glUniform1i(uIsPreview, if (isPreview) 1 else 0)
@@ -1628,7 +1509,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             uniform sampler2D uLut;
             uniform int uLutEnabled;
             uniform float uLutSize;
-            uniform int uCalibrationBypass;
 
             float luma2020(vec3 c) {
                 return dot(c, vec3(0.2627, 0.6780, 0.0593));
@@ -1787,15 +1667,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                     c = bt709To2020(bt709ToLinear(src.rgb));
                 }
 
-                // Calibration measurement: stop before the input profile and
-                // creative look, but keep the same EOTF/gamut path. Output is
-                // display-referred BT.709 so the host can linearise it back.
-                if (uCalibrationBypass == 1) {
-                    c = linearToBt709(clamp(bt2020To709(c), 0.0, 1.0));
-                    gl_FragColor = vec4(c, 1.0);
-                    return;
-                }
-
                 // 2. Per-lens normalisation in linear working space.
                 c.r *= uInputWb.x;
                 c.b *= uInputWb.y;
@@ -1882,7 +1753,6 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
         const val ANALYSIS_WIDTH = 320
         const val ANALYSIS_HEIGHT = 180
-        const val CALIBRATION_CAPTURE_WIDTH = 960
         const val HISTOGRAM_BINS = 64
         const val WAVEFORM_COLUMNS = 64
         const val WAVEFORM_BINS = 16
