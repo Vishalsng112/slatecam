@@ -1417,3 +1417,25 @@ The switch skips the old frame-pump pause; the outgoing session stays alive as
 the next standby. `dualSessionSwitch` does not compare exposure/WB across two
 different sensors, because a front↔back boundary is expected to change scene.
 The test clip was removed.
+
+## Logical handoff FOV and jitter check (POCO X6 Pro, build 2169)
+
+Compared the same still scene at 1.0× from:
+
+- physical camera `0` (main, 25 mm) via the B0 top-bar switch, and
+- logical camera `4` at `CONTROL_ZOOM_RATIO = 1.0` (which the HAL routes through
+  the ultra-wide at that moment).
+
+The outlet, cable and wall edges have identical position and scale in both
+frames, so the logical camera's normalized FOV at 1.0× matches the physical
+main lens. The handoff itself is HAL-owned and hysteretic:
+
+| Direction | Physical-ID transition |
+|---|---|
+| zooming wide | ultra-wide at ~0.86× |
+| zooming back | main at ~1.37× |
+
+The app cannot force which physical sensor the logical camera selects. The
+`activePhysicalCameraId` now travels on telemetry instead of forcing a full
+`CameraState` and preview rebuild at that transition, removing the app-side
+viewfinder remount jitter.
