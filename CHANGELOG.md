@@ -9,6 +9,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — Console card balance (build 2146)
+- In the two-column console, Processing now sits in the right column beside
+  Focus & Stabilisation instead of stacking below it, removing the empty
+  lower-right gap on tablet layouts.
+
 ### Added — Audio input, monitoring and metering (build 2140)
 - New **Audio** card in the console: input selection, pre-roll stereo
   peak/RMS meter with peak hold and a latching clip indicator, and an

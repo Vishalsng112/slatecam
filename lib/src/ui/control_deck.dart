@@ -236,7 +236,6 @@ class _ControlDeckState extends State<ControlDeck> {
                           child: Column(
                             children: [
                               ...primary,
-                              _processingCard(context),
                             ],
                           ),
                         ),
@@ -248,6 +247,7 @@ class _ControlDeckState extends State<ControlDeck> {
                               ...secondary,
                               _monitorCard(context),
                               _clipCard(context),
+                              _processingCard(context),
                             ],
                           ),
                         ),
