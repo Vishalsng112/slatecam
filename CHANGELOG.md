@@ -9,7 +9,7 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
-### Added — Logical zoom controller (build 2158)
+### Added — Logical zoom controller and verdict (build 2160)
 - Eligible **exposed** logical multi-cameras now drive lens chips through
   `CONTROL_ZOOM_RATIO` in one session: `selectLensStop` switches to the logical
   camera only when needed, then hands 0.6×/1× stops to `SmoothZoom`; pinch and
@@ -20,14 +20,15 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
   the existing session-switch + `SwitchFramePump` fallback.
 - `LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID` is read from capture results and
   surfaces in `CameraState`; the active sensor gets a dot on its lens chip.
-- Hidden logical cameras stay discovery-only. POCO X6 Pro's logical camera `4`
-  is vendor-hidden; it opens once but its ID disappears after opening macro
-  until the process restarts, so enabling it broke macro→main. Only exposed
-  logical cameras use the new path until a verdict covers the fallback round
-  trip.
-- Hidden macro lenses are excluded from the session-switch UI: opening POCO
-  camera `3` invalidates the vendor camera list until process restart. Hidden
-  ultrawide/tele remain eligible; macro needs a stability verdict.
+- `logicalZoomHandoff` now captures a short camera stream while sweeping the
+  discovered stops and passes only when frame gaps, exposure and WB jumps stay
+  bounded and two physical IDs are observed. The controller path is gated on
+  that recorded verdict, including for vendor-hidden logical cameras.
+- POCO X6 Pro logical camera `4` passes the verdict (102 frames, 3.4 s, median
+  33 ms, max gap 34 ms, exposure 1.15×, WB 1.46×, physical 0/2 observed) and
+  front→back returns to it correctly.
+- Hidden macro `3` remains excluded: opening it invalidates the vendor camera
+  list until process restart. Hidden ultrawide/tele stay eligible.
 
 ### Added — Logical zoom handoff discovery (build 2150)
 - The probe now detects logical multi-cameras whose `CONTROL_ZOOM_RATIO` range

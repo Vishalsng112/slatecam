@@ -36,7 +36,7 @@ Status legend: ✅ covered · ⬜ missing · 🕒 only knowable at session time.
 | ✅ Lock availability (1.3.0) | `CONTROL_AE_LOCK_AVAILABLE`, `CONTROL_AWB_LOCK_AVAILABLE` | Whether a WB/exposure lock button is honest |
 | ✅ Metering/focus regions (1.3.0) | `CONTROL_MAX_REGIONS_AE/AF/AWB` | Tap-to-focus needs a region count, not an assumption |
 | ✅ Zoom ratio (1.3.0) | `CONTROL_ZOOM_RATIO_RANGE` | Digital zoom alone ignores logical multi-camera switching |
-| ✅ Logical zoom stops (1.12.0) | physical IDs + intrinsic ratios + zoom range | Discovery only; `logicalZoomHandoff` recording verdict is still pending |
+| ✅ Logical zoom stops (1.12.0) | physical IDs + intrinsic ratios + zoom range | Discovery and `logicalZoomHandoff` stream verdict (prober 1.11.0) |
 | ✅ Focus calibration (1.3.0) | `LENS_INFO_FOCUS_DISTANCE_CALIBRATION` | Whether dioptre values map to real distances |
 | ✅ Rotate and crop (1.3.0) | `SCALER_AVAILABLE_ROTATE_AND_CROP_MODES` | Stabilisation crop behaviour |
 | ✅ Tone-map modes (1.11.0) | `TONEMAP_AVAILABLE_TONE_MAP_MODES` · `TONEMAP_MAX_CURVE_POINTS` | Whether a manual curve is offered; still verify the applied result |

@@ -25,6 +25,50 @@ data class FeatureGate(
 object CapabilityGates {
 
     /**
+     * Whether the controller may use CONTROL_ZOOM_RATIO handoff for [cameraId].
+     * The probe must have recorded a passing `logicalZoomHandoff` check; the
+     * discovery fields alone are not evidence.
+     */
+    fun logicalZoomHandoff(
+        identity: DeviceIdentity,
+        report: ProbeReport?,
+        cameraId: String,
+    ): FeatureGate {
+        if (report == null) {
+            return FeatureGate(false, "run the device report to verify logical zoom handoff")
+        }
+        if (!report.device.deviceKey.equals(identity.deviceKey, ignoreCase = true)) {
+            return FeatureGate(
+                false,
+                "latest report is for ${report.device.deviceKey}; " +
+                    "run the device report on this device",
+            )
+        }
+        val camera = report.cameras.firstOrNull { it.id == cameraId }
+            ?: return FeatureGate(false, "camera $cameraId is missing from the probe report")
+        if (camera.logicalZoom?.handoffEligible != true) {
+            return FeatureGate(
+                false,
+                camera.logicalZoom?.reason?.takeIf { it.isNotBlank() }
+                    ?: "camera $cameraId has no eligible logical zoom range",
+            )
+        }
+        val check = report.verification.checks.firstOrNull {
+            it.id == "logicalZoomHandoff_c$cameraId"
+        } ?: return FeatureGate(
+            false,
+            "logical zoom handoff was not exercised; re-run the device report",
+        )
+        if (check.status != "pass") {
+            return FeatureGate(
+                false,
+                "logical zoom handoff ${check.status}: ${check.detail ?: "no detail"}",
+            )
+        }
+        return FeatureGate(true, check.detail ?: "logical zoom handoff verified")
+    }
+
+    /**
      * Whether 10-bit HLG recording may be requested for [cameraId] at
      * [width] x [height] @ [fps].
      *

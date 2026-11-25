@@ -64,9 +64,9 @@ AF handling). Remaining:
 |---|---|
 | Manual focus UI | The MF slider, tap-to-focus and pinch zoom ship in the Focus card; **focus/AE lock** remains and is not implemented |
 | Measured colour matrices | `ColorCalibration` solves a 3×3 matrix + trim; capture 24 patches per lens and add the result to the device database |
-| Logical zoom handoff controller | Implemented for exposed logical cameras; hidden logical IDs wait for a verdict that includes the fallback round trip |
-| `logicalZoomHandoff` verdict | Record while sweeping across handoff stops and across a fallback lens and back; reject on timestamp gaps, exposure/WB jumps or a lost camera ID |
-| Hidden logical reopen | Vendor-hidden logical IDs disappear after another session starts and need a process restart; investigate a safe reopen or keep them discovery-only |
+| Logical zoom handoff controller | Implemented and gated by the recorded `logicalZoomHandoff` verdict |
+| `logicalZoomHandoff` verdict | Implemented: stream sweep checks gaps, exposure/WB jumps and active physical IDs; runs last in the probe |
+| Hidden logical fallback | POCO hidden logical `4` survives front→back once hidden macro is excluded; other hidden round trips still need verdict coverage |
 | Hidden lens stability | Opening hidden macro `3` on the POCO invalidates the camera list for the process; hidden macro is excluded from the UI until a reopen/identity verdict exists |
 | Dual-session switch | ADR/design only after the logical-zoom path is verified; no concurrent-session code yet |
 | Dual-session seamless switch | The frame pump hides the session gap; a true no-freeze switch needs concurrent sessions and a probe verdict |

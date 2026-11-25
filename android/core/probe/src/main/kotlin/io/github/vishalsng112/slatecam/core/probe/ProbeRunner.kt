@@ -19,6 +19,7 @@ import io.github.vishalsng112.slatecam.core.probe.source.SystemSource
 import io.github.vishalsng112.slatecam.core.probe.verify.CameraSessionVerifier
 import io.github.vishalsng112.slatecam.core.probe.verify.ConcurrentSessionVerifier
 import io.github.vishalsng112.slatecam.core.probe.verify.EncoderVerifier
+import io.github.vishalsng112.slatecam.core.probe.verify.LogicalZoomHandoffVerifier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.math.roundToInt
@@ -126,6 +127,20 @@ class ProbeRunner(private val context: Context) {
             }
         }
         val concurrentCheck = if (verify) ConcurrentSessionVerifier(context).verify() else null
+        // Run last: opening a vendor-hidden logical camera can disturb the
+        // camera list for the checks above.
+        val logicalZoomChecks = if (verify) {
+            cameras
+                .filter { it.logicalZoom?.handoffEligible == true }
+                .map { camera ->
+                    LogicalZoomHandoffVerifier(context).verify(
+                        camera = camera,
+                        checkId = "logicalZoomHandoff_c${camera.id}",
+                    )
+                }
+        } else {
+            emptyList()
+        }
 
         // Tier uses the primary camera's largest claimed pair, so a mix of sizes
         // or cameras cannot be promoted to cinema.
@@ -253,10 +268,12 @@ class ProbeRunner(private val context: Context) {
             verification = Verification(
                 ran = encodeOutcomes.isNotEmpty() ||
                     sessionResults.isNotEmpty() ||
-                    concurrentCheck != null,
+                    concurrentCheck != null ||
+                    logicalZoomChecks.isNotEmpty(),
                 checks = encodeOutcomes.map { it.check } +
                     sessionResults.map { it.check } +
-                    listOfNotNull(concurrentCheck),
+                    listOfNotNull(concurrentCheck) +
+                    logicalZoomChecks,
             ),
             cameraAux = cameraAux,
             warnings = warnings,
@@ -306,7 +323,7 @@ class ProbeRunner(private val context: Context) {
         }
 
     companion object {
-        const val PROBER_VERSION = "1.10.0"
+        const val PROBER_VERSION = "1.11.0"
 
         /**
          * Sizes the prober exercises for the 10-bit path. UHD first: it is the

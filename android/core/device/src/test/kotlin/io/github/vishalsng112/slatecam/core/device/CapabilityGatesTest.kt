@@ -3,11 +3,16 @@ package io.github.vishalsng112.slatecam.core.device
 import io.github.vishalsng112.slatecam.core.probe.model.CameraInfo
 import io.github.vishalsng112.slatecam.core.probe.model.DeviceInfo
 import io.github.vishalsng112.slatecam.core.probe.model.DynamicRangeInfo
+import io.github.vishalsng112.slatecam.core.probe.model.FloatRange
+import io.github.vishalsng112.slatecam.core.probe.model.LogicalZoomInfo
+import io.github.vishalsng112.slatecam.core.probe.model.LogicalZoomStop
 import io.github.vishalsng112.slatecam.core.probe.model.PresetInfo
 import io.github.vishalsng112.slatecam.core.probe.model.ProbeReport
 import io.github.vishalsng112.slatecam.core.probe.model.ReportMeta
 import io.github.vishalsng112.slatecam.core.probe.model.SystemInfo
 import io.github.vishalsng112.slatecam.core.probe.model.TierVerdict
+import io.github.vishalsng112.slatecam.core.probe.model.Verification
+import io.github.vishalsng112.slatecam.core.probe.model.VerificationCheck
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -148,6 +153,75 @@ class CapabilityGatesTest {
 
         assertFalse(gate.available)
         assertTrue(gate.reason.contains("device report"))
+    }
+
+    @Test
+    fun `logical zoom handoff requires a passing recording verdict`() {
+        val passed = logicalReport("pass")
+        val failed = logicalReport("fail")
+        val missing = logicalReport("pass").copy(
+            verification = Verification(ran = true, checks = emptyList()),
+        )
+
+        assertTrue(
+            CapabilityGates.logicalZoomHandoff(
+                identity, passed, "4",
+            ).available,
+        )
+        assertFalse(
+            CapabilityGates.logicalZoomHandoff(
+                identity, failed, "4",
+            ).available,
+        )
+        assertFalse(
+            CapabilityGates.logicalZoomHandoff(
+                identity, missing, "4",
+            ).available,
+        )
+    }
+
+    private fun logicalReport(status: String): ProbeReport {
+        val base = report(
+            deviceKey = identity.deviceKey,
+            tier = "cinema",
+            verified = mapOf("fhd30_10bit" to "pass"),
+        )
+        return base.copy(
+            cameras = listOf(
+                base.cameras.first().copy(
+                    id = "4",
+                    logicalMultiCamera = true,
+                    logicalZoom = LogicalZoomInfo(
+                        handoffEligible = true,
+                        ratioRange = FloatRange(0.6f, 10f),
+                        stops = listOf(
+                            LogicalZoomStop(
+                                physicalId = "2",
+                                role = "ultrawide",
+                                ratio = 0.621,
+                                basis = "physical_intrinsic",
+                            ),
+                            LogicalZoomStop(
+                                physicalId = "0",
+                                role = "default",
+                                ratio = 1.0,
+                                basis = "physical_intrinsic",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            verification = Verification(
+                ran = true,
+                checks = listOf(
+                    VerificationCheck(
+                        id = "logicalZoomHandoff_c4",
+                        status = status,
+                        detail = "test",
+                    ),
+                ),
+            ),
+        )
     }
 
     private fun report(

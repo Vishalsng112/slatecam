@@ -1598,12 +1598,16 @@ class SlateCamBridge private constructor(
         val cameras = deviceSnapshot.probeReport?.cameras ?: return null
         return cameras
             .asSequence()
-            // Hidden logical IDs may open once but disappear after another
-            // session starts; only an exposed logical camera is safe to drive
-            // the no-reopen path. A hidden candidate needs the verdict first.
-            .filter { it.facing == "back" && it.exposed }
+            .filter { it.facing == "back" && (it.exposed || it.openable == true) }
             .filter { it.id != failedLogicalId }
             .filter { it.logicalZoom?.handoffEligible == true }
+            .filter {
+                CapabilityGates.logicalZoomHandoff(
+                    identity = deviceSnapshot.identity,
+                    report = deviceSnapshot.probeReport,
+                    cameraId = it.id,
+                ).available
+            }
             .maxWithOrNull(
                 compareBy<CameraInfo> { if (it.role == "default") 1 else 0 }
                     .thenBy {

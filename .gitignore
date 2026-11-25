@@ -49,3 +49,7 @@ Thumbs.db
 
 # --- Keep the Gradle wrapper jar -------------------------------------------
 !gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin incremental metadata
+.kotlin/
+android/.kotlin/

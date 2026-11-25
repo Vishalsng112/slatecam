@@ -603,6 +603,13 @@ Known check ids:
 | `camera_hlg10_session_fhd43` | The same primary camera at 1440×1080 |
 | `camera_hlg10_session_c<id>_<size>` | A specific lens configured HLG10 at that size |
 | `concurrent_camera_session` | Two cameras can be configured at once |
+| `logicalZoomHandoff_c<id>` | A logical camera captured a stream while sweeping stops: no timestamp gap, bounded exposure/WB jumps, at least two active physical IDs |
+
+The `logicalZoomHandoff` check (prober 1.11.0) is recorded as
+`logicalZoomHandoff_c<id>` and runs last, because opening a vendor-hidden
+logical camera can disturb other probe sessions. A pass enables the controller's
+`CONTROL_ZOOM_RATIO` handoff for that logical camera; discovery fields alone do
+not.
 
 A 10-bit preset is only marked `verified: pass` when an encode check and a
 camera-session check passed **at that preset's size and on that camera**. A UHD
