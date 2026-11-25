@@ -71,6 +71,10 @@ data class CameraUiState(
     val previewRotationDegrees: Int,
     /** Rotation the GL shader must apply to make the sensor image upright. */
     val glRotationDegrees: Int = 0,
+    /** Fixed landscape rotation for the encoder, independent of the display. */
+    val encoderRotationDegrees: Int = 0,
+    /** Clockwise MP4 orientation hint for the rotation the take started in. */
+    val recordingOrientationHint: Int = 0,
     val zoomRatio: Float = 1f,
     val zoomMin: Float = 1f,
     val zoomMax: Float = 1f,
@@ -170,6 +174,8 @@ class CameraController(private val context: Context) {
     private var lastFocusRampMs = 0L
     private var rotationDegrees = 0
     private var glRotationDegrees = 0
+    private var encoderRotationDegrees = 0
+    private var recordingOrientationHint = 0
     private var initialized = false
     private var wantsTenBit = false
     private var tenBitActive = false
@@ -1089,24 +1095,71 @@ class CameraController(private val context: Context) {
         // flicker-safe snap happens here rather than with the range clamping.
         if (!autoExposure) shutterNs = snapShutter(shutterNs)
 
-        rotationDegrees = displayRotationDegrees(characteristics)
-        val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
-        val display = currentDisplayRotation()
-        // The Matrix in texMatrix already carries one quarter turn; this is the
-        // additional rotation that makes the encoded/preview pixels upright in
-        // the app's landscape orientation. Validated on ROTATION_90; the other
-        // landscape branch is the 180-degree counterpart.
-        glRotationDegrees = when (display) {
-            Surface.ROTATION_90 -> sensor % 360
-            Surface.ROTATION_270 -> (sensor + 180) % 360
-            Surface.ROTATION_180 -> (sensor + 90) % 360
-            else -> (sensor + 270) % 360
+        updateDisplayRotation(characteristics)
+    }
+
+    /**
+     * Recomputes the display-relative preview rotation without reopening the
+     * camera. Called when the activity rotates while the session stays alive.
+     */
+    fun refreshDisplayRotation() {
+        handler.post {
+            val characteristics = currentCharacteristics ?: return@post
+            updateDisplayRotation(characteristics)
+            emit()
         }
+    }
+
+    private fun updateDisplayRotation(characteristics: CameraCharacteristics) {
+        rotationDegrees = displayRotationDegrees(characteristics)
+        encoderRotationDegrees = encoderRotationFor(characteristics)
+        recordingOrientationHint = recordingHintFor(characteristics)
+        glRotationDegrees = glRotationFor(characteristics)
         android.util.Log.i(
             "SlateCam",
             "preview rotation=$rotationDegrees gl=$glRotationDegrees " +
-                "sensor=$sensor display=$display",
+                "encode=$encoderRotationDegrees hint=$recordingOrientationHint " +
+                "sensor=${characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)} " +
+                "display=${currentDisplayRotation()}",
         )
+    }
+
+    /**
+     * The encoder always receives a landscape frame, upright relative to the
+     * sensor's natural landscape orientation. Portrait playback is handled by
+     * the MP4 orientation hint instead of encoding a second pixel layout.
+     */
+    private fun encoderRotationFor(characteristics: CameraCharacteristics): Int {
+        val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        return sensor % 360
+    }
+
+    /** Clockwise rotation a player applies to make the take upright. */
+    private fun recordingHintFor(characteristics: CameraCharacteristics): Int {
+        val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+        val display = when (currentDisplayRotation()) {
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> 0
+        }
+        return if (facing == CameraCharacteristics.LENS_FACING_FRONT) {
+            (sensor + display) % 360
+        } else {
+            (sensor - display + 360) % 360
+        }
+    }
+
+    /**
+     * The GL preview always renders the sensor-upright landscape frame, the
+     * same pixels the encoder receives. Flutter applies the display quarter
+     * turn from the MP4 orientation hint, so preview and playback share one
+     * transform and there is no second pixel path.
+     */
+    private fun glRotationFor(characteristics: CameraCharacteristics): Int {
+        val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        return sensor % 360
     }
 
     private fun currentDisplayRotation(): Int = runCatching {
@@ -1396,6 +1449,8 @@ class CameraController(private val context: Context) {
             previewHeight = previewSize.height,
             previewRotationDegrees = rotationDegrees,
             glRotationDegrees = glRotationDegrees,
+            encoderRotationDegrees = encoderRotationDegrees,
+            recordingOrientationHint = recordingOrientationHint,
             zoomRatio = zoomRamp.value,
             zoomMin = zoomMin,
             zoomMax = zoomMax,

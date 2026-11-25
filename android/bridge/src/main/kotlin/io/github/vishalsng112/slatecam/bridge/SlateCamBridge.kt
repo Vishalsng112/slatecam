@@ -188,6 +188,8 @@ class SlateCamBridge private constructor(
     private var flutterApi: SlateCamFlutterApi? = null
     /** Renderer + preview surface are started; independent of a transient session reopen. */
     private var pipelineActive = false
+    private var rotationRefreshPending = false
+    private var activeOrientationHint = 0
     private var resumeOnReturn = false
     private var lastState: CameraUiState? = null
 
@@ -1180,6 +1182,8 @@ class SlateCamBridge private constructor(
                 previous.frameRate != state.frameRate ||
                 previous.previewWidth != state.previewWidth ||
                 previous.previewHeight != state.previewHeight ||
+                previous.previewRotationDegrees != state.previewRotationDegrees ||
+                previous.recordingOrientationHint != state.recordingOrientationHint ||
                 previous.activePhysicalCameraId != state.activePhysicalCameraId
             )
         lastState = state
@@ -1213,6 +1217,7 @@ class SlateCamBridge private constructor(
         renderer.setTenBitSource(state.isTenBit)
         renderer.setDisplayRotation(state.previewRotationDegrees)
         renderer.setGlRotation(state.glRotationDegrees)
+        renderer.setEncoderRotation(state.encoderRotationDegrees)
         applyManualWhiteBalance(state)
         if (cameraChanged || openChanged || configChanged) {
             pushState()
@@ -1443,6 +1448,9 @@ class SlateCamBridge private constructor(
         if (recorder.isRecording) return
 
         val mode = activeMode()
+        // Freeze the orientation for the take. Rotating the device mid-clip
+        // updates preview after the clip is finalized, not the encoded stream.
+        activeOrientationHint = lastState?.recordingOrientationHint ?: 0
         val name = "SlateCam_" +
             SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".mp4"
 
@@ -1525,6 +1533,10 @@ class SlateCamBridge private constructor(
             audioSource = null
             mainHandler.post {
                 closeStandby()
+                if (rotationRefreshPending) {
+                    rotationRefreshPending = false
+                    controller.refreshDisplayRotation()
+                }
                 if (pipelineActive) startAudioMonitor()
                 pushState()
             }
@@ -1582,7 +1594,7 @@ class SlateCamBridge private constructor(
                 bitrate,
                 tenBitHlg,
                 destination.muxer,
-                orientationHint = 0,
+                orientationHint = activeOrientationHint,
                 audio = ClipRecorder.AudioConfig(audioInputKey, audioGainDb),
             )
         } catch (first: Throwable) {
@@ -1598,7 +1610,7 @@ class SlateCamBridge private constructor(
                     bitrate,
                     false,
                     destination.muxer,
-                    orientationHint = 0,
+                    orientationHint = activeOrientationHint,
                     audio = ClipRecorder.AudioConfig(audioInputKey, audioGainDb),
                 )
             } catch (second: Throwable) {
@@ -1699,6 +1711,18 @@ class SlateCamBridge private constructor(
             clipPath = destination.file?.absolutePath
         }
         recorder.lastError?.let { recordingError = it }
+    }
+
+    /**
+     * The activity rotated but stayed alive. Preview rotation follows the
+     * display immediately; a take keeps the orientation it started with.
+     */
+    fun onDisplayRotationChanged() {
+        if (recorder.isRecording) {
+            rotationRefreshPending = true
+            return
+        }
+        controller.refreshDisplayRotation()
     }
 
     /** Releases the camera when the app leaves the foreground. */
@@ -2486,6 +2510,7 @@ class SlateCamBridge private constructor(
         previewOutputHeight = this@SlateCamBridge.previewOutputHeight.toLong(),
         previewQuality = this@SlateCamBridge.previewQuality,
         previewRotationDegrees = previewRotationDegrees.toLong(),
+        recordingOrientationHint = recordingOrientationHint.toLong(),
         zoomRatio = zoomRatio.toDouble(),
         zoomMin = zoomMin.toDouble(),
         zoomMax = zoomMax.toDouble(),

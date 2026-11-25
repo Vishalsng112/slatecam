@@ -2,6 +2,7 @@ package io.github.vishalsng112.slatecam
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
@@ -44,6 +45,13 @@ class MainActivity : FlutterActivity() {
         bridge?.dispose()
         bridge = null
         super.onDestroy()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // The activity keeps the Flutter view alive across rotation, so the
+        // camera pipeline must recompute its display-relative rotation.
+        bridge?.onDisplayRotationChanged()
     }
 
     override fun onPause() {

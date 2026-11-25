@@ -68,6 +68,7 @@ root is `android/`, not the repository root.
 | Scene-linear shader / output routing | `:core:gpu` | `GlPreviewRenderer.ShaderSource.FRAGMENT` |
 | Flicker-safe exposure grid | `:core:common` | `FlickerGrid`, `CameraController.setShutterNs` |
 | Viewfinder tap-to-focus / pinch | `lib/src/ui/capture_screen.dart`, `:core:gpu` transform, `:core:camera` AF region | `GlPreviewRenderer.viewfinderToBuffer`, `CameraController.setFocusPoint` |
+| Orientation / portrait recording | `MainActivity`, `:bridge`, `:core:camera`, `:core:gpu`, `lib/src/ui/capture_screen.dart` | `onDisplayRotationChanged`, `recordingOrientationHint`, `RotatedBox` preview |
 | Picture profiles / look pipeline | `:core:profile` | `PictureProfile.kt`, `PictureProfileLibrary.kt`, `SlateCamBridge.applyProfile` |
 | Custom profile persistence | `:bridge` | `setProfileSettings`, `encodeSettings`/`decodeSettings` |
 | Per-lens calibration / WB / shadow | `:core:device` | `CalibrationEntry`, `DeviceDatabase.calibrationFor`, `InputProfile` |

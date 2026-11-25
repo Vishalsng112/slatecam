@@ -251,9 +251,12 @@ class _CaptureScreenState extends State<CaptureScreen>
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final portrait = constraints.maxHeight > constraints.maxWidth;
             if (!_layoutInitialised && constraints.maxWidth > 0) {
               _layoutInitialised = true;
-              _deckOpen = constraints.maxWidth >= 760;
+              // Portrait keeps the console docked below the viewfinder so both
+              // are usable; landscape docks it beside the image on wide screens.
+              _deckOpen = constraints.maxWidth >= 760 || portrait;
             }
 
             final state = _state;
@@ -290,6 +293,22 @@ class _CaptureScreenState extends State<CaptureScreen>
               telemetry: _telemetry,
               audio: _audio,
             );
+
+            if (portrait) {
+              // One responsive arrangement for phones and tablets: the same
+              // preview, zoom rail and console widgets, stacked instead of
+              // duplicated for a second orientation.
+              final deckHeight = math.min(
+                460.0,
+                math.max(300.0, constraints.maxHeight * 0.48),
+              );
+              return Column(
+                children: [
+                  Expanded(child: preview),
+                  if (_deckOpen) SizedBox(height: deckHeight, child: deck),
+                ],
+              );
+            }
 
             if (constraints.maxWidth >= 760) {
               return Row(
@@ -592,30 +611,38 @@ class _CaptureScreenState extends State<CaptureScreen>
   }
 
   Widget _previewTexture(CameraState state) {
-    // The GL pipeline already applies the camera/display rotation, so Flutter
-    // must not rotate again. Keep the exact pixel aspect and let the frame
-    // letterbox rather than stretch.
+    // The GL pipeline renders the same sensor-upright frame for preview and
+    // encoder. Flutter applies the display quarter turn from the MP4 hint, so
+    // the viewfinder is exactly the composition that will play back.
     final outputWidth = state.previewOutputWidth > 0
         ? state.previewOutputWidth
         : state.previewWidth;
     final outputHeight = state.previewOutputHeight > 0
         ? state.previewOutputHeight
         : state.previewHeight;
-    final texture = SizedBox(
+    final turns = (state.recordingOrientationHint ~/ 90) % 4;
+    final rotated = turns.isOdd;
+    Widget texture = SizedBox(
       width: outputWidth.toDouble(),
       height: outputHeight.toDouble(),
       child: Texture(textureId: _textureId!),
     );
+    if (turns != 0) {
+      texture = RotatedBox(quarterTurns: turns, child: texture);
+    }
 
     return Center(
       child: AspectRatio(
-        aspectRatio: outputWidth / outputHeight,
+        aspectRatio: rotated
+            ? outputHeight / outputWidth
+            : outputWidth / outputHeight,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final size = constraints.biggest;
             return GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTapUp: (details) => _focusAt(details.localPosition, size),
+              onTapUp: (details) =>
+                  _focusAt(details.localPosition, size, turns),
               onScaleStart: (_) => _scaleStartZoom = state.zoomRatio,
               onScaleUpdate: (details) {
                 if (details.pointerCount < 2) return;
@@ -661,10 +688,18 @@ class _CaptureScreenState extends State<CaptureScreen>
     );
   }
 
-  void _focusAt(Offset point, Size size) {
+  void _focusAt(Offset point, Size size, int turns) {
     if (size.width <= 0 || size.height <= 0) return;
-    final x = (point.dx / size.width).clamp(0.0, 1.0);
-    final y = (point.dy / size.height).clamp(0.0, 1.0);
+    final dx = (point.dx / size.width).clamp(0.0, 1.0);
+    final dy = (point.dy / size.height).clamp(0.0, 1.0);
+    // Undo the presentation rotation before handing the point to the GL
+    // viewfinder-to-buffer transform.
+    final (x, y) = switch (turns % 4) {
+      1 => (dy, 1 - dx),
+      2 => (1 - dx, 1 - dy),
+      3 => (1 - dy, dx),
+      _ => (dx, dy),
+    };
     _host.setFocusPoint(x, y);
     setState(() => _focusReticle = point);
     _focusReticleTimer?.cancel();

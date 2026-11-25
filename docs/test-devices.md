@@ -1475,3 +1475,22 @@ POCO X6 Pro, logical camera `4` (all HAL modes plus SAF):
 Pad 3: fresh launch selects CAF and lists CAF, CAF-P, AF, MACRO, EDOF, MF and
 SAF. The Wedding preset is not highlighted while CAF is active, confirming that
 a scenario only describes SAF. Choosing SAF highlights the selected scenario.
+
+## Portrait UI and recording (build 2180)
+
+**POCO X6 Pro, logical camera 4, 1440×1080 4:3 30p 8-bit.**
+
+| Check | Result |
+|---|---|
+| Portrait layout | Viewfinder above the console; all existing cards below |
+| Landscape layout | Viewfinder beside the console; rotation live, no reopen |
+| Portrait preview vs clip | Same composition and upright orientation |
+| Portrait clip | `1440×1080`, MP4 rotation `-90`; auto-rotated playback `1080×1440` |
+| Landscape clip | `1440×1080`, no rotation matrix; unchanged from before |
+| Focus tap in portrait | Reticle at the tapped point; focus region follows the inverse rotation |
+| Rotate during idle | Preview and console switch immediately |
+| Rotate during take | Clip keeps its start orientation; new rotation applies after finalize |
+
+**Pad 3:** portrait stacks the viewfinder above the console and the console uses
+its three responsive columns; landscape remains side-by-side. The Pad reports a
+different preview size and still rotates live without reopening the camera.

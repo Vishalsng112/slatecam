@@ -198,6 +198,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     @Volatile private var falseColor = false
     @Volatile private var displayRotation = 0
     @Volatile private var glRotation = 0
+    @Volatile private var encoderRotation = 0
     @Volatile private var inputMatrix = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
     @Volatile private var inputExposure = 1f
     @Volatile private var inputSaturation = 1f
@@ -315,6 +316,11 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     /** Rotation the shader applies so encoded and preview pixels are upright. */
     fun setGlRotation(degrees: Int) {
         glRotation = ((degrees % 360) + 360) % 360
+    }
+
+    /** Fixed landscape rotation used for the encoder frame. */
+    fun setEncoderRotation(degrees: Int) {
+        encoderRotation = ((degrees % 360) + 360) % 360
     }
 
     /** Records the timestamp submitted with each encoded frame. */
@@ -976,7 +982,11 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         onFrameRendered()
     }
 
-    private fun drawQuad(isPreview: Boolean, overlay: Boolean) {
+    private fun drawQuad(
+        isPreview: Boolean,
+        overlay: Boolean,
+        rotationDegrees: Int = glRotation,
+    ) {
         GLES20.glUseProgram(program)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(
@@ -1025,7 +1035,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             1f / captureHeight.coerceAtLeast(1),
         )
         GLES20.glUniformMatrix4fv(uTexMatrix, 1, false, texMatrix, 0)
-        GLES20.glUniform1f(uRotation, glRotation.toFloat())
+        GLES20.glUniform1f(uRotation, rotationDegrees.toFloat())
 
         GLES20.glEnableVertexAttribArray(aPosition)
         GLES20.glVertexAttribPointer(aPosition, 2, GLES20.GL_FLOAT, false, 0, QUAD_VERTICES)
@@ -1257,7 +1267,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glViewport(0, 0, captureWidth, captureHeight)
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        drawQuad(isPreview = false, overlay = false)
+        drawQuad(isPreview = false, overlay = false, rotationDegrees = encoderRotation)
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
 
         // Copy the FP16 result to the encoder surface at 1:1.
@@ -1415,7 +1425,11 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
-        drawQuad(isPreview, overlay)
+        drawQuad(
+            isPreview,
+            overlay,
+            rotationDegrees = if (surface == encoderEglSurface) encoderRotation else glRotation,
+        )
 
         if (surface == encoderEglSurface) {
             if (captureEncoderTimestamps) {

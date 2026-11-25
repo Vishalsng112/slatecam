@@ -9,6 +9,21 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Added — Portrait UI and portrait recording (build 2180)
+- The activity now follows `fullSensor`; rotating the device keeps the camera
+  open and switches the UI between a side-by-side landscape console and a
+  portrait stack with the viewfinder above the same console widgets.
+- Portrait uses the exact playback composition: the GL path renders one
+  sensor-upright landscape frame for preview and encoder, Flutter applies the
+  display quarter turn from the MP4 orientation hint, and tap-to-focus
+  inversely rotates the point before the viewfinder-to-buffer transform.
+- Timer/recording keeps its start orientation. Portrait clips carry the MP4
+  rotation hint (POCO: 1440×1080 with a 90° hint, played as 1080×1440) instead
+  of opening a second pixel path; landscape clips remain untagged.
+- Rotation while idle is applied live; rotation during a take is applied when
+  the clip is finalized so the encoded stream cannot change orientation
+  mid-clip.
+
 ### Changed — One focus interface, CAF default (build 2174)
 - `FocusController` now owns every focus decision: the mode catalog, the
   active/preferred mode, manual diopters, SAF presets and the AF/lens request

@@ -322,6 +322,23 @@ restarts. There is no face or eye tracking.
 | Hybrid CDAF | hill-climb focus engine | Future |
 | Focus peaking controls | Monitoring card | Current |
 
+### 5.5.1 Orientation
+
+The same widgets serve both orientations; nothing is duplicated per layout.
+
+- **Landscape / wide:** viewfinder and console side by side. The console docks
+  on the right and the viewfinder takes the remaining width.
+- **Portrait:** viewfinder on top and the console docked below at roughly half
+  the height. The console uses its existing responsive columns.
+- **Preview/recording:** the GL layer renders the sensor-upright landscape frame
+  for both preview and encoder. The MP4 orientation hint describes the take
+  orientation; Flutter presents the preview with that same quarter turn and
+  inversely rotates focus taps. Portrait clips therefore play back exactly as
+  framed without a second pixel path.
+- Rotating while idle updates the preview immediately. Deciding to rotate
+  during a take applies after the clip is finalized: a recording never changes
+  orientation mid-stream.
+
 ### 5.6 Picture profile card
 
 | Element | Native call | Status |
