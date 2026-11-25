@@ -612,7 +612,7 @@ class _ControlDeckState extends State<ControlDeck> {
               onTap: () => _selectAspect(true),
             ),
             _aspectCircle(
-              _portrait ? '3:4' : '4:3',
+              '4:3',
               selected: !wide,
               onTap: () => _selectAspect(false),
             ),
@@ -875,25 +875,30 @@ class _ControlDeckState extends State<ControlDeck> {
     return null;
   }
 
-  bool get _portrait => state.previewQuarterTurns.isOdd;
+  bool get _portrait =>
+      MediaQuery.orientationOf(context) == Orientation.portrait;
 
-  int get _displayWidth => _portrait ? state.previewHeight : state.previewWidth;
+  bool get _verticalFrame => state.previewQuarterTurns.isOdd;
+
+  int get _displayWidth =>
+      _verticalFrame ? state.previewHeight : state.previewWidth;
 
   int get _displayHeight =>
-      _portrait ? state.previewWidth : state.previewHeight;
+      _verticalFrame ? state.previewWidth : state.previewHeight;
 
   String _sizeLabelFor(int width, int height) {
     if (_portrait) {
       return switch ((width, height)) {
+        // 16:9 becomes the vertical 9:16 take; 4:3 stays the open gate.
         (3840, 2160) => '4K',
-        (4096, 3072) => '4K3:4',
-        (3840, 2880) => '4K3:4',
-        (2880, 2160) => '4K3:4',
+        (4096, 3072) => '4K4:3',
+        (3840, 2880) => '4K4:3',
+        (2880, 2160) => '4K4:3',
         (1920, 1080) => '1080p',
-        (1920, 1440) => '3:4',
-        (1440, 1080) => '3:4',
+        (1920, 1440) => '4:3',
+        (1440, 1080) => '4:3',
         (1280, 720) => '720p',
-        _ => '$height×$width',
+        _ => '$width×$height',
       };
     }
     return switch ((width, height)) {

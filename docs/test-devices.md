@@ -1531,3 +1531,16 @@ at full width; starting a recording draws the red border on the image edges, all
 four corners visible. Portrait 9:16 shows the complete `1080×1920` frame; its
 side margins are outside the red border and are never encoded. The playback
 frame matches the viewfinder composition in both ratios.
+
+## Portrait 9:16 and 4:3 open gate (build 2190)
+
+POCO X6 Pro portrait:
+
+| Selection | UI size | Preview | Encoded clip |
+|---|---|---|---|
+| 9:16 | 1080×1920 | tall, full frame | 1920×1080 + `-90` hint |
+| 4:3 | 1440×1080 | landscape, letterboxed | 1440×1080, no hint |
+
+The red recording border wraps the actual frame in both cases, with all four
+corners visible. The 4:3 open gate is no longer mislabelled or converted to
+3:4; 9:16 remains the vertical video mode.

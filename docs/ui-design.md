@@ -332,9 +332,10 @@ The same widgets serve both orientations; nothing is duplicated per layout.
   the height. The console uses its existing responsive columns. The viewfinder
   shows the complete recorded frame at its true aspect; it never crops. The
   red recording border wraps that frame (all four corners), so the viewfinder
-  and the encoded clip always contain the same image. The aspect control and
-  labels swap with the orientation (`16:9`/`4:3` in landscape, `9:16`/`3:4` in
-  portrait), and the displayed recording size is the effective vertical size.
+  and the encoded clip always contain the same image. Portrait offers `9:16`
+  (vertical video, effective `1080×1920`) and `4:3` (sensor open gate, stays
+  `1440×1080` and is letterboxed). Landscape offers `16:9` and `4:3`. Labels
+  follow the display orientation; sizes follow the actual frame.
 - **Preview/recording:** the GL layer renders the sensor-upright landscape frame
   for both preview and encoder. The MP4 orientation hint describes the take
   orientation; Flutter presents the preview with that same quarter turn and

@@ -51,9 +51,11 @@ hint; the latter keeps one encoder path and one GL frame.
   `1080×1440`. Landscape clips remain `1440×1080` with no rotation.
 - Pad 3: portrait uses the stacked layout and the console's three responsive
   columns below the viewfinder; rotation during idle is live.
-- The viewfinder aspect for a portrait 4:3 mode is 3:4, and for 16:9 it is 9:16;
-  the aspect control and size labels swap with the orientation, so the UI never
-  claims X:Y while playback is Y:X.
+- Portrait offers `9:16` (16:9 sensor take plus the quarter-turn hint) and
+  `4:3` (sensor open gate, no rotation). The 4:3 frame keeps its landscape shape
+  and is letterboxed; it is not silently converted to 3:4.
+- The viewfinder never crops: the red recording border wraps the actual frame
+  for both families.
 - Mid-take rotation does not rotate the clip; the operator sees the live
   preview continue for the current take, then the new orientation applies.
 

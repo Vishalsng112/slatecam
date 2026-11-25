@@ -9,6 +9,18 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Portrait aspect families: 9:16 video, 4:3 open gate (build 2190)
+- Portrait now offers `9:16` and `4:3`, matching the reference camera layout.
+  `9:16` records the vertical video take (`1080×1920`, 16:9 sensor frame plus
+  the MP4 quarter turn). `4:3` is the sensor open gate and stays `4:3`
+  (`1440×1080`) even while the phone is upright, shown letterboxed in the
+  viewfinder with the red border on its edges.
+- The earlier `3:4` label/rotation for the second portrait option is removed;
+  it was the wrong convention for this UI.
+- Aspect labels no longer depend on the frame rotation, only on the display
+  orientation, so the buttons read `9:16` / `4:3` in portrait and `16:9` /
+  `4:3` in landscape.
+
 ### Fixed — Uncrop the viewfinder and align the recording border (build 2188)
 - The viewfinder no longer uses a full-bleed cover crop. It shows the complete
   recorded frame at its true aspect, so preview and file contain the same image.
