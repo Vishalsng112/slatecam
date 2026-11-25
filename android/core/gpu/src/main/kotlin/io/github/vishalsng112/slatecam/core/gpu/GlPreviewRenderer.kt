@@ -1548,6 +1548,20 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 return mix(low, high, step(vec3(1.0 / 12.0), x));
             }
 
+            // Preview-only HLG display mapping. The HLG inverse yields
+            // scene-linear relative to the 1000-nit reference; the OOTF and a
+            // 100-nit SDR normalisation are required before BT.709 encoding.
+            // Without this the HLG preview sits roughly 40% darker than SDR.
+            vec3 hlgPreviewToSdr(vec3 c) {
+                float y = max(luma2020(c), 1e-6);
+                vec3 display = c * pow(y, 0.2) * 4.93;
+                vec3 knee = vec3(0.8);
+                vec3 over = max(display - knee, 0.0);
+                vec3 shoulder = knee + (1.0 - knee) *
+                    (1.0 - exp(-over / (1.0 - knee)));
+                return clamp(mix(display, shoulder, step(knee, display)), 0.0, 1.0);
+            }
+
             vec3 bt709To2020(vec3 c) {
                 return vec3(
                     dot(c, vec3(0.6274, 0.3293, 0.0433)),
@@ -1690,6 +1704,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
 
                 // 4/5. Output routing and creative LUT in the delivery domain.
                 if (uIsPreview == 1) {
+                    if (uInputHlg == 1) {
+                        c = hlgPreviewToSdr(c);
+                    }
                     vec3 displayLinear = bt2020To709(c);
                     c = linearToBt709(clamp(displayLinear, 0.0, 1.0));
                 } else if (uOutputHlg == 1) {

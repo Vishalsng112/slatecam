@@ -9,6 +9,16 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — HLG preview brightness (build 2149)
+- The HLG preview now applies the BT.2100 OOTF and normalises the 1000-nit
+  reference to a 100-nit SDR display before BT.709 encoding, with a soft
+  highlight shoulder. Previously HLG scene-linear values went straight to
+  BT.709, making the viewfinder about 40% darker than SDR on the same scene.
+- Preview only: the recorded HLG stream remains Main10 / BT.2020 /
+  arib-std-b67, and metering still uses the delivery signal.
+- Pad 3 A/B on the same scene: preview mean luma 57 → 106 (SDR 102); the
+  10-bit clip still verifies as HLG after the change.
+
 ### Removed — In-app colour calibration (build 2147)
 - Removed the guided ColorChecker screen, calibration bypass capture, solver
   API and save path. The per-lens `InputProfile`/`CalibrationEntry` loader

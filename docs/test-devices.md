@@ -1343,3 +1343,20 @@ The built-in microphone was very quiet on this unit: the monitor reported
 The AAC track exists and is not digital silence; no USB or wired mic was
 available to distinguish room/mic gain from a routing issue. The test clip was
 removed; the app was left live.
+
+
+## HLG preview brightness (OnePlus Pad 3, build 2149)
+
+Same stationary scene, switching only the bit depth in the Recording Mode card;
+preview content region and a fixed wall patch measured from the screenshots.
+
+| Mode | Preview mean luma | Wall luma |
+|---|---|---|
+| 10-bit HLG before fix | 57.4 | 104.9 |
+| 8-bit SDR | 103.2 | 163.1 |
+| 10-bit HLG after fix | 106.0 | 200.8 |
+
+The mapping uses the BT.2100 OOTF and a 203-nit-to-100-nit SDR reference
+(K≈4.93). Preview mean now matches SDR; HLG highlights sit slightly higher,
+which is expected headroom. A 2.7 s 10-bit take after the fix still probes as
+HEVC Main 10, BT.2020, arib-std-b67; the test clip was removed.

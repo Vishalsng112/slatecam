@@ -37,9 +37,12 @@ preview outputs.
    - Analysis: the same delivery signal as the encoder, without overlays or
      monitoring transforms, so waveforms/false colour/metering follow what is
      recorded.
-   - Preview: BT.2020→BT.709 linear, then BT.709 OETF or SlateLog, then the
-     creative LUT and overlays. SlateLog is a monitoring view only; the encoder
-     always receives HLG or BT.709. This keeps the container SPS/VUI honest.
+   - Preview: for HLG input, apply the BT.2100 OOTF and normalise the
+     1000-nit reference to a 100-nit SDR display (with a soft shoulder), then
+     BT.2020→BT.709 and BT.709 OETF or SlateLog, then the creative LUT and
+     overlays. SDR input skips the extra mapping. SlateLog is a monitoring view
+     only; the encoder always receives HLG or BT.709. This keeps the container
+     SPS/VUI honest and stops the HLG viewfinder sitting darker than SDR.
 6. **FP16 encoder intermediate remains.** The scene-linear shader writes the
    encoder delivery into the FP16 FBO (ADR 0017), then the dithered copy feeds
    the RGBA8888 encoder surface. True 10-bit delivery is still pending a
