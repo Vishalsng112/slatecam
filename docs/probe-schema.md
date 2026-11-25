@@ -604,6 +604,7 @@ Known check ids:
 | `camera_hlg10_session_c<id>_<size>` | A specific lens configured HLG10 at that size |
 | `concurrent_camera_session` | Two cameras can be configured at once |
 | `logicalZoomHandoff_c<id>` | A logical camera captured a stream while sweeping stops: no timestamp gap, bounded exposure/WB jumps, at least two active physical IDs |
+| `dualSessionSwitch_c<A>_c<B>` | Two exposed cameras ran concurrently and joined a stream boundary with no timestamp gap; exposure/WB are not compared across different sensors |
 
 The `logicalZoomHandoff` check (prober 1.11.0) is recorded as
 `logicalZoomHandoff_c<id>` and runs last, because opening a vendor-hidden

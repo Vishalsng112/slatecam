@@ -69,6 +69,43 @@ object CapabilityGates {
     }
 
     /**
+     * Whether two cameras may be used as a dual-session pair. The probe must
+     * have recorded a passing stream-switch check for this exact pair.
+     */
+    fun dualSessionSwitch(
+        identity: DeviceIdentity,
+        report: ProbeReport?,
+        cameraA: String,
+        cameraB: String,
+    ): FeatureGate {
+        if (report == null) {
+            return FeatureGate(false, "run the device report to verify dual-session switching")
+        }
+        if (!report.device.deviceKey.equals(identity.deviceKey, ignoreCase = true)) {
+            return FeatureGate(
+                false,
+                "latest report is for ${report.device.deviceKey}; " +
+                    "run the device report on this device",
+            )
+        }
+        val a = minOf(cameraA, cameraB)
+        val b = maxOf(cameraA, cameraB)
+        val check = report.verification.checks.firstOrNull {
+            it.id == "dualSessionSwitch_c${a}_c$b"
+        } ?: return FeatureGate(
+            false,
+            "dual-session switch was not exercised for cameras $a+$b; re-run the device report",
+        )
+        if (check.status != "pass") {
+            return FeatureGate(
+                false,
+                "dual-session switch ${check.status}: ${check.detail ?: "no detail"}",
+            )
+        }
+        return FeatureGate(true, check.detail ?: "dual-session switch verified")
+    }
+
+    /**
      * Whether 10-bit HLG recording may be requested for [cameraId] at
      * [width] x [height] @ [fps].
      *

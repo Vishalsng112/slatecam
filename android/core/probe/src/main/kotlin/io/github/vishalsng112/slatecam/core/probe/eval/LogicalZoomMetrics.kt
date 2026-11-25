@@ -41,7 +41,10 @@ object LogicalZoomMetrics {
     private const val MAX_WB_RATIO = 1.6f
     private const val GAP_ABSOLUTE_MS = 100L
 
-    fun analyze(samples: List<Sample>): Result {
+    fun analyze(
+        samples: List<Sample>,
+        checkHandoffExposure: Boolean = true,
+    ): Result {
         val ordered = samples
             .filter { it.timestampNs > 0L }
             .sortedBy { it.timestampNs }
@@ -60,8 +63,11 @@ object LogicalZoomMetrics {
         val maxGap = gaps.maxOrNull() ?: 0L
         val gapLimit = maxOf(median * 3L, GAP_ABSOLUTE_MS)
 
-        val exposureJump = maxExposureJump(ordered)
-        val wbJump = maxWbJump(ordered)
+        // A dual-session switch joins two different sensors/scenes, so a
+        // boundary exposure or WB difference is expected. The logical-zoom
+        // path hands off within one scene and must keep it bounded.
+        val exposureJump = if (checkHandoffExposure) maxExposureJump(ordered) else 1f
+        val wbJump = if (checkHandoffExposure) maxWbJump(ordered) else 1f
         val physicalIds = ordered.mapNotNull { it.activePhysicalId }
             .filter { it.isNotBlank() }
             .distinct()
@@ -70,10 +76,10 @@ object LogicalZoomMetrics {
         if (maxGap > gapLimit) {
             reasons += "frame gap ${maxGap}ms (median ${median}ms)"
         }
-        if (exposureJump > MAX_EXPOSURE_RATIO) {
+        if (checkHandoffExposure && exposureJump > MAX_EXPOSURE_RATIO) {
             reasons += "exposure jump ${"%.2f".format(exposureJump)}×"
         }
-        if (wbJump > MAX_WB_RATIO) {
+        if (checkHandoffExposure && wbJump > MAX_WB_RATIO) {
             reasons += "WB jump ${"%.2f".format(wbJump)}×"
         }
         if (physicalIds.size < 2) {

@@ -1398,3 +1398,22 @@ was exercised end to end.
 `LogicalZoomMetricsTest` covers steady frames, timestamp gaps, exposure/WB
 jumps, a single physical lens and too few frames. The test clips created for the
 run were removed.
+
+## Dual-session front↔back switch (Pad 3, build 2165)
+
+OnePlus Pad 3, 1440×1080 · 30p · 10-bit HLG. Probe pair `0+1` passes
+`dualSessionSwitch_c0_c1`.
+
+| Check | Result |
+|---|---|
+| Standby | `standby camera=1 slot=1 mode=1440x1080@30/10` while recording |
+| Switch A→B | `dual switch active=1 slot=1`; recorder continued, preview switched to front |
+| Switch B→A | `dual switch active=0 slot=0`; recorder continued, preview returned to back |
+| Clip | 11.78 s video / 11.78 s audio; video max PTS delta **44.6 ms**, no recorder teardown |
+| Verdict | `dualSessionSwitch_c0_c1 pass`: 50 frames, 1.7 s, median 33 ms, max 73 ms, both stream IDs |
+| Gate | Runtime required exposed IDs, `concurrent_with`, a matching mode and the verdict |
+
+The switch skips the old frame-pump pause; the outgoing session stays alive as
+the next standby. `dualSessionSwitch` does not compare exposure/WB across two
+different sensors, because a front↔back boundary is expected to change scene.
+The test clip was removed.

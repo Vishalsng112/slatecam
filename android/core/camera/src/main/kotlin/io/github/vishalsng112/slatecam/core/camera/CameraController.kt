@@ -303,6 +303,11 @@ class CameraController(private val context: Context) {
         }
     }
 
+    /** Re-emit the current state after the bridge changes which controller is active. */
+    fun refreshState() {
+        handler.post { emit() }
+    }
+
     fun setIso(value: Int) {
         handler.post {
             iso = value.coerceIn(isoMin, isoMax)

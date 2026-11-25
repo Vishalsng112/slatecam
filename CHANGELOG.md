@@ -9,6 +9,22 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Added — Dual-session lens switching (build 2165)
+- Two exposed cameras can run concurrently during a take. The renderer holds
+  two OES textures but selects exactly one active source for preview, analysis
+  and the single encoder/muxer path.
+- A standby controller is prewarmed on record start at the same mode, with
+  exposure/WB/focus/zoom copied; `setCameraId` switches renderer source and
+  controller ownership without touching the recorder. The outgoing session
+  becomes the next standby.
+- `dualSessionSwitch_c<A>_c<B>` probe check opens both streams, joins a sample
+  boundary and rejects timestamp gaps or a missing stream. The runtime path is
+  gated on this verdict, concurrent IDs, exposed cameras and a matching mode.
+- Pad 3: 1440×1080 10-bit HLG, two front↔back switches during one take; video
+  durations 11.78 s, audio 11.78 s, max PTS delta 44.6 ms, no recorder teardown.
+- Exposure/WB jump checks are not applied across two physically different
+  sensors; they remain active for the same-session logical-zoom handoff.
+
 ### Designed — Dual-session lens switching (ADR 0030)
 - Two concurrently open Camera2 sessions, each with its own OES texture; the
   renderer selects one active texture, so preview, analysis and the single

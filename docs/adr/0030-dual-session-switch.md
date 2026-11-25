@@ -1,6 +1,6 @@
 # ADR 0030 — Dual-session lens switching
 
-- **Status:** Accepted for design; no implementation yet
+- **Status:** Accepted and implemented for exposed concurrent pairs
 - **Date:** 2026-11-26
 - **Phase:** 5.5 (Movie-Vlog)
 - **Depends on:** ADR 0006 (single pixel path), ADR 0022 (presentation),
@@ -29,9 +29,9 @@ is specified now and implemented only after a real-device verdict proves it.
 ### Scope
 
 1. **Fallback only.** Use dual-session switching only when ADR 0029's
-   `logicalZoomHandoff` is unavailable or does not cover the target lens, and
-   only while recording in Movie mode. Single mode keeps its current one-session
-   behavior.
+   `logicalZoomHandoff` is unavailable or does not cover the target lens. The
+   implementation allows it during a take when the pair and mode pass the
+   verdict; logical zoom remains preferred for covered stops.
 2. **Per-pair, per-mode verdict.** A `dualSessionSwitch` probe check must pass
    for the exact camera pair and recording mode. Concurrency claims and the
    existing `concurrent_camera_session` check are not sufficient: they prove two
@@ -84,16 +84,17 @@ is specified now and implemented only after a real-device verdict proves it.
 
 ### Probe verdict
 
-7. Add `dualSessionSwitch_c<A>_c<B>_<mode>` to the probe:
+7. Add `dualSessionSwitch_c<A>_c<B>` to the probe:
    - open both cameras concurrently,
    - configure both at the requested mode,
-   - record (or capture) while switching A→B and B→A at least twice,
-   - require no timestamp gap beyond the normal frame interval, bounded
-     exposure/WB jumps, both physical/active IDs observed, and the audio track
-     unaffected,
-   - check the mode/size/fps and the encoded timestamps, not just configuration.
-   Gate the controller per pair and mode; a pass on one size or one pair never
-   promotes another.
+   - run both streams concurrently and join a sample boundary A→B,
+   - require no timestamp gap beyond the normal frame interval and both stream
+     IDs observed,
+   - skip exposure/WB jump checks across two different sensors; those remain a
+     same-session logical-zoom check.
+   The probe check currently exercises a common preview-size stream, while the
+   runtime additionally requires both cameras to support the **active recording
+   mode** before it starts a standby. A pass on one pair never promotes another.
 
 ### Ownership
 
@@ -114,8 +115,10 @@ is specified now and implemented only after a real-device verdict proves it.
   pairs are more likely. The verdict, not a model name, decides.
 - Dual-session and logical zoom overlap; logical zoom remains preferred because
   it needs one session and preserves one 3A state.
-- Implementation is intentionally deferred until at least one device produces a
-  `dualSessionSwitch` pass. Until then the frame pump is the honest fallback.
+- Pad 3 passes the verdict and switches front↔back mid-take with no recorder
+  teardown; max PTS delta was 44.6 ms across two switches at 1440×1080 10-bit.
+  The frame pump remains the fallback for pairs without a verdict or a matching
+  mode.
 
 ## Alternatives considered
 

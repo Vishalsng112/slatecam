@@ -180,6 +180,31 @@ class CapabilityGatesTest {
         )
     }
 
+    @Test
+    fun `dual session requires a passing pair verdict`() {
+        val passed = report(
+            deviceKey = identity.deviceKey,
+            tier = "cinema",
+            verified = mapOf("fhd30_10bit" to "pass"),
+        ).copy(
+            verification = Verification(
+                ran = true,
+                checks = listOf(
+                    VerificationCheck(
+                        id = "dualSessionSwitch_c0_c1",
+                        status = "pass",
+                        detail = "test",
+                    ),
+                ),
+            ),
+        )
+        val missing = passed.copy(verification = Verification(ran = true))
+
+        assertTrue(CapabilityGates.dualSessionSwitch(identity, passed, "0", "1").available)
+        assertFalse(CapabilityGates.dualSessionSwitch(identity, missing, "0", "1").available)
+        assertFalse(CapabilityGates.dualSessionSwitch(identity, passed, "0", "2").available)
+    }
+
     private fun logicalReport(status: String): ProbeReport {
         val base = report(
             deviceKey = identity.deviceKey,

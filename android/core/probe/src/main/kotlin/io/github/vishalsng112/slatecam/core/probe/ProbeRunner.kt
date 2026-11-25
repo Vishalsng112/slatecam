@@ -20,6 +20,7 @@ import io.github.vishalsng112.slatecam.core.probe.verify.CameraSessionVerifier
 import io.github.vishalsng112.slatecam.core.probe.verify.ConcurrentSessionVerifier
 import io.github.vishalsng112.slatecam.core.probe.verify.EncoderVerifier
 import io.github.vishalsng112.slatecam.core.probe.verify.LogicalZoomHandoffVerifier
+import io.github.vishalsng112.slatecam.core.probe.verify.DualSessionSwitchVerifier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.math.roundToInt
@@ -127,6 +128,23 @@ class ProbeRunner(private val context: Context) {
             }
         }
         val concurrentCheck = if (verify) ConcurrentSessionVerifier(context).verify() else null
+        val dualSessionChecks = if (verify) {
+            val exposed = cameras.filter { it.exposed }
+            val pairs = exposed
+                .flatMap { a ->
+                    a.concurrentWith.mapNotNull { b ->
+                        exposed.firstOrNull { it.id == b }?.let { other ->
+                            listOf(a.id, other.id).sorted()
+                        }
+                    }
+                }
+                .distinct()
+            pairs.map { pair ->
+                DualSessionSwitchVerifier(context).verify(pair[0], pair[1])
+            }
+        } else {
+            emptyList()
+        }
         // Run last: opening a vendor-hidden logical camera can disturb the
         // camera list for the checks above.
         val logicalZoomChecks = if (verify) {
@@ -269,10 +287,12 @@ class ProbeRunner(private val context: Context) {
                 ran = encodeOutcomes.isNotEmpty() ||
                     sessionResults.isNotEmpty() ||
                     concurrentCheck != null ||
+                    dualSessionChecks.isNotEmpty() ||
                     logicalZoomChecks.isNotEmpty(),
                 checks = encodeOutcomes.map { it.check } +
                     sessionResults.map { it.check } +
                     listOfNotNull(concurrentCheck) +
+                    dualSessionChecks +
                     logicalZoomChecks,
             ),
             cameraAux = cameraAux,
@@ -323,7 +343,7 @@ class ProbeRunner(private val context: Context) {
         }
 
     companion object {
-        const val PROBER_VERSION = "1.11.0"
+        const val PROBER_VERSION = "1.12.0"
 
         /**
          * Sizes the prober exercises for the 10-bit path. UHD first: it is the

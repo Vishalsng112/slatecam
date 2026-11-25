@@ -94,8 +94,10 @@ class SlateCamBridge private constructor(
     private val engine: FlutterEngine,
     private val producer: TextureRegistry.SurfaceProducer,
     private val renderer: GlPreviewRenderer,
-    private val controller: CameraController,
+    controllerInput: CameraController,
 ) : SlateCamHostApi {
+
+    private var controller: CameraController = controllerInput
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -138,6 +140,18 @@ class SlateCamBridge private constructor(
     private val mediaLibrary = MediaLibrary(context)
     private var deviceSnapshot: DeviceDatabaseSnapshot = deviceDatabase.snapshot()
     private var lastCameraId: String? = null
+    private var standbyController: CameraController? = null
+    private var standbyCameraId: String? = null
+    private var activeSlot = 0
+
+    @Volatile
+    private var standbyState: CameraUiState? = null
+
+    private val mainListener = CameraController.Listener(::handleControllerState)
+
+    private val standbyListener = CameraController.Listener { state ->
+        standbyState = state
+    }
     private var switchPump: SwitchFramePump? = null
     private var switchPumpTarget: String? = null
     private var pendingZoom: Pair<String, Float>? = null
@@ -247,77 +261,7 @@ class SlateCamBridge private constructor(
         runCatching {
             audioManager.registerAudioDeviceCallback(audioDeviceCallback, mainHandler)
         }
-        controller.listener = CameraController.Listener { state ->
-            val previous = lastState
-            val cameraChanged = state.cameraId != lastCameraId
-            val openChanged = previous?.isOpen != state.isOpen
-            val configChanged = previous != null && (
-                previous.whiteBalanceMode != state.whiteBalanceMode ||
-                    previous.focusMode != state.focusMode ||
-                    previous.focusScenario != state.focusScenario ||
-                    previous.exposureMode != state.exposureMode ||
-                    previous.meteringMode != state.meteringMode ||
-                    previous.edgeMode != state.edgeMode ||
-                    previous.noiseReduction != state.noiseReduction ||
-                    previous.antibanding != state.antibanding ||
-                    previous.shadingCorrection != state.shadingCorrection ||
-                    previous.oisEnabled != state.oisEnabled ||
-                    previous.eisEnabled != state.eisEnabled ||
-                    previous.frameRate != state.frameRate ||
-                    previous.previewWidth != state.previewWidth ||
-                    previous.previewHeight != state.previewHeight ||
-                    previous.activePhysicalCameraId != state.activePhysicalCameraId
-                )
-            lastState = state
-            if (!state.isOpen) {
-                // A failed logical-camera switch must not leave `opened` stale:
-                // the launch screen's Open camera action would otherwise be a no-op.
-                opened = false
-                pendingZoom?.let { (id, _) ->
-                    failedLogicalId = id
-                    pendingZoom = null
-                }
-            } else {
-                pendingZoom?.let { (id, ratio) ->
-                    if (state.cameraId == id) {
-                        pendingZoom = null
-                        controller.setZoomRatio(ratio)
-                    }
-                }
-            }
-            if (cameraChanged) {
-                lastCameraId = state.cameraId
-                refreshDeviceSnapshot(state.cameraId)
-                // In single mode the 10-bit gate follows the active camera.
-                // In movie mode the selected common mode owns the decision, so
-                // a lens switch must not silently change bit depth.
-                if (shootMode == SHOOT_SINGLE) {
-                    controller.setTenBit(tenBitGate(state.cameraId).available)
-                }
-                controller.setShadingCorrection(shadingEnabledFor(state.cameraId))
-                controller.setOis(enabledFor(KEY_OIS_OFF, state.cameraId))
-                controller.setEis(enabledFor(KEY_EIS_OFF, state.cameraId))
-                renderer.setFocusRoi(0.5f, 0.5f)
-            }
-            // Restore the software focus choice once the lens reports support.
-            if (state.focusMode != FocusMode.SOFTWARE &&
-                FocusMode.SOFTWARE in state.focusModes &&
-                // Software AF is the default on lenses with a focus range; the
-                // operator can switch to the camera's CAF/AF/MF at any time.
-                shootPrefs.getBoolean(KEY_FOCUS_SOFTWARE, true)
-            ) {
-                controller.setFocusMode(FocusMode.SOFTWARE)
-            }
-            renderer.setTenBitSource(state.isTenBit)
-            renderer.setDisplayRotation(state.previewRotationDegrees)
-            renderer.setGlRotation(state.glRotationDegrees)
-            applyManualWhiteBalance(state)
-            if (cameraChanged || openChanged || configChanged) {
-                pushState()
-            } else {
-                pushTelemetry()
-            }
-        }
+        controller.listener = mainListener
         applyProfileById(profileId)
 
         renderer.setAnalysisEnabled(true)
@@ -376,7 +320,7 @@ class SlateCamBridge private constructor(
                     previewWidth,
                     previewHeight,
                 )
-                val cameraSurface = renderer.cameraSurface
+                val cameraSurface = renderer.activeCameraSurface
                     ?: throw IllegalStateException("GL pipeline did not expose a camera surface")
                 controller.open(
                     cameraSurface,
@@ -416,6 +360,7 @@ class SlateCamBridge private constructor(
         if (recorder.isRecording) stopRecording()
         stopAudioMonitor()
         stopSwitchPump()
+        closeStandby()
         controller.close()
         opened = false
         stopAudioTicker()
@@ -512,6 +457,15 @@ class SlateCamBridge private constructor(
     }
 
     override fun setCameraId(id: String) {
+        android.util.Log.i(
+            "SlateCam",
+            "setCameraId id=$id recording=${recorder.isRecording} " +
+                "standby=$standbyCameraId ready=${standbyState?.isOpen}",
+        )
+        if (recorder.isRecording && standbyCameraId == id && standbyState?.isOpen == true) {
+            switchToStandby()
+            return
+        }
         requestLensSwitch(id, allowUnlisted = false)
     }
 
@@ -1207,6 +1161,190 @@ class SlateCamBridge private constructor(
         renderer.setManualWhiteBalance(gains.red, gains.blue)
     }
 
+    private fun handleControllerState(state: CameraUiState) {
+        val previous = lastState
+        val cameraChanged = state.cameraId != lastCameraId
+        val openChanged = previous?.isOpen != state.isOpen
+        val configChanged = previous != null && (
+            previous.whiteBalanceMode != state.whiteBalanceMode ||
+                previous.focusMode != state.focusMode ||
+                previous.focusScenario != state.focusScenario ||
+                previous.exposureMode != state.exposureMode ||
+                previous.meteringMode != state.meteringMode ||
+                previous.edgeMode != state.edgeMode ||
+                previous.noiseReduction != state.noiseReduction ||
+                previous.antibanding != state.antibanding ||
+                previous.shadingCorrection != state.shadingCorrection ||
+                previous.oisEnabled != state.oisEnabled ||
+                previous.eisEnabled != state.eisEnabled ||
+                previous.frameRate != state.frameRate ||
+                previous.previewWidth != state.previewWidth ||
+                previous.previewHeight != state.previewHeight ||
+                previous.activePhysicalCameraId != state.activePhysicalCameraId
+            )
+        lastState = state
+        if (!state.isOpen) {
+            // A failed logical-camera switch must not leave `opened` stale:
+            // the launch screen's Open camera action would otherwise be a no-op.
+            opened = false
+            pendingZoom?.let { (id, _) ->
+                failedLogicalId = id
+                pendingZoom = null
+            }
+        } else {
+            pendingZoom?.let { (id, ratio) ->
+                if (state.cameraId == id) {
+                    pendingZoom = null
+                    controller.setZoomRatio(ratio)
+                }
+            }
+        }
+        if (cameraChanged) {
+            lastCameraId = state.cameraId
+            refreshDeviceSnapshot(state.cameraId)
+            // In single mode the 10-bit gate follows the active camera.
+            // In movie mode the selected common mode owns the decision, so
+            // a lens switch must not silently change bit depth.
+            if (shootMode == SHOOT_SINGLE) {
+                controller.setTenBit(tenBitGate(state.cameraId).available)
+            }
+            controller.setShadingCorrection(shadingEnabledFor(state.cameraId))
+            controller.setOis(enabledFor(KEY_OIS_OFF, state.cameraId))
+            controller.setEis(enabledFor(KEY_EIS_OFF, state.cameraId))
+            renderer.setFocusRoi(0.5f, 0.5f)
+        }
+        // Restore the software focus choice once the lens reports support.
+        if (state.focusMode != FocusMode.SOFTWARE &&
+            FocusMode.SOFTWARE in state.focusModes &&
+            // Software AF is the default on lenses with a focus range; the
+            // operator can switch to the camera's CAF/AF/MF at any time.
+            shootPrefs.getBoolean(KEY_FOCUS_SOFTWARE, true)
+        ) {
+            controller.setFocusMode(FocusMode.SOFTWARE)
+        }
+        renderer.setTenBitSource(state.isTenBit)
+        renderer.setDisplayRotation(state.previewRotationDegrees)
+        renderer.setGlRotation(state.glRotationDegrees)
+        applyManualWhiteBalance(state)
+        if (cameraChanged || openChanged || configChanged) {
+            pushState()
+        } else {
+            pushTelemetry()
+        }
+    }
+
+    /**
+     * Dual-session switching is limited to exposed cameras the platform reports
+     * as concurrent, with the same recording mode. The standby is prewarmed
+     * while recording; a switch swaps renderer source and controller ownership.
+     */
+    private fun maybeStartStandby() {
+        if (!opened || standbyController != null) return
+        val state = lastState ?: return
+        val activeId = state.cameraId
+        val report = deviceSnapshot.probeReport ?: return
+        val active = report.cameras.firstOrNull { it.id == activeId } ?: return
+        val mode = activeMode()
+        val target = active.concurrentWith
+            .mapNotNull { id -> report.cameras.firstOrNull { it.id == id } }
+            .filter { it.exposed }
+            .filter {
+                CapabilityGates.dualSessionSwitch(
+                    identity = deviceSnapshot.identity,
+                    report = report,
+                    cameraA = active.id,
+                    cameraB = it.id,
+                ).available
+            }
+            .filter { candidate ->
+                RecordingModeCatalog.modesFor(
+                    CameraCapabilitiesReader.read(context, candidate.id) ?: return@filter false,
+                    tenBitVerifier(candidate.id),
+                ).any { it.id == mode.id && it.enabled }
+            }
+            .firstOrNull { it.facing != active.facing }
+            ?: return
+        startStandby(target.id, mode)
+    }
+
+    private fun startStandby(targetId: String, mode: RecordingMode) {
+        if (standbyController != null || targetId == lastState?.cameraId) return
+        val slot = 1 - activeSlot
+        val surface = if (slot == 0) {
+            renderer.cameraSurface
+        } else {
+            renderer.secondaryCameraSurface
+        } ?: return
+        val standby = CameraController(context)
+        standby.listener = standbyListener
+        standbyState = null
+        standbyCameraId = targetId
+        standby.open(
+            surface,
+            mode.width.toInt(),
+            mode.height.toInt(),
+            tenBit = mode.tenBit,
+            cameraIdOverride = targetId,
+        )
+        standby.setFrameRate(mode.fps.toInt())
+        val state = lastState
+        if (state != null) {
+            standby.setExposureMode(state.exposureMode)
+            if (state.exposureMode == "M") {
+                standby.setIso(state.iso)
+                standby.setShutterNs(state.shutterNs)
+            }
+            standby.setMeteringMode(state.meteringMode)
+            standby.setWhiteBalanceMode(state.whiteBalanceMode)
+            if (state.whiteBalanceMode == ManualWhiteBalance.WIRE_VALUE) {
+                standby.setManualWhiteBalance(state.whiteBalanceKelvin, state.whiteBalanceTint)
+            }
+            standby.setFocusMode(state.focusMode)
+            if (!state.autoFocus) standby.setFocusDiopters(state.focusDiopters)
+            standby.setZoomRatio(1f)
+        }
+        standbyController = standby
+        android.util.Log.i("SlateCam", "standby camera=$targetId slot=$slot mode=${mode.id}")
+    }
+
+    private fun switchToStandby() {
+        val next = standbyController ?: return
+        val nextState = standbyState
+        if (nextState?.isOpen != true) {
+            recordingError = "standby camera is not ready"
+            pushState()
+            return
+        }
+        val target = 1 - activeSlot
+        val old = controller
+        val oldState = lastState
+        renderer.setActiveCamera(target)
+        old.listener = standbyListener
+        next.listener = mainListener
+        controller = next
+        standbyController = old
+        standbyCameraId = oldState?.cameraId
+        standbyState = oldState
+        activeSlot = target
+        lastCameraId = nextState.cameraId
+        lastState = nextState
+        controller.refreshState()
+        pushState()
+        android.util.Log.i(
+            "SlateCam",
+            "dual switch active=${nextState.cameraId} slot=$target",
+        )
+    }
+
+    private fun closeStandby() {
+        val standby = standbyController ?: return
+        standby.listener = null
+        standby.close()
+        standbyController = null
+        standbyCameraId = null
+        standbyState = null
+    }
+
     private fun refreshDeviceSnapshot(cameraId: String?) {
         deviceSnapshot = snapshotFor(cameraId)
         deviceReportPath = deviceSnapshot.lastReportPath
@@ -1252,7 +1390,7 @@ class SlateCamBridge private constructor(
     }
 
     private fun reopenCamera() {
-        val surface = renderer.cameraSurface ?: return
+        val surface = renderer.activeCameraSurface ?: return
         val mode = activeMode()
         controller.setFrameRate(mode.fps.toInt())
         controller.open(
@@ -1355,6 +1493,7 @@ class SlateCamBridge private constructor(
                 )
             }
             mainHandler.post(tick)
+            maybeStartStandby()
             pushState()
         } catch (t: Throwable) {
             recordingError = "recording failed to start: ${t.message}"
@@ -1397,6 +1536,7 @@ class SlateCamBridge private constructor(
             audioActive = false
             audioSource = null
             mainHandler.post {
+                closeStandby()
                 if (opened) startAudioMonitor()
                 pushState()
             }
@@ -1407,6 +1547,7 @@ class SlateCamBridge private constructor(
 
     fun dispose() {
         stopSwitchPump()
+        closeStandby()
         stopAudioMonitor()
         stopAudioTicker()
         runCatching { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) }
@@ -1576,6 +1717,7 @@ class SlateCamBridge private constructor(
     fun pause() {
         resumeOnReturn = opened
         if (recorder.isRecording) stopRecording()
+        closeStandby()
         stopAudioMonitor()
         stopAudioTicker()
         controller.close()

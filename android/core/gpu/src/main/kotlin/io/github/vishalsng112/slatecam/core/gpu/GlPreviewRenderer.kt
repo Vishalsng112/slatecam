@@ -43,7 +43,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private var encoderEglSurface: EGLSurface = EGL14.EGL_NO_SURFACE
 
     private var oesTextureId = 0
+    private var secondaryOesTextureId = 0
     private var surfaceTexture: SurfaceTexture? = null
+    private var secondarySurfaceTexture: SurfaceTexture? = null
     private var program = 0
     private var uTexMatrix = 0
     private var uRotation = 0
@@ -113,7 +115,9 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     var onAnalysis: ((FrameAnalysis) -> Unit)? = null
     private var aPosition = 0
     private var aTexCoord = 0
-    private val texMatrix = FloatArray(16)
+    private var texMatrix = FloatArray(16)
+    private val primaryTexMatrix = FloatArray(16)
+    private val secondaryTexMatrix = FloatArray(16)
 
     /** Copy of the live SurfaceTexture transform for viewfinder tap mapping. */
     @Volatile
@@ -398,7 +402,13 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     /** Surface the camera must target. Available after [start]. */
     @Volatile
     var cameraSurface: Surface? = null
-        private set
+    var secondaryCameraSurface: Surface? = null
+
+    @Volatile
+    private var activeCameraIndex = 0
+
+    val activeCameraSurface: Surface?
+        get() = if (activeCameraIndex == 0) cameraSurface else secondaryCameraSurface
 
     /** Changes the camera stream size (the encoder follows this size). */
     fun setCaptureSize(width: Int, height: Int) {
@@ -406,6 +416,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             captureWidth = width
             captureHeight = height
             surfaceTexture?.setDefaultBufferSize(width, height)
+            secondarySurfaceTexture?.setDefaultBufferSize(width, height)
             releaseIntermediate()
             intermediateAttempted = false
         }
@@ -806,10 +817,22 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     }
 
     private fun setupTexture() {
-        val ids = IntArray(1)
-        GLES20.glGenTextures(1, ids, 0)
+        choreographer = Choreographer.getInstance()
+        val ids = IntArray(2)
+        GLES20.glGenTextures(2, ids, 0)
         oesTextureId = ids[0]
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
+        secondaryOesTextureId = ids[1]
+        configureOesTexture(oesTextureId)
+        configureOesTexture(secondaryOesTextureId)
+
+        surfaceTexture = createCameraTexture(0, oesTextureId)
+        secondarySurfaceTexture = createCameraTexture(1, secondaryOesTextureId)
+        cameraSurface = Surface(surfaceTexture)
+        secondaryCameraSurface = Surface(secondarySurfaceTexture)
+    }
+
+    private fun configureOesTexture(id: Int) {
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, id)
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_MIN_FILTER,
@@ -830,11 +853,16 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             GLES20.GL_TEXTURE_WRAP_T,
             GLES20.GL_CLAMP_TO_EDGE,
         )
+    }
 
-        choreographer = Choreographer.getInstance()
-        val texture = SurfaceTexture(oesTextureId)
+    private fun createCameraTexture(index: Int, textureId: Int): SurfaceTexture {
+        val texture = SurfaceTexture(textureId)
         texture.setDefaultBufferSize(captureWidth, captureHeight)
         texture.setOnFrameAvailableListener {
+            if (index != activeCameraIndex) {
+                handler.post { updateStandbyTexture(index) }
+                return@setOnFrameAvailableListener
+            }
             if (encoderActive) {
                 // No coalescing on the record path: the encoder needs every
                 // camera frame, not just the newest one at the next vsync.
@@ -849,9 +877,29 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
                 vsync.postFrameCallback(vsyncCallback)
             }
         }
-        surfaceTexture = texture
-        cameraSurface = Surface(texture)
+        return texture
     }
+
+    /** Consume standby frames without drawing them into preview, encoder or analysis. */
+    private fun updateStandbyTexture(index: Int) {
+        val texture = if (index == 0) surfaceTexture else secondarySurfaceTexture
+        val matrix = if (index == 0) primaryTexMatrix else secondaryTexMatrix
+        runCatching {
+            texture?.updateTexImage()
+            texture?.getTransformMatrix(matrix)
+        }
+    }
+
+    /** Select which camera texture feeds preview, encoder and analysis. */
+    fun setActiveCamera(index: Int) {
+        handler.post {
+            activeCameraIndex = if (index == 0) 0 else 1
+            texMatrix = if (activeCameraIndex == 0) primaryTexMatrix else secondaryTexMatrix
+            // Do not synthesize a frame here: the next standby camera frame
+            // carries the real timestamp and keeps the encoder timeline honest.
+        }
+    }
+
 
     /**
      * Frame count from the camera only. A switch pump compares this between
@@ -869,13 +917,17 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     }
 
     private fun drawFrame(updateTexture: Boolean = true) {
-        val texture = surfaceTexture ?: return
+        val index = activeCameraIndex
+        val texture = if (index == 0) surfaceTexture else secondarySurfaceTexture
+        texture ?: return
+        val matrix = if (index == 0) primaryTexMatrix else secondaryTexMatrix
 
         val timestampNs: Long
         if (updateTexture) {
             runCatching {
                 texture.updateTexImage()
-                texture.getTransformMatrix(texMatrix)
+                texture.getTransformMatrix(matrix)
+                texMatrix = matrix
                 texMatrixSnapshot = texMatrix.copyOf()
             }.onFailure { return }
             timestampNs = texture.timestamp.takeIf { it > 0L }
@@ -883,6 +935,7 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
             cameraFrames++
         } else {
             if (!started || cameraFrames == 0L) return
+            texMatrix = matrix
             timestampNs = SystemClock.elapsedRealtimeNanos()
                 .coerceAtLeast(lastFrameTimestampNs + 1_000_000L)
         }
@@ -926,7 +979,10 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
     private fun drawQuad(isPreview: Boolean, overlay: Boolean) {
         GLES20.glUseProgram(program)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
+        GLES20.glBindTexture(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
+            if (activeCameraIndex == 0) oesTextureId else secondaryOesTextureId,
+        )
         GLES20.glUniform1i(uTexture, 0)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTexture)
@@ -1389,11 +1445,27 @@ class GlPreviewRenderer(private val onFrameRendered: () -> Unit) : AutoCloseable
         detachEncoderInternal()
         cameraSurface?.release()
         cameraSurface = null
+        secondaryCameraSurface?.release()
+        secondaryCameraSurface = null
         surfaceTexture?.release()
         surfaceTexture = null
+        secondarySurfaceTexture?.release()
+        secondarySurfaceTexture = null
         if (oesTextureId != 0) {
-            GLES20.glDeleteTextures(1, intArrayOf(oesTextureId), 0)
+            GLES20.glDeleteTextures(
+                1,
+                intArrayOf(oesTextureId),
+                0,
+            )
             oesTextureId = 0
+        }
+        if (secondaryOesTextureId != 0) {
+            GLES20.glDeleteTextures(
+                1,
+                intArrayOf(secondaryOesTextureId),
+                0,
+            )
+            secondaryOesTextureId = 0
         }
         if (program != 0) {
             GLES20.glDeleteProgram(program)
