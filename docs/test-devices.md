@@ -1502,3 +1502,10 @@ portrait moved the display to `ROTATION_90` and switched to the side-by-side
 landscape console; tapping the same control again returned to `ROTATION_0` and
 the stacked portrait console. The camera stayed open and the preview composition
 followed the new orientation in both directions.
+
+## Full-bleed portrait viewfinder (build 2182)
+
+POCO X6 Pro: in portrait, both 1440×1080 4:3 and 1920×1080 16:9 fill the
+viewfinder width with no black side bars; vertical overflow is cropped. Focus
+taps use the cropped mapping before the GL transform. Landscape still shows the
+complete frame beside the console.

@@ -329,7 +329,9 @@ The same widgets serve both orientations; nothing is duplicated per layout.
 - **Landscape / wide:** viewfinder and console side by side. The console docks
   on the right and the viewfinder takes the remaining width.
 - **Portrait:** viewfinder on top and the console docked below at roughly half
-  the height. The console uses its existing responsive columns.
+  the height. The console uses its existing responsive columns. The viewfinder
+  is full-bleed for both 4:3 and 16:9: it fills the width and crops overflow
+  rather than leaving black side bars.
 - **Preview/recording:** the GL layer renders the sensor-upright landscape frame
   for both preview and encoder. The MP4 orientation hint describes the take
   orientation; Flutter presents the preview with that same quarter turn and

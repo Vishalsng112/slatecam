@@ -9,6 +9,12 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — Full-bleed portrait viewfinder (build 2182)
+- In portrait, the viewfinder now fills the available width edge to edge for
+  both 4:3 and 16:9, cropping the overflow instead of showing black side bars.
+  Focus taps account for the crop before the viewfinder-to-buffer transform.
+  Landscape keeps the full frame visible beside the console.
+
 ### Added — One-tap orientation button (build 2181)
 - A circular rotate control beside the viewfinder-quality pill flips the app
   between portrait and landscape. The icon shows the destination orientation;

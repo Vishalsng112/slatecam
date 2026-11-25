@@ -674,6 +674,9 @@ class _CaptureScreenState extends State<CaptureScreen>
         : state.previewHeight;
     final turns = (state.recordingOrientationHint ~/ 90) % 4;
     final rotated = turns.isOdd;
+    final imageAspect = rotated
+        ? outputHeight / outputWidth
+        : outputWidth / outputHeight;
     Widget texture = SizedBox(
       width: outputWidth.toDouble(),
       height: outputHeight.toDouble(),
@@ -683,67 +686,112 @@ class _CaptureScreenState extends State<CaptureScreen>
       texture = RotatedBox(quarterTurns: turns, child: texture);
     }
 
-    return Center(
-      child: AspectRatio(
-        aspectRatio: rotated
-            ? outputHeight / outputWidth
-            : outputWidth / outputHeight,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final size = constraints.biggest;
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapUp: (details) =>
-                  _focusAt(details.localPosition, size, turns),
-              onScaleStart: (_) => _scaleStartZoom = state.zoomRatio,
-              onScaleUpdate: (details) {
-                if (details.pointerCount < 2) return;
-                final zoom = (_scaleStartZoom * details.scale)
-                    .clamp(state.zoomMin, state.zoomMax)
-                    .toDouble();
-                _host.setZoom(zoom);
-              },
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.contain,
-                    clipBehavior: Clip.hardEdge,
-                    child: texture,
-                  ),
-                  if (_showGuides)
-                    IgnorePointer(child: CustomPaint(painter: GuidesPainter())),
-                  if (_focusReticle != null)
-                    Positioned(
-                      left: _focusReticle!.dx - 16,
-                      top: _focusReticle!.dy - 16,
-                      child: IgnorePointer(
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: UiTokens.accent,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          },
+    // Portrait fills the viewfinder edge to edge like a phone camera; the
+    // overflow is cropped instead of leaving side bars. Landscape keeps the
+    // full frame visible beside the console.
+    final cover = MediaQuery.orientationOf(context) == Orientation.portrait;
+    if (!cover) {
+      return Center(
+        child: AspectRatio(
+          aspectRatio: imageAspect,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final size = constraints.biggest;
+              return _previewGesture(
+                state: state,
+                turns: turns,
+                size: size,
+                fit: BoxFit.contain,
+                normalize: (point) => (
+                  (point.dx / size.width).clamp(0.0, 1.0),
+                  (point.dy / size.height).clamp(0.0, 1.0),
+                ),
+                texture: texture,
+              );
+            },
+          ),
         ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        final paneAspect = size.width / size.height;
+        return _previewGesture(
+          state: state,
+          turns: turns,
+          size: size,
+          fit: BoxFit.cover,
+          normalize: (point) {
+            var nx = (point.dx / size.width).clamp(0.0, 1.0);
+            var ny = (point.dy / size.height).clamp(0.0, 1.0);
+            if (paneAspect > imageAspect) {
+              // Scaled to width: the top/bottom overflow is cropped.
+              final visible = imageAspect / paneAspect;
+              ny = ((ny - (1 - visible) / 2) / visible).clamp(0.0, 1.0);
+            } else {
+              // Scaled to height: the left/right overflow is cropped.
+              final visible = paneAspect / imageAspect;
+              nx = ((nx - (1 - visible) / 2) / visible).clamp(0.0, 1.0);
+            }
+            return (nx, ny);
+          },
+          texture: texture,
+        );
+      },
+    );
+  }
+
+  Widget _previewGesture({
+    required CameraState state,
+    required int turns,
+    required Size size,
+    required BoxFit fit,
+    required (double, double) Function(Offset) normalize,
+    required Widget texture,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: (details) {
+        final (x, y) = normalize(details.localPosition);
+        _focusAt(x, y, turns, details.localPosition);
+      },
+      onScaleStart: (_) => _scaleStartZoom = state.zoomRatio,
+      onScaleUpdate: (details) {
+        if (details.pointerCount < 2) return;
+        final zoom = (_scaleStartZoom * details.scale)
+            .clamp(state.zoomMin, state.zoomMax)
+            .toDouble();
+        _host.setZoom(zoom);
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          FittedBox(fit: fit, clipBehavior: Clip.hardEdge, child: texture),
+          if (_showGuides)
+            IgnorePointer(child: CustomPaint(painter: GuidesPainter())),
+          if (_focusReticle != null)
+            Positioned(
+              left: _focusReticle!.dx - 16,
+              top: _focusReticle!.dy - 16,
+              child: IgnorePointer(
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: UiTokens.accent, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  void _focusAt(Offset point, Size size, int turns) {
-    if (size.width <= 0 || size.height <= 0) return;
-    final dx = (point.dx / size.width).clamp(0.0, 1.0);
-    final dy = (point.dy / size.height).clamp(0.0, 1.0);
+  void _focusAt(double dx, double dy, int turns, Offset reticle) {
     // Undo the presentation rotation before handing the point to the GL
     // viewfinder-to-buffer transform.
     final (x, y) = switch (turns % 4) {
@@ -753,7 +801,7 @@ class _CaptureScreenState extends State<CaptureScreen>
       _ => (dx, dy),
     };
     _host.setFocusPoint(x, y);
-    setState(() => _focusReticle = point);
+    setState(() => _focusReticle = reticle);
     _focusReticleTimer?.cancel();
     _focusReticleTimer = Timer(const Duration(milliseconds: 900), () {
       if (mounted) setState(() => _focusReticle = null);
