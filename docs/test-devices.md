@@ -1523,3 +1523,11 @@ The viewfinder composition matches the auto-rotated playback frame in both
 cases. Landscape labels and dimensions remain `4:3` (1440×1080) and `16:9`
 (1920×1080). This follows the standard Camera2 approach: sensors emit landscape
 frames, and the MP4 orientation hint carries the take orientation.
+
+## Uncrop and recording border (build 2188)
+
+POCO X6 Pro portrait 3:4: the viewfinder shows the complete `1080×1440` frame
+at full width; starting a recording draws the red border on the image edges, all
+four corners visible. Portrait 9:16 shows the complete `1080×1920` frame; its
+side margins are outside the red border and are never encoded. The playback
+frame matches the viewfinder composition in both ratios.

@@ -298,15 +298,29 @@ class _CaptureScreenState extends State<CaptureScreen>
             if (portrait) {
               // One responsive arrangement for phones and tablets: the same
               // preview, zoom rail and console widgets, stacked instead of
-              // duplicated for a second orientation.
-              final deckHeight = math.min(
-                460.0,
-                math.max(300.0, constraints.maxHeight * 0.48),
-              );
+              // duplicated for a second orientation. The viewfinder takes its
+              // natural height for the active aspect, so the recorded frame is
+              // never cropped; the console gets the rest.
+              final turns = state.previewQuarterTurns % 4;
+              final frameWidth = state.previewOutputWidth > 0
+                  ? state.previewOutputWidth
+                  : state.previewWidth;
+              final frameHeight = state.previewOutputHeight > 0
+                  ? state.previewOutputHeight
+                  : state.previewHeight;
+              final aspect = turns.isOdd
+                  ? frameHeight / frameWidth
+                  : frameWidth / frameHeight;
+              final naturalHeight = constraints.maxWidth / aspect;
+              final maxPreview = constraints.maxHeight * 0.72;
+              final previewHeight = naturalHeight.clamp(240.0, maxPreview);
               return Column(
                 children: [
-                  Expanded(child: preview),
-                  if (_deckOpen) SizedBox(height: deckHeight, child: deck),
+                  if (_deckOpen)
+                    SizedBox(height: previewHeight, child: preview)
+                  else
+                    Expanded(child: preview),
+                  if (_deckOpen) Expanded(child: deck),
                 ],
               );
             }
@@ -471,22 +485,6 @@ class _CaptureScreenState extends State<CaptureScreen>
           ValueListenableBuilder<CameraTelemetry?>(
             valueListenable: _telemetry,
             builder: (context, _, _) => _bottomDock(state),
-          ),
-          ValueListenableBuilder<CameraTelemetry?>(
-            valueListenable: _telemetry,
-            builder: (context, telemetry, _) {
-              final recording = telemetry?.isRecording ?? state.isRecording;
-              if (!recording) return const SizedBox.shrink();
-              return Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: UiTokens.danger, width: 3),
-                    ),
-                  ),
-                ),
-              );
-            },
           ),
         ],
       ),
@@ -686,60 +684,27 @@ class _CaptureScreenState extends State<CaptureScreen>
       texture = RotatedBox(quarterTurns: turns, child: texture);
     }
 
-    // Portrait fills the viewfinder edge to edge like a phone camera; the
-    // overflow is cropped instead of leaving side bars. Landscape keeps the
-    // full frame visible beside the console.
-    final cover = MediaQuery.orientationOf(context) == Orientation.portrait;
-    if (!cover) {
-      return Center(
-        child: AspectRatio(
-          aspectRatio: imageAspect,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final size = constraints.biggest;
-              return _previewGesture(
-                state: state,
-                turns: turns,
-                size: size,
-                fit: BoxFit.contain,
-                normalize: (point) => (
-                  (point.dx / size.width).clamp(0.0, 1.0),
-                  (point.dy / size.height).clamp(0.0, 1.0),
-                ),
-                texture: texture,
-              );
-            },
-          ),
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = constraints.biggest;
-        final paneAspect = size.width / size.height;
-        return _previewGesture(
-          state: state,
-          turns: turns,
-          size: size,
-          fit: BoxFit.cover,
-          normalize: (point) {
-            var nx = (point.dx / size.width).clamp(0.0, 1.0);
-            var ny = (point.dy / size.height).clamp(0.0, 1.0);
-            if (paneAspect > imageAspect) {
-              // Scaled to width: the top/bottom overflow is cropped.
-              final visible = imageAspect / paneAspect;
-              ny = ((ny - (1 - visible) / 2) / visible).clamp(0.0, 1.0);
-            } else {
-              // Scaled to height: the left/right overflow is cropped.
-              final visible = paneAspect / imageAspect;
-              nx = ((nx - (1 - visible) / 2) / visible).clamp(0.0, 1.0);
-            }
-            return (nx, ny);
+    // Never crop the viewfinder: the red recording border must outline exactly
+    // the frame that reaches the encoder. The pane letterboxes instead.
+    return Center(
+      child: AspectRatio(
+        aspectRatio: imageAspect,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = constraints.biggest;
+            return _previewGesture(
+              state: state,
+              turns: turns,
+              size: size,
+              normalize: (point) => (
+                (point.dx / size.width).clamp(0.0, 1.0),
+                (point.dy / size.height).clamp(0.0, 1.0),
+              ),
+              texture: texture,
+            );
           },
-          texture: texture,
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -747,7 +712,6 @@ class _CaptureScreenState extends State<CaptureScreen>
     required CameraState state,
     required int turns,
     required Size size,
-    required BoxFit fit,
     required (double, double) Function(Offset) normalize,
     required Widget texture,
   }) {
@@ -768,7 +732,11 @@ class _CaptureScreenState extends State<CaptureScreen>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          FittedBox(fit: fit, clipBehavior: Clip.hardEdge, child: texture),
+          FittedBox(
+            fit: BoxFit.contain,
+            clipBehavior: Clip.hardEdge,
+            child: texture,
+          ),
           if (_showGuides)
             IgnorePointer(child: CustomPaint(painter: GuidesPainter())),
           if (_focusReticle != null)
@@ -786,6 +754,20 @@ class _CaptureScreenState extends State<CaptureScreen>
                 ),
               ),
             ),
+          ValueListenableBuilder<CameraTelemetry?>(
+            valueListenable: _telemetry,
+            builder: (context, telemetry, _) {
+              final recording = telemetry?.isRecording ?? state.isRecording;
+              if (!recording) return const SizedBox.shrink();
+              return IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: UiTokens.danger, width: 3),
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

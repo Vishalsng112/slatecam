@@ -9,6 +9,15 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Uncrop the viewfinder and align the recording border (build 2188)
+- The viewfinder no longer uses a full-bleed cover crop. It shows the complete
+  recorded frame at its true aspect, so preview and file contain the same image.
+- The red recording border is drawn around the video frame itself, not the
+  surrounding pane. All four corners now mark exactly what is being encoded.
+- Portrait sizing follows the active aspect: 3:4 and 9:16 use the frame's
+  natural height, with the console taking the remainder; any letterboxing is
+  outside the red frame and is not recorded.
+
 ### Fixed — Orientation-aware aspect ratios (build 2186)
 - In portrait the aspect control now shows and selects the effective vertical
   ratio: `9:16` and `3:4` instead of `16:9`/`4:3`, and the header/mode labels
