@@ -672,7 +672,7 @@ class _CaptureScreenState extends State<CaptureScreen>
     final outputHeight = state.previewOutputHeight > 0
         ? state.previewOutputHeight
         : state.previewHeight;
-    final turns = (state.recordingOrientationHint ~/ 90) % 4;
+    final turns = state.previewQuarterTurns % 4;
     final rotated = turns.isOdd;
     final imageAspect = rotated
         ? outputHeight / outputWidth
@@ -814,8 +814,11 @@ class _CaptureScreenState extends State<CaptureScreen>
   Widget _statusStrip(CameraState state) {
     final recording = state.isRecording;
     final error = state.recordingError ?? state.error;
+    final portrait = state.previewQuarterTurns.isOdd;
+    final outputWidth = portrait ? state.previewHeight : state.previewWidth;
+    final outputHeight = portrait ? state.previewWidth : state.previewHeight;
     final output =
-        '${state.previewWidth}×${state.previewHeight} · ${state.frameRate}p · '
+        '$outputWidth×$outputHeight · ${state.frameRate}p · '
         'HEVC${state.tenBit ? ' · 10-bit' : ''}';
     return Positioned(
       top: 8,

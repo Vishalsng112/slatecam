@@ -273,8 +273,10 @@ class CameraState {
     required this.previewOutputHeight,
     required this.previewQuality,
     required this.previewRotationDegrees,
-    /// Clockwise MP4 orientation hint for the current display orientation.
+    /// Clockwise MP4 orientation hint; 0 when portrait is encoded natively.
     required this.recordingOrientationHint,
+    /// Quarter turns the viewfinder applies for the current display.
+    required this.previewQuarterTurns,
     required this.zoomRatio,
     required this.zoomMin,
     required this.zoomMax,
@@ -397,8 +399,10 @@ class CameraState {
   /// full | 1080 | 720
   String previewQuality;
   int previewRotationDegrees;
-  /// Clockwise MP4 orientation hint for the current display orientation.
+  /// Clockwise MP4 orientation hint; 0 when portrait is encoded natively.
   int recordingOrientationHint;
+  /// Quarter turns the viewfinder applies for the current display.
+  int previewQuarterTurns;
   /// Current optical/digital zoom ratio applied to the active camera.
   double zoomRatio;
   double zoomMin;

@@ -330,8 +330,10 @@ The same widgets serve both orientations; nothing is duplicated per layout.
   on the right and the viewfinder takes the remaining width.
 - **Portrait:** viewfinder on top and the console docked below at roughly half
   the height. The console uses its existing responsive columns. The viewfinder
-  is full-bleed for both 4:3 and 16:9: it fills the width and crops overflow
-  rather than leaving black side bars.
+  is full-bleed for both aspects: it fills the width and crops overflow rather
+  than leaving black side bars. The aspect control and labels swap with the
+  orientation (`16:9`/`4:3` in landscape, `9:16`/`3:4` in portrait), and the
+  displayed recording size is the effective vertical size.
 - **Preview/recording:** the GL layer renders the sensor-upright landscape frame
   for both preview and encoder. The MP4 orientation hint describes the take
   orientation; Flutter presents the preview with that same quarter turn and

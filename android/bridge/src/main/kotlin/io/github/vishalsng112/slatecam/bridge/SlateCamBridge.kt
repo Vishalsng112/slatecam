@@ -189,7 +189,6 @@ class SlateCamBridge private constructor(
     /** Renderer + preview surface are started; independent of a transient session reopen. */
     private var pipelineActive = false
     private var rotationRefreshPending = false
-    private var activeOrientationHint = 0
     private var resumeOnReturn = false
     private var lastState: CameraUiState? = null
 
@@ -1448,9 +1447,6 @@ class SlateCamBridge private constructor(
         if (recorder.isRecording) return
 
         val mode = activeMode()
-        // Freeze the orientation for the take. Rotating the device mid-clip
-        // updates preview after the clip is finalized, not the encoded stream.
-        activeOrientationHint = lastState?.recordingOrientationHint ?: 0
         val name = "SlateCam_" +
             SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".mp4"
 
@@ -1585,6 +1581,9 @@ class SlateCamBridge private constructor(
         var tenBitHlg = mode.tenBit && controller.isTenBitActive
         val bitrate = bitrateFor(mode)
         var destination = openDestination(name)
+        // Camera2 sensors produce landscape frames. The take orientation is
+        // the MP4 hint; portrait playback swaps the effective axes.
+        val orientationHint = lastState?.recordingOrientationHint ?: 0
 
         val surface = try {
             recorder.start(
@@ -1594,7 +1593,7 @@ class SlateCamBridge private constructor(
                 bitrate,
                 tenBitHlg,
                 destination.muxer,
-                orientationHint = activeOrientationHint,
+                orientationHint = orientationHint,
                 audio = ClipRecorder.AudioConfig(audioInputKey, audioGainDb),
             )
         } catch (first: Throwable) {
@@ -1610,7 +1609,7 @@ class SlateCamBridge private constructor(
                     bitrate,
                     false,
                     destination.muxer,
-                    orientationHint = activeOrientationHint,
+                    orientationHint = orientationHint,
                     audio = ClipRecorder.AudioConfig(audioInputKey, audioGainDb),
                 )
             } catch (second: Throwable) {
@@ -2511,6 +2510,7 @@ class SlateCamBridge private constructor(
         previewQuality = this@SlateCamBridge.previewQuality,
         previewRotationDegrees = previewRotationDegrees.toLong(),
         recordingOrientationHint = recordingOrientationHint.toLong(),
+        previewQuarterTurns = previewQuarterTurns.toLong(),
         zoomRatio = zoomRatio.toDouble(),
         zoomMin = zoomMin.toDouble(),
         zoomMax = zoomMax.toDouble(),

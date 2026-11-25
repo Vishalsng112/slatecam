@@ -28,10 +28,7 @@ const _blackGammaRangeOptions = <String, String>{
   'narrow': 'Narrow',
 };
 
-const _kneeModeOptions = <String, String>{
-  'auto': 'Auto',
-  'manual': 'Manual',
-};
+const _kneeModeOptions = <String, String>{'auto': 'Auto', 'manual': 'Manual'};
 
 const _kneeSensitivityOptions = <String, String>{
   'high': 'High',
@@ -151,8 +148,7 @@ class _ControlDeckState extends State<ControlDeck> {
   double get _peakingSensitivity =>
       _peakingSensitivityDraft ?? state.peakingSensitivity;
   double get _peakingStrength => _peakingStrengthDraft ?? state.peakingStrength;
-  double get _wbKelvin =>
-      _wbKelvinDraft ?? state.whiteBalanceKelvin.toDouble();
+  double get _wbKelvin => _wbKelvinDraft ?? state.whiteBalanceKelvin.toDouble();
   double get _wbTint => _wbTintDraft ?? state.whiteBalanceTint.toDouble();
   double get _audioGain => _audioGainDraft ?? state.audioGainDb;
 
@@ -200,18 +196,17 @@ class _ControlDeckState extends State<ControlDeck> {
                   Widget columns;
                   if (constraints.maxWidth < 520) {
                     columns = Column(
-                      children: [
-                        ...primary,
-                        ...secondary,
-                        ...tertiary,
-                      ],
+                      children: [...primary, ...secondary, ...tertiary],
                     );
                   } else if (constraints.maxWidth >= 720) {
                     final width = (constraints.maxWidth - 16) / 3;
                     columns = Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(width: width, child: Column(children: primary)),
+                        SizedBox(
+                          width: width,
+                          child: Column(children: primary),
+                        ),
                         const SizedBox(width: 8),
                         SizedBox(
                           width: width,
@@ -231,11 +226,7 @@ class _ControlDeckState extends State<ControlDeck> {
                       children: [
                         SizedBox(
                           width: width,
-                          child: Column(
-                            children: [
-                              ...primary,
-                            ],
-                          ),
+                          child: Column(children: [...primary]),
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
@@ -253,9 +244,7 @@ class _ControlDeckState extends State<ControlDeck> {
                     );
                   }
                   // Device is diagnostics, not a shooting control: always last.
-                  return Column(
-                    children: [columns, _deviceCard(context)],
-                  );
+                  return Column(children: [columns, _deviceCard(context)]);
                 },
               ),
             ),
@@ -314,7 +303,7 @@ class _ControlDeckState extends State<ControlDeck> {
               Expanded(
                 child: Text(
                   '${state.shootMode == 'movie' ? 'MOVIE' : 'SINGLE'} · '
-                  '${state.previewWidth}×${state.previewHeight} · '
+                  '$_displayWidth×$_displayHeight · '
                   '${state.frameRate}p · '
                   '${state.tenBit ? '10b HLG' : '8b SDR'}',
                   maxLines: 1,
@@ -516,11 +505,16 @@ class _ControlDeckState extends State<ControlDeck> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _stepButton(Icons.chevron_left, 'Previous mode', () => _cycleMode(-1)),
+          _stepButton(
+            Icons.chevron_left,
+            'Previous mode',
+            () => _cycleMode(-1),
+          ),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 150),
             child: Semantics(
-              label: 'recording mode: ${mode != null ? _modeShort(mode) : state.recordingMode}',
+              label:
+                  'recording mode: ${mode != null ? _modeShort(mode) : state.recordingMode}',
               child: Text(
                 mode != null ? _modeShort(mode) : state.recordingMode,
                 maxLines: 1,
@@ -567,12 +561,15 @@ class _ControlDeckState extends State<ControlDeck> {
     final is1080 = !is4k;
     final wide = _isWideMode(current);
 
-    final rates = state.recordingModes
-        .where((mode) => _familyOf(mode) == family && _isWideMode(mode) == wide)
-        .map((mode) => mode.fps.toInt())
-        .toSet()
-        .toList()
-      ..sort();
+    final rates =
+        state.recordingModes
+            .where(
+              (mode) => _familyOf(mode) == family && _isWideMode(mode) == wide,
+            )
+            .map((mode) => mode.fps.toInt())
+            .toSet()
+            .toList()
+          ..sort();
 
     // Only show depths that can actually be selected at this size/rate. A
     // 4K 4:3 mode is 8-bit until the probe verifies its 10-bit preset.
@@ -593,74 +590,63 @@ class _ControlDeckState extends State<ControlDeck> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _modeRow(
-            'Resolution',
-            [
-              _modeChip(
-                label: '4K',
-                tooltip: '4K family, exact size follows the aspect',
-                selected: is4k,
-                onTap: () => _selectResolution('4K'),
-              ),
-              _modeChip(
-                label: '1080',
-                tooltip: '1080 family, exact size follows the aspect',
-                selected: is1080,
-                onTap: () => _selectResolution('1080'),
-              ),
-            ],
-          ),
+          _modeRow('Resolution', [
+            _modeChip(
+              label: '4K',
+              tooltip: '4K family, exact size follows the aspect',
+              selected: is4k,
+              onTap: () => _selectResolution('4K'),
+            ),
+            _modeChip(
+              label: '1080',
+              tooltip: '1080 family, exact size follows the aspect',
+              selected: is1080,
+              onTap: () => _selectResolution('1080'),
+            ),
+          ]),
           const SizedBox(height: 4),
-          _modeRow(
-            'Aspect',
-            [
-              _aspectCircle(
-                '16:9',
-                selected: wide,
-                onTap: () => _selectAspect(true),
-              ),
-              _aspectCircle(
-                '4:3',
-                selected: !wide,
-                onTap: () => _selectAspect(false),
-              ),
-            ],
-          ),
+          _modeRow('Aspect', [
+            _aspectCircle(
+              _portrait ? '9:16' : '16:9',
+              selected: wide,
+              onTap: () => _selectAspect(true),
+            ),
+            _aspectCircle(
+              _portrait ? '3:4' : '4:3',
+              selected: !wide,
+              onTap: () => _selectAspect(false),
+            ),
+          ]),
           const SizedBox(height: 4),
-          _modeRow(
-            'Frame rate',
-            [
-              for (final fps in rates)
+          _modeRow('Frame rate', [
+            for (final fps in rates)
+              _modeChip(
+                label: '$fps',
+                tooltip: '$fps fps',
+                selected: fps == current.fps,
+                onTap: () => _selectFps(fps),
+              ),
+          ]),
+          const SizedBox(height: 4),
+          _modeRow('Bit depth', [
+            for (final tenBit in [true, false])
+              if (depths.contains(tenBit))
                 _modeChip(
-                  label: '$fps',
-                  tooltip: '$fps fps',
-                  selected: fps == current.fps,
-                  onTap: () => _selectFps(fps),
+                  label: tenBit ? '10-bit' : '8-bit',
+                  tooltip: tenBit
+                      ? '10-bit HLG where probe-verified'
+                      : '8-bit SDR',
+                  selected: current.tenBit == tenBit,
+                  onTap: () => _selectBit(tenBit),
                 ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          _modeRow(
-            'Bit depth',
-            [
-              for (final tenBit in [true, false])
-                if (depths.contains(tenBit))
-                  _modeChip(
-                    label: tenBit ? '10-bit' : '8-bit',
-                    tooltip: tenBit
-                        ? '10-bit HLG where probe-verified'
-                        : '8-bit SDR',
-                    selected: current.tenBit == tenBit,
-                    onTap: () => _selectBit(tenBit),
-                  ),
-            ],
-          ),
+          ]),
         ],
       ),
     );
   }
 
-  Widget _aspectCircle(String label, {
+  Widget _aspectCircle(
+    String label, {
     required bool selected,
     required VoidCallback onTap,
   }) {
@@ -726,15 +712,12 @@ class _ControlDeckState extends State<ControlDeck> {
             padding: const EdgeInsets.only(top: 7),
             child: Text(
               label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(fontSize: 10),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(fontSize: 10),
             ),
           ),
         ),
-        Expanded(
-          child: Wrap(spacing: 4, runSpacing: 4, children: chips),
-        ),
+        Expanded(child: Wrap(spacing: 4, runSpacing: 4, children: chips)),
       ],
     );
   }
@@ -766,14 +749,12 @@ class _ControlDeckState extends State<ControlDeck> {
     return null;
   }
 
-  bool _isWideMode(RecordingMode mode) =>
-      mode.width * 9 == mode.height * 16;
+  bool _isWideMode(RecordingMode mode) => mode.width * 9 == mode.height * 16;
 
   /// A mode's resolution family. 4K means a 2160-or-taller frame; the exact
   /// size then follows the aspect (e.g. 3840x2160 for 16:9 and 4096x3072 or
   /// 2880x2160 for 4:3). This is why changing aspect no longer drops to 1080.
-  String _familyOf(RecordingMode mode) =>
-      mode.height >= 2160 ? '4K' : '1080';
+  String _familyOf(RecordingMode mode) => mode.height >= 2160 ? '4K' : '1080';
 
   /// Candidate sizes in preference order for a family and aspect.
   List<(int, int)> _sizesFor(String family, bool wide) {
@@ -865,12 +846,7 @@ class _ControlDeckState extends State<ControlDeck> {
         _firstEnabledAt(width, height);
   }
 
-  RecordingMode? _nearestRate(
-    int width,
-    int height,
-    int fps,
-    bool tenBit,
-  ) {
+  RecordingMode? _nearestRate(int width, int height, int fps, bool tenBit) {
     RecordingMode? best;
     var bestDelta = 1 << 30;
     for (final mode in state.recordingModes) {
@@ -899,7 +875,27 @@ class _ControlDeckState extends State<ControlDeck> {
     return null;
   }
 
+  bool get _portrait => state.previewQuarterTurns.isOdd;
+
+  int get _displayWidth => _portrait ? state.previewHeight : state.previewWidth;
+
+  int get _displayHeight =>
+      _portrait ? state.previewWidth : state.previewHeight;
+
   String _sizeLabelFor(int width, int height) {
+    if (_portrait) {
+      return switch ((width, height)) {
+        (3840, 2160) => '4K',
+        (4096, 3072) => '4K3:4',
+        (3840, 2880) => '4K3:4',
+        (2880, 2160) => '4K3:4',
+        (1920, 1080) => '1080p',
+        (1920, 1440) => '3:4',
+        (1440, 1080) => '3:4',
+        (1280, 720) => '720p',
+        _ => '$height×$width',
+      };
+    }
     return switch ((width, height)) {
       (3840, 2160) => '4K',
       (4096, 3072) => '4K4:3',
@@ -968,9 +964,7 @@ class _ControlDeckState extends State<ControlDeck> {
                         ? UiTokens.accent
                         : UiTokens.surfaceRaised,
                     border: Border.all(
-                      color: lens.selected
-                          ? UiTokens.accent
-                          : UiTokens.border,
+                      color: lens.selected ? UiTokens.accent : UiTokens.border,
                     ),
                   ),
                   child: Text(
@@ -1028,7 +1022,8 @@ class _ControlDeckState extends State<ControlDeck> {
                 ? 'Stop recording to edit the shoot set or profiles.'
                 : 'Movie mode uses the common mode of the selected lenses. '
                       'Macro lenses are never included.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(fontSize: 10),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -1163,18 +1158,15 @@ class _ControlDeckState extends State<ControlDeck> {
             ],
           ),
           const SizedBox(height: 2),
-          _modeRow(
-            'Metering',
-            [
-              for (final mode in state.meteringModes)
-                _modeChip(
-                  label: _meteringLabel(mode),
-                  tooltip: _meteringTooltip(mode),
-                  selected: state.meteringMode == mode,
-                  onTap: () => widget.host.setMeteringMode(mode),
-                ),
-            ],
-          ),
+          _modeRow('Metering', [
+            for (final mode in state.meteringModes)
+              _modeChip(
+                label: _meteringLabel(mode),
+                tooltip: _meteringTooltip(mode),
+                selected: state.meteringMode == mode,
+                onTap: () => widget.host.setMeteringMode(mode),
+              ),
+          ]),
           LabeledSlider(
             label: 'Meter speed',
             valueLabel: '${(_meterSpeed * 100).round()}%',
@@ -1211,9 +1203,8 @@ class _ControlDeckState extends State<ControlDeck> {
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
                 shutterGridHint,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: UiTokens.muted),
+                style: Theme.of(context).textTheme.labelSmall
+                    ?.copyWith(color: UiTokens.muted),
               ),
             ),
           Wrap(
@@ -1224,7 +1215,10 @@ class _ControlDeckState extends State<ControlDeck> {
                 ChoiceChip(
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  label: Text('${angle.toInt()}°', style: const TextStyle(fontSize: 10)),
+                  label: Text(
+                    '${angle.toInt()}°',
+                    style: const TextStyle(fontSize: 10),
+                  ),
                   selected:
                       state.shutterAngle.roundToDouble() == angle &&
                       manualShutter,
@@ -1324,10 +1318,7 @@ class _ControlDeckState extends State<ControlDeck> {
                 ),
                 TextButton(
                   onPressed: widget.host.requestCameraPermissions,
-                  child: const Text(
-                    'Grant',
-                    style: TextStyle(fontSize: 11),
-                  ),
+                  child: const Text('Grant', style: TextStyle(fontSize: 11)),
                 ),
               ],
             ),
@@ -1346,18 +1337,14 @@ class _ControlDeckState extends State<ControlDeck> {
                   : 'Audio input inactive',
               style: TextStyle(
                 fontSize: 11,
-                color: state.audioAvailable
-                    ? UiTokens.muted
-                    : UiTokens.danger,
+                color: state.audioAvailable ? UiTokens.muted : UiTokens.danger,
               ),
             ),
           const SizedBox(height: 8),
           ValueListenableBuilder<AudioTelemetry?>(
             valueListenable: widget.audio,
-            builder: (context, level, _) => _AudioMeter(
-              level: level,
-              active: state.audioAvailable,
-            ),
+            builder: (context, level, _) =>
+                _AudioMeter(level: level, active: state.audioAvailable),
           ),
           LabeledSlider(
             label: 'Input gain',
@@ -1426,30 +1413,26 @@ class _ControlDeckState extends State<ControlDeck> {
           if (state.profile == 'slatelook')
             Text(
               'S-Cinetone-inspired look: soft shoulder, gentle knee, warm skin.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: UiTokens.muted),
             )
           else if (state.profile == 'standard')
             Text(
               'Camera look: no creative processing.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: UiTokens.muted),
             )
           else if (editable)
             Text(
               'Custom look. Changes save automatically.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: UiTokens.muted),
             )
           else
             Text(
               'Preset look. Pick a user profile to edit every control.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: UiTokens.muted),
             ),
           if (editable) ...[
             const Divider(height: 10, color: UiTokens.border),
@@ -1493,10 +1476,8 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -15,
               max: 15,
               divisions: 30,
-              onCommit: (value) =>
-                  _patchProfile(blackLevel: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('blackLevel'),
+              onCommit: (value) => _patchProfile(blackLevel: value.round()),
+              onReset: () => _resetProfileParameter('blackLevel'),
             ),
             _profileChoiceGroup(
               'Gamma',
@@ -1510,8 +1491,7 @@ class _ControlDeckState extends State<ControlDeck> {
               _blackGammaRangeOptions,
               settings.blackGammaRange,
               (value) => _patchProfile(blackGammaRange: value),
-              onReset: () =>
-                  _resetProfileParameter('blackGammaRange'),
+              onReset: () => _resetProfileParameter('blackGammaRange'),
             ),
             _profileSlider(
               context,
@@ -1523,8 +1503,7 @@ class _ControlDeckState extends State<ControlDeck> {
               divisions: 14,
               onCommit: (value) =>
                   _patchProfile(blackGammaLevel: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('blackGammaLevel'),
+              onReset: () => _resetProfileParameter('blackGammaLevel'),
             ),
             _profileChoiceGroup(
               'Knee mode',
@@ -1545,16 +1524,14 @@ class _ControlDeckState extends State<ControlDeck> {
                 suffix: '%',
                 onCommit: (value) =>
                     _patchProfile(kneeAutoMaxPoint: value.round()),
-                onReset: () =>
-                    _resetProfileParameter('kneeAutoMaxPoint'),
+                onReset: () => _resetProfileParameter('kneeAutoMaxPoint'),
               ),
               _profileChoiceGroup(
                 'Knee sensitivity',
                 _kneeSensitivityOptions,
                 settings.kneeAutoSensitivity,
                 (value) => _patchProfile(kneeAutoSensitivity: value),
-                onReset: () =>
-                    _resetProfileParameter('kneeAutoSensitivity'),
+                onReset: () => _resetProfileParameter('kneeAutoSensitivity'),
               ),
             ] else ...[
               _profileSlider(
@@ -1566,10 +1543,8 @@ class _ControlDeckState extends State<ControlDeck> {
                 max: 105,
                 divisions: 30,
                 suffix: '%',
-                onCommit: (value) =>
-                    _patchProfile(kneePoint: value.round()),
-                onReset: () =>
-                    _resetProfileParameter('kneePoint'),
+                onCommit: (value) => _patchProfile(kneePoint: value.round()),
+                onReset: () => _resetProfileParameter('kneePoint'),
               ),
               _profileSlider(
                 context,
@@ -1579,10 +1554,8 @@ class _ControlDeckState extends State<ControlDeck> {
                 min: -5,
                 max: 5,
                 divisions: 10,
-                onCommit: (value) =>
-                    _patchProfile(kneeSlope: value.round()),
-                onReset: () =>
-                    _resetProfileParameter('kneeSlope'),
+                onCommit: (value) => _patchProfile(kneeSlope: value.round()),
+                onReset: () => _resetProfileParameter('kneeSlope'),
               ),
             ],
             _profileChoiceGroup(
@@ -1600,10 +1573,8 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -32,
               max: 32,
               divisions: 64,
-              onCommit: (value) =>
-                  _patchProfile(saturation: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('saturation'),
+              onCommit: (value) => _patchProfile(saturation: value.round()),
+              onReset: () => _resetProfileParameter('saturation'),
             ),
             _profileSlider(
               context,
@@ -1613,15 +1584,10 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -7,
               max: 7,
               divisions: 14,
-              onCommit: (value) =>
-                  _patchProfile(colorPhase: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('colorPhase'),
+              onCommit: (value) => _patchProfile(colorPhase: value.round()),
+              onReset: () => _resetProfileParameter('colorPhase'),
             ),
-            Text(
-              'COLOR DEPTH',
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
+            Text('COLOR DEPTH', style: Theme.of(context).textTheme.labelSmall),
             _profileSlider(
               context,
               key: 'colorDepthR',
@@ -1630,10 +1596,8 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -7,
               max: 7,
               divisions: 14,
-              onCommit: (value) =>
-                  _patchProfile(colorDepthR: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('colorDepthR'),
+              onCommit: (value) => _patchProfile(colorDepthR: value.round()),
+              onReset: () => _resetProfileParameter('colorDepthR'),
             ),
             _profileSlider(
               context,
@@ -1643,10 +1607,8 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -7,
               max: 7,
               divisions: 14,
-              onCommit: (value) =>
-                  _patchProfile(colorDepthG: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('colorDepthG'),
+              onCommit: (value) => _patchProfile(colorDepthG: value.round()),
+              onReset: () => _resetProfileParameter('colorDepthG'),
             ),
             _profileSlider(
               context,
@@ -1656,10 +1618,8 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -7,
               max: 7,
               divisions: 14,
-              onCommit: (value) =>
-                  _patchProfile(colorDepthB: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('colorDepthB'),
+              onCommit: (value) => _patchProfile(colorDepthB: value.round()),
+              onReset: () => _resetProfileParameter('colorDepthB'),
             ),
             _profileSlider(
               context,
@@ -1669,10 +1629,8 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -7,
               max: 7,
               divisions: 14,
-              onCommit: (value) =>
-                  _patchProfile(colorDepthC: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('colorDepthC'),
+              onCommit: (value) => _patchProfile(colorDepthC: value.round()),
+              onReset: () => _resetProfileParameter('colorDepthC'),
             ),
             _profileSlider(
               context,
@@ -1682,10 +1640,8 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -7,
               max: 7,
               divisions: 14,
-              onCommit: (value) =>
-                  _patchProfile(colorDepthM: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('colorDepthM'),
+              onCommit: (value) => _patchProfile(colorDepthM: value.round()),
+              onReset: () => _resetProfileParameter('colorDepthM'),
             ),
             _profileSlider(
               context,
@@ -1695,10 +1651,8 @@ class _ControlDeckState extends State<ControlDeck> {
               min: -7,
               max: 7,
               divisions: 14,
-              onCommit: (value) =>
-                  _patchProfile(colorDepthY: value.round()),
-              onReset: () =>
-                  _resetProfileParameter('colorDepthY'),
+              onCommit: (value) => _patchProfile(colorDepthY: value.round()),
+              onReset: () => _resetProfileParameter('colorDepthY'),
             ),
             TextButton.icon(
               style: TextButton.styleFrom(
@@ -1735,10 +1689,7 @@ class _ControlDeckState extends State<ControlDeck> {
                 ChoiceChip(
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  label: Text(
-                    'Manual',
-                    style: const TextStyle(fontSize: 10),
-                  ),
+                  label: Text('Manual', style: const TextStyle(fontSize: 10)),
                   selected: state.whiteBalanceMode == 'manual',
                   onSelected: (_) => widget.host.setManualWhiteBalance(
                     state.whiteBalanceKelvin,
@@ -2058,10 +2009,7 @@ class _ControlDeckState extends State<ControlDeck> {
             const SizedBox(height: 4),
             Row(
               children: [
-                Text(
-                  'MF',
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
+                Text('MF', style: Theme.of(context).textTheme.labelSmall),
                 Expanded(
                   child: Slider(
                     value: focusValue,
@@ -2125,9 +2073,8 @@ class _ControlDeckState extends State<ControlDeck> {
             if (state.focusMode != 'software')
               Text(
                 'Choose a scenario or SAF to run the software focus engine.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: UiTokens.muted),
               ),
           ],
           if (state.oisSupported || state.eisSupported) ...[
@@ -2138,17 +2085,9 @@ class _ControlDeckState extends State<ControlDeck> {
             ),
             const SizedBox(height: 4),
             if (state.oisSupported)
-              _stabilizationRow(
-                'OIS',
-                state.oisEnabled,
-                widget.host.setOis,
-              ),
+              _stabilizationRow('OIS', state.oisEnabled, widget.host.setOis),
             if (state.eisSupported)
-              _stabilizationRow(
-                'EIS',
-                state.eisEnabled,
-                widget.host.setEis,
-              ),
+              _stabilizationRow('EIS', state.eisEnabled, widget.host.setEis),
           ],
         ],
       ),
@@ -2230,7 +2169,8 @@ class _ControlDeckState extends State<ControlDeck> {
     'continuous_picture' => 'Continuous autofocus for stills',
     'macro' => 'Macro autofocus',
     'edof' => 'Extended depth of field',
-    'software' => 'Software autofocus with shift sensitivity and transition speed',
+    'software' =>
+      'Software autofocus with shift sensitivity and transition speed',
     _ => humanizeWireValue(mode),
   };
 
@@ -2245,10 +2185,7 @@ class _ControlDeckState extends State<ControlDeck> {
         children: [
           SizedBox(
             width: 34,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
+            child: Text(label, style: Theme.of(context).textTheme.labelSmall),
           ),
           _modeChip(
             label: 'on',
@@ -2287,15 +2224,13 @@ class _ControlDeckState extends State<ControlDeck> {
               'Vignette correction',
               const ['on', 'off'],
               state.shadingCorrection ? 'on' : 'off',
-              (value) =>
-                  widget.host.setShadingCorrection(value == 'on'),
+              (value) => widget.host.setShadingCorrection(value == 'on'),
             )
           else
             Text(
               'VIGNETTE CORRECTION · not offered by this sensor',
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: UiTokens.muted),
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: UiTokens.muted),
             ),
           const SizedBox(height: 8),
           _chipGroup(
@@ -2325,7 +2260,10 @@ class _ControlDeckState extends State<ControlDeck> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: Theme.of(context).textTheme.labelSmall),
+        Text(
+          label.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
         const SizedBox(height: 4),
         Wrap(
           spacing: 4,
@@ -2380,7 +2318,8 @@ class _ControlDeckState extends State<ControlDeck> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: state.deviceReportOptIn && !state.deviceReportRunning
+                  onPressed:
+                      state.deviceReportOptIn && !state.deviceReportRunning
                       ? () => widget.host.runDeviceReport()
                       : null,
                   icon: state.deviceReportRunning
@@ -2604,9 +2543,8 @@ class _ControlDeckState extends State<ControlDeck> {
             width: 92,
             child: Text(
               label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: UiTokens.muted),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: UiTokens.muted),
             ),
           ),
           Expanded(
@@ -2785,7 +2723,8 @@ class _AudioMeterState extends State<_AudioMeter> {
     final rmsL = active ? level.rmsDbL : _floor;
     final rmsR = active ? level.rmsDbR : _floor;
     final clipped = active && _clipped;
-    final silent = active &&
+    final silent =
+        active &&
         _silentSince != null &&
         DateTime.now().difference(_silentSince!) > const Duration(seconds: 2);
 
@@ -2797,9 +2736,7 @@ class _AudioMeterState extends State<_AudioMeter> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                color: clipped
-                    ? UiTokens.danger
-                    : UiTokens.surfaceRaised,
+                color: clipped ? UiTokens.danger : UiTokens.surfaceRaised,
                 borderRadius: BorderRadius.circular(3),
                 border: Border.all(
                   color: clipped ? UiTokens.danger : UiTokens.border,
@@ -2817,7 +2754,11 @@ class _AudioMeterState extends State<_AudioMeter> {
             ),
             const Spacer(),
             Text(
-              silent ? 'SILENT INPUT' : active ? 'dBFS' : 'NO SIGNAL',
+              silent
+                  ? 'SILENT INPUT'
+                  : active
+                  ? 'dBFS'
+                  : 'NO SIGNAL',
               style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
@@ -2932,7 +2873,8 @@ class _MeterBar extends StatelessWidget {
                         top: 0,
                         bottom: 0,
                         child: const ColoredBox(color: UiTokens.surface),
-                      ),                      if (peak > 0)
+                      ),
+                      if (peak > 0)
                         Positioned(
                           left: (width * rms - 1).clamp(0.0, width - 2),
                           top: 0,

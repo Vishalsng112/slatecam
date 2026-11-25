@@ -73,8 +73,10 @@ data class CameraUiState(
     val glRotationDegrees: Int = 0,
     /** Fixed landscape rotation for the encoder, independent of the display. */
     val encoderRotationDegrees: Int = 0,
-    /** Clockwise MP4 orientation hint for the rotation the take started in. */
+    /** Clockwise MP4 orientation hint; native portrait encoding leaves it 0. */
     val recordingOrientationHint: Int = 0,
+    /** Quarter turns the viewfinder applies to match the display orientation. */
+    val previewQuarterTurns: Int = 0,
     val zoomRatio: Float = 1f,
     val zoomMin: Float = 1f,
     val zoomMax: Float = 1f,
@@ -176,6 +178,7 @@ class CameraController(private val context: Context) {
     private var glRotationDegrees = 0
     private var encoderRotationDegrees = 0
     private var recordingOrientationHint = 0
+    private var previewQuarterTurns = 0
     private var initialized = false
     private var wantsTenBit = false
     private var tenBitActive = false
@@ -1112,9 +1115,12 @@ class CameraController(private val context: Context) {
 
     private fun updateDisplayRotation(characteristics: CameraCharacteristics) {
         rotationDegrees = displayRotationDegrees(characteristics)
-        encoderRotationDegrees = encoderRotationFor(characteristics)
-        recordingOrientationHint = recordingHintFor(characteristics)
         glRotationDegrees = glRotationFor(characteristics)
+        // Camera2 sensor frames stay landscape; the MP4 hint carries the take
+        // orientation and the presenter applies the same quarter turn.
+        recordingOrientationHint = recordingHintFor(characteristics)
+        previewQuarterTurns = (recordingOrientationHint / 90) % 4
+        encoderRotationDegrees = glRotationDegrees
         android.util.Log.i(
             "SlateCam",
             "preview rotation=$rotationDegrees gl=$glRotationDegrees " +
@@ -1122,16 +1128,6 @@ class CameraController(private val context: Context) {
                 "sensor=${characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION)} " +
                 "display=${currentDisplayRotation()}",
         )
-    }
-
-    /**
-     * The encoder always receives a landscape frame, upright relative to the
-     * sensor's natural landscape orientation. Portrait playback is handled by
-     * the MP4 orientation hint instead of encoding a second pixel layout.
-     */
-    private fun encoderRotationFor(characteristics: CameraCharacteristics): Int {
-        val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
-        return sensor % 360
     }
 
     /** Clockwise rotation a player applies to make the take upright. */
@@ -1451,6 +1447,7 @@ class CameraController(private val context: Context) {
             glRotationDegrees = glRotationDegrees,
             encoderRotationDegrees = encoderRotationDegrees,
             recordingOrientationHint = recordingOrientationHint,
+            previewQuarterTurns = previewQuarterTurns,
             zoomRatio = zoomRamp.value,
             zoomMin = zoomMin,
             zoomMax = zoomMax,

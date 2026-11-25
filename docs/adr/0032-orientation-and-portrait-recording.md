@@ -52,7 +52,8 @@ hint; the latter keeps one encoder path and one GL frame.
 - Pad 3: portrait uses the stacked layout and the console's three responsive
   columns below the viewfinder; rotation during idle is live.
 - The viewfinder aspect for a portrait 4:3 mode is 3:4, and for 16:9 it is 9:16;
-  no stretching or letterboxing inside the preview box.
+  the aspect control and size labels swap with the orientation, so the UI never
+  claims X:Y while playback is Y:X.
 - Mid-take rotation does not rotate the clip; the operator sees the live
   preview continue for the current take, then the new orientation applies.
 

@@ -9,6 +9,17 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Orientation-aware aspect ratios (build 2186)
+- In portrait the aspect control now shows and selects the effective vertical
+  ratio: `9:16` and `3:4` instead of `16:9`/`4:3`, and the header/mode labels
+  show the effective size (`1080×1920`, `1080×1440`). Landscape is unchanged
+  (`16:9`, `4:3`).
+- Camera2 sensors still emit landscape frames; the MP4 orientation hint is the
+  standard mechanism that makes a portrait take Y:X on playback. The app applies
+  that same turn to the viewfinder and taps, so UI, selection and playback agree.
+- A take keeps the orientation and aspect it started with; changing either
+  applies after finalization.
+
 ### Changed — Full-bleed portrait viewfinder (build 2182)
 - In portrait, the viewfinder now fills the available width edge to edge for
   both 4:3 and 16:9, cropping the overflow instead of showing black side bars.

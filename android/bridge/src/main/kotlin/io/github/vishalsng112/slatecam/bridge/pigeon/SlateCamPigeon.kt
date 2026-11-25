@@ -930,8 +930,10 @@ data class CameraState (
   /** full | 1080 | 720 */
   val previewQuality: String,
   val previewRotationDegrees: Long,
-  /** Clockwise MP4 orientation hint for the current display orientation. */
+  /** Clockwise MP4 orientation hint; 0 when portrait is encoded natively. */
   val recordingOrientationHint: Long,
+  /** Quarter turns the viewfinder applies for the current display. */
+  val previewQuarterTurns: Long,
   /** Current optical/digital zoom ratio applied to the active camera. */
   val zoomRatio: Double,
   val zoomMin: Double,
@@ -1069,76 +1071,77 @@ data class CameraState (
       val previewQuality = pigeonVar_list[35] as String
       val previewRotationDegrees = pigeonVar_list[36] as Long
       val recordingOrientationHint = pigeonVar_list[37] as Long
-      val zoomRatio = pigeonVar_list[38] as Double
-      val zoomMin = pigeonVar_list[39] as Double
-      val zoomMax = pigeonVar_list[40] as Double
-      val lenses = pigeonVar_list[41] as List<LensOption>
-      val recordingMode = pigeonVar_list[42] as String
-      val recordingModes = pigeonVar_list[43] as List<RecordingMode>
-      val shootMode = pigeonVar_list[44] as String
-      val shootLenses = pigeonVar_list[45] as List<ShootLens>
-      val shootProfiles = pigeonVar_list[46] as List<ShootProfile>
-      val activeShootProfile = pigeonVar_list[47] as String
-      val tenBit = pigeonVar_list[48] as Boolean
-      val hlgAvailable = pigeonVar_list[49] as Boolean
-      val hlgReason = pigeonVar_list[50] as String
-      val isRecording = pigeonVar_list[51] as Boolean
-      val recordingSeconds = pigeonVar_list[52] as Long
-      val clipPath = pigeonVar_list[53] as String?
-      val recordingError = pigeonVar_list[54] as String?
-      val shutterAngle = pigeonVar_list[55] as Double
-      val frameRate = pigeonVar_list[56] as Long
-      val gyroSampleCount = pigeonVar_list[57] as Long
-      val profile = pigeonVar_list[58] as String
-      val pictureProfiles = pigeonVar_list[59] as List<PictureProfileInfo>
-      val profileSettings = pigeonVar_list[60] as ProfileSettings
-      val creativeLut = pigeonVar_list[61] as String
-      val creativeLuts = pigeonVar_list[62] as List<String>
-      val zebra = pigeonVar_list[63] as Boolean
-      val falseColor = pigeonVar_list[64] as Boolean
-      val peaking = pigeonVar_list[65] as Boolean
-      val peakingSensitivity = pigeonVar_list[66] as Double
-      val peakingStrength = pigeonVar_list[67] as Double
-      val edgeMode = pigeonVar_list[68] as String
-      val edgeModes = pigeonVar_list[69] as List<String>
-      val noiseReduction = pigeonVar_list[70] as String
-      val noiseReductionModes = pigeonVar_list[71] as List<String>
-      val antibanding = pigeonVar_list[72] as String
-      val antibandingModes = pigeonVar_list[73] as List<String>
-      val shadingCorrection = pigeonVar_list[74] as Boolean
-      val shadingSupported = pigeonVar_list[75] as Boolean
-      val oisSupported = pigeonVar_list[76] as Boolean
-      val oisEnabled = pigeonVar_list[77] as Boolean
-      val eisSupported = pigeonVar_list[78] as Boolean
-      val eisEnabled = pigeonVar_list[79] as Boolean
-      val exposureMode = pigeonVar_list[80] as String
-      val exposureModes = pigeonVar_list[81] as List<String>
-      val meteringMode = pigeonVar_list[82] as String
-      val meteringModes = pigeonVar_list[83] as List<String>
-      val meteringSpeed = pigeonVar_list[84] as Double
-      val deviceKey = pigeonVar_list[85] as String
-      val deviceQuirks = pigeonVar_list[86] as List<String>
-      val deviceCalibrationActive = pigeonVar_list[87] as Boolean
-      val deviceCalibrationSource = pigeonVar_list[88] as String?
-      val deviceDatabaseVersion = pigeonVar_list[89] as Long
-      val deviceReportOptIn = pigeonVar_list[90] as Boolean
-      val deviceReportRunning = pigeonVar_list[91] as Boolean
-      val deviceReportPath = pigeonVar_list[92] as String?
-      val deviceReportError = pigeonVar_list[93] as String?
-      val audioInputs = pigeonVar_list[94] as List<AudioInputOption>
-      val audioInputKey = pigeonVar_list[95] as String
-      val audioGainDb = pigeonVar_list[96] as Double
-      val audioPermissionGranted = pigeonVar_list[97] as Boolean
-      val audioAvailable = pigeonVar_list[98] as Boolean
-      val audioError = pigeonVar_list[99] as String?
-      val audioSource = pigeonVar_list[100] as String?
-      val audioSampleRate = pigeonVar_list[101] as Long
-      val audioChannels = pigeonVar_list[102] as Long
-      val histogram = pigeonVar_list[103] as List<Long>
-      val waveform = pigeonVar_list[104] as List<Long>
-      val waveformColumns = pigeonVar_list[105] as Long
-      val waveformBins = pigeonVar_list[106] as Long
-      return CameraState(isOpen, error, cameraId, activePhysicalCameraId, cameraIds, cameraLabels, iso, isoMin, isoMax, shutterNs, shutterMinNs, shutterMaxNs, shutterStepNs, focusDiopters, focusMin, focusMax, focusShiftSpeed, whiteBalanceMode, whiteBalanceModes, whiteBalanceKelvin, whiteBalanceTint, manualWhiteBalanceSupported, autoExposure, autoFocus, autoFocusSupported, focusMode, focusModes, focusScenario, focusScenarios, focusShiftSensitivity, focusTransitionSpeed, previewWidth, previewHeight, previewOutputWidth, previewOutputHeight, previewQuality, previewRotationDegrees, recordingOrientationHint, zoomRatio, zoomMin, zoomMax, lenses, recordingMode, recordingModes, shootMode, shootLenses, shootProfiles, activeShootProfile, tenBit, hlgAvailable, hlgReason, isRecording, recordingSeconds, clipPath, recordingError, shutterAngle, frameRate, gyroSampleCount, profile, pictureProfiles, profileSettings, creativeLut, creativeLuts, zebra, falseColor, peaking, peakingSensitivity, peakingStrength, edgeMode, edgeModes, noiseReduction, noiseReductionModes, antibanding, antibandingModes, shadingCorrection, shadingSupported, oisSupported, oisEnabled, eisSupported, eisEnabled, exposureMode, exposureModes, meteringMode, meteringModes, meteringSpeed, deviceKey, deviceQuirks, deviceCalibrationActive, deviceCalibrationSource, deviceDatabaseVersion, deviceReportOptIn, deviceReportRunning, deviceReportPath, deviceReportError, audioInputs, audioInputKey, audioGainDb, audioPermissionGranted, audioAvailable, audioError, audioSource, audioSampleRate, audioChannels, histogram, waveform, waveformColumns, waveformBins)
+      val previewQuarterTurns = pigeonVar_list[38] as Long
+      val zoomRatio = pigeonVar_list[39] as Double
+      val zoomMin = pigeonVar_list[40] as Double
+      val zoomMax = pigeonVar_list[41] as Double
+      val lenses = pigeonVar_list[42] as List<LensOption>
+      val recordingMode = pigeonVar_list[43] as String
+      val recordingModes = pigeonVar_list[44] as List<RecordingMode>
+      val shootMode = pigeonVar_list[45] as String
+      val shootLenses = pigeonVar_list[46] as List<ShootLens>
+      val shootProfiles = pigeonVar_list[47] as List<ShootProfile>
+      val activeShootProfile = pigeonVar_list[48] as String
+      val tenBit = pigeonVar_list[49] as Boolean
+      val hlgAvailable = pigeonVar_list[50] as Boolean
+      val hlgReason = pigeonVar_list[51] as String
+      val isRecording = pigeonVar_list[52] as Boolean
+      val recordingSeconds = pigeonVar_list[53] as Long
+      val clipPath = pigeonVar_list[54] as String?
+      val recordingError = pigeonVar_list[55] as String?
+      val shutterAngle = pigeonVar_list[56] as Double
+      val frameRate = pigeonVar_list[57] as Long
+      val gyroSampleCount = pigeonVar_list[58] as Long
+      val profile = pigeonVar_list[59] as String
+      val pictureProfiles = pigeonVar_list[60] as List<PictureProfileInfo>
+      val profileSettings = pigeonVar_list[61] as ProfileSettings
+      val creativeLut = pigeonVar_list[62] as String
+      val creativeLuts = pigeonVar_list[63] as List<String>
+      val zebra = pigeonVar_list[64] as Boolean
+      val falseColor = pigeonVar_list[65] as Boolean
+      val peaking = pigeonVar_list[66] as Boolean
+      val peakingSensitivity = pigeonVar_list[67] as Double
+      val peakingStrength = pigeonVar_list[68] as Double
+      val edgeMode = pigeonVar_list[69] as String
+      val edgeModes = pigeonVar_list[70] as List<String>
+      val noiseReduction = pigeonVar_list[71] as String
+      val noiseReductionModes = pigeonVar_list[72] as List<String>
+      val antibanding = pigeonVar_list[73] as String
+      val antibandingModes = pigeonVar_list[74] as List<String>
+      val shadingCorrection = pigeonVar_list[75] as Boolean
+      val shadingSupported = pigeonVar_list[76] as Boolean
+      val oisSupported = pigeonVar_list[77] as Boolean
+      val oisEnabled = pigeonVar_list[78] as Boolean
+      val eisSupported = pigeonVar_list[79] as Boolean
+      val eisEnabled = pigeonVar_list[80] as Boolean
+      val exposureMode = pigeonVar_list[81] as String
+      val exposureModes = pigeonVar_list[82] as List<String>
+      val meteringMode = pigeonVar_list[83] as String
+      val meteringModes = pigeonVar_list[84] as List<String>
+      val meteringSpeed = pigeonVar_list[85] as Double
+      val deviceKey = pigeonVar_list[86] as String
+      val deviceQuirks = pigeonVar_list[87] as List<String>
+      val deviceCalibrationActive = pigeonVar_list[88] as Boolean
+      val deviceCalibrationSource = pigeonVar_list[89] as String?
+      val deviceDatabaseVersion = pigeonVar_list[90] as Long
+      val deviceReportOptIn = pigeonVar_list[91] as Boolean
+      val deviceReportRunning = pigeonVar_list[92] as Boolean
+      val deviceReportPath = pigeonVar_list[93] as String?
+      val deviceReportError = pigeonVar_list[94] as String?
+      val audioInputs = pigeonVar_list[95] as List<AudioInputOption>
+      val audioInputKey = pigeonVar_list[96] as String
+      val audioGainDb = pigeonVar_list[97] as Double
+      val audioPermissionGranted = pigeonVar_list[98] as Boolean
+      val audioAvailable = pigeonVar_list[99] as Boolean
+      val audioError = pigeonVar_list[100] as String?
+      val audioSource = pigeonVar_list[101] as String?
+      val audioSampleRate = pigeonVar_list[102] as Long
+      val audioChannels = pigeonVar_list[103] as Long
+      val histogram = pigeonVar_list[104] as List<Long>
+      val waveform = pigeonVar_list[105] as List<Long>
+      val waveformColumns = pigeonVar_list[106] as Long
+      val waveformBins = pigeonVar_list[107] as Long
+      return CameraState(isOpen, error, cameraId, activePhysicalCameraId, cameraIds, cameraLabels, iso, isoMin, isoMax, shutterNs, shutterMinNs, shutterMaxNs, shutterStepNs, focusDiopters, focusMin, focusMax, focusShiftSpeed, whiteBalanceMode, whiteBalanceModes, whiteBalanceKelvin, whiteBalanceTint, manualWhiteBalanceSupported, autoExposure, autoFocus, autoFocusSupported, focusMode, focusModes, focusScenario, focusScenarios, focusShiftSensitivity, focusTransitionSpeed, previewWidth, previewHeight, previewOutputWidth, previewOutputHeight, previewQuality, previewRotationDegrees, recordingOrientationHint, previewQuarterTurns, zoomRatio, zoomMin, zoomMax, lenses, recordingMode, recordingModes, shootMode, shootLenses, shootProfiles, activeShootProfile, tenBit, hlgAvailable, hlgReason, isRecording, recordingSeconds, clipPath, recordingError, shutterAngle, frameRate, gyroSampleCount, profile, pictureProfiles, profileSettings, creativeLut, creativeLuts, zebra, falseColor, peaking, peakingSensitivity, peakingStrength, edgeMode, edgeModes, noiseReduction, noiseReductionModes, antibanding, antibandingModes, shadingCorrection, shadingSupported, oisSupported, oisEnabled, eisSupported, eisEnabled, exposureMode, exposureModes, meteringMode, meteringModes, meteringSpeed, deviceKey, deviceQuirks, deviceCalibrationActive, deviceCalibrationSource, deviceDatabaseVersion, deviceReportOptIn, deviceReportRunning, deviceReportPath, deviceReportError, audioInputs, audioInputKey, audioGainDb, audioPermissionGranted, audioAvailable, audioError, audioSource, audioSampleRate, audioChannels, histogram, waveform, waveformColumns, waveformBins)
     }
   }
   fun toList(): List<Any?> {
@@ -1181,6 +1184,7 @@ data class CameraState (
       previewQuality,
       previewRotationDegrees,
       recordingOrientationHint,
+      previewQuarterTurns,
       zoomRatio,
       zoomMin,
       zoomMax,
@@ -1260,7 +1264,7 @@ data class CameraState (
       return true
     }
     val other = other as CameraState
-    return SlateCamPigeonPigeonUtils.deepEquals(this.isOpen, other.isOpen) && SlateCamPigeonPigeonUtils.deepEquals(this.error, other.error) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraId, other.cameraId) && SlateCamPigeonPigeonUtils.deepEquals(this.activePhysicalCameraId, other.activePhysicalCameraId) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraIds, other.cameraIds) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraLabels, other.cameraLabels) && SlateCamPigeonPigeonUtils.deepEquals(this.iso, other.iso) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMin, other.isoMin) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMax, other.isoMax) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterNs, other.shutterNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMinNs, other.shutterMinNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMaxNs, other.shutterMaxNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterStepNs, other.shutterStepNs) && SlateCamPigeonPigeonUtils.deepEquals(this.focusDiopters, other.focusDiopters) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMin, other.focusMin) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMax, other.focusMax) && SlateCamPigeonPigeonUtils.deepEquals(this.focusShiftSpeed, other.focusShiftSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceMode, other.whiteBalanceMode) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceModes, other.whiteBalanceModes) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceKelvin, other.whiteBalanceKelvin) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceTint, other.whiteBalanceTint) && SlateCamPigeonPigeonUtils.deepEquals(this.manualWhiteBalanceSupported, other.manualWhiteBalanceSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.autoExposure, other.autoExposure) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocus, other.autoFocus) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocusSupported, other.autoFocusSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMode, other.focusMode) && SlateCamPigeonPigeonUtils.deepEquals(this.focusModes, other.focusModes) && SlateCamPigeonPigeonUtils.deepEquals(this.focusScenario, other.focusScenario) && SlateCamPigeonPigeonUtils.deepEquals(this.focusScenarios, other.focusScenarios) && SlateCamPigeonPigeonUtils.deepEquals(this.focusShiftSensitivity, other.focusShiftSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.focusTransitionSpeed, other.focusTransitionSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.previewWidth, other.previewWidth) && SlateCamPigeonPigeonUtils.deepEquals(this.previewHeight, other.previewHeight) && SlateCamPigeonPigeonUtils.deepEquals(this.previewOutputWidth, other.previewOutputWidth) && SlateCamPigeonPigeonUtils.deepEquals(this.previewOutputHeight, other.previewOutputHeight) && SlateCamPigeonPigeonUtils.deepEquals(this.previewQuality, other.previewQuality) && SlateCamPigeonPigeonUtils.deepEquals(this.previewRotationDegrees, other.previewRotationDegrees) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingOrientationHint, other.recordingOrientationHint) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomRatio, other.zoomRatio) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomMin, other.zoomMin) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomMax, other.zoomMax) && SlateCamPigeonPigeonUtils.deepEquals(this.lenses, other.lenses) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingMode, other.recordingMode) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingModes, other.recordingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.shootMode, other.shootMode) && SlateCamPigeonPigeonUtils.deepEquals(this.shootLenses, other.shootLenses) && SlateCamPigeonPigeonUtils.deepEquals(this.shootProfiles, other.shootProfiles) && SlateCamPigeonPigeonUtils.deepEquals(this.activeShootProfile, other.activeShootProfile) && SlateCamPigeonPigeonUtils.deepEquals(this.tenBit, other.tenBit) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgAvailable, other.hlgAvailable) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgReason, other.hlgReason) && SlateCamPigeonPigeonUtils.deepEquals(this.isRecording, other.isRecording) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingSeconds, other.recordingSeconds) && SlateCamPigeonPigeonUtils.deepEquals(this.clipPath, other.clipPath) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingError, other.recordingError) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterAngle, other.shutterAngle) && SlateCamPigeonPigeonUtils.deepEquals(this.frameRate, other.frameRate) && SlateCamPigeonPigeonUtils.deepEquals(this.gyroSampleCount, other.gyroSampleCount) && SlateCamPigeonPigeonUtils.deepEquals(this.profile, other.profile) && SlateCamPigeonPigeonUtils.deepEquals(this.pictureProfiles, other.pictureProfiles) && SlateCamPigeonPigeonUtils.deepEquals(this.profileSettings, other.profileSettings) && SlateCamPigeonPigeonUtils.deepEquals(this.creativeLut, other.creativeLut) && SlateCamPigeonPigeonUtils.deepEquals(this.creativeLuts, other.creativeLuts) && SlateCamPigeonPigeonUtils.deepEquals(this.zebra, other.zebra) && SlateCamPigeonPigeonUtils.deepEquals(this.falseColor, other.falseColor) && SlateCamPigeonPigeonUtils.deepEquals(this.peaking, other.peaking) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingSensitivity, other.peakingSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingStrength, other.peakingStrength) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeMode, other.edgeMode) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeModes, other.edgeModes) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReduction, other.noiseReduction) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReductionModes, other.noiseReductionModes) && SlateCamPigeonPigeonUtils.deepEquals(this.antibanding, other.antibanding) && SlateCamPigeonPigeonUtils.deepEquals(this.antibandingModes, other.antibandingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.shadingCorrection, other.shadingCorrection) && SlateCamPigeonPigeonUtils.deepEquals(this.shadingSupported, other.shadingSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.oisSupported, other.oisSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.oisEnabled, other.oisEnabled) && SlateCamPigeonPigeonUtils.deepEquals(this.eisSupported, other.eisSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.eisEnabled, other.eisEnabled) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureMode, other.exposureMode) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureModes, other.exposureModes) && SlateCamPigeonPigeonUtils.deepEquals(this.meteringMode, other.meteringMode) && SlateCamPigeonPigeonUtils.deepEquals(this.meteringModes, other.meteringModes) && SlateCamPigeonPigeonUtils.deepEquals(this.meteringSpeed, other.meteringSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceKey, other.deviceKey) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceQuirks, other.deviceQuirks) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceCalibrationActive, other.deviceCalibrationActive) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceCalibrationSource, other.deviceCalibrationSource) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceDatabaseVersion, other.deviceDatabaseVersion) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportOptIn, other.deviceReportOptIn) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportRunning, other.deviceReportRunning) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportPath, other.deviceReportPath) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportError, other.deviceReportError) && SlateCamPigeonPigeonUtils.deepEquals(this.audioInputs, other.audioInputs) && SlateCamPigeonPigeonUtils.deepEquals(this.audioInputKey, other.audioInputKey) && SlateCamPigeonPigeonUtils.deepEquals(this.audioGainDb, other.audioGainDb) && SlateCamPigeonPigeonUtils.deepEquals(this.audioPermissionGranted, other.audioPermissionGranted) && SlateCamPigeonPigeonUtils.deepEquals(this.audioAvailable, other.audioAvailable) && SlateCamPigeonPigeonUtils.deepEquals(this.audioError, other.audioError) && SlateCamPigeonPigeonUtils.deepEquals(this.audioSource, other.audioSource) && SlateCamPigeonPigeonUtils.deepEquals(this.audioSampleRate, other.audioSampleRate) && SlateCamPigeonPigeonUtils.deepEquals(this.audioChannels, other.audioChannels) && SlateCamPigeonPigeonUtils.deepEquals(this.histogram, other.histogram) && SlateCamPigeonPigeonUtils.deepEquals(this.waveform, other.waveform) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformColumns, other.waveformColumns) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformBins, other.waveformBins)
+    return SlateCamPigeonPigeonUtils.deepEquals(this.isOpen, other.isOpen) && SlateCamPigeonPigeonUtils.deepEquals(this.error, other.error) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraId, other.cameraId) && SlateCamPigeonPigeonUtils.deepEquals(this.activePhysicalCameraId, other.activePhysicalCameraId) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraIds, other.cameraIds) && SlateCamPigeonPigeonUtils.deepEquals(this.cameraLabels, other.cameraLabels) && SlateCamPigeonPigeonUtils.deepEquals(this.iso, other.iso) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMin, other.isoMin) && SlateCamPigeonPigeonUtils.deepEquals(this.isoMax, other.isoMax) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterNs, other.shutterNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMinNs, other.shutterMinNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterMaxNs, other.shutterMaxNs) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterStepNs, other.shutterStepNs) && SlateCamPigeonPigeonUtils.deepEquals(this.focusDiopters, other.focusDiopters) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMin, other.focusMin) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMax, other.focusMax) && SlateCamPigeonPigeonUtils.deepEquals(this.focusShiftSpeed, other.focusShiftSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceMode, other.whiteBalanceMode) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceModes, other.whiteBalanceModes) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceKelvin, other.whiteBalanceKelvin) && SlateCamPigeonPigeonUtils.deepEquals(this.whiteBalanceTint, other.whiteBalanceTint) && SlateCamPigeonPigeonUtils.deepEquals(this.manualWhiteBalanceSupported, other.manualWhiteBalanceSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.autoExposure, other.autoExposure) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocus, other.autoFocus) && SlateCamPigeonPigeonUtils.deepEquals(this.autoFocusSupported, other.autoFocusSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.focusMode, other.focusMode) && SlateCamPigeonPigeonUtils.deepEquals(this.focusModes, other.focusModes) && SlateCamPigeonPigeonUtils.deepEquals(this.focusScenario, other.focusScenario) && SlateCamPigeonPigeonUtils.deepEquals(this.focusScenarios, other.focusScenarios) && SlateCamPigeonPigeonUtils.deepEquals(this.focusShiftSensitivity, other.focusShiftSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.focusTransitionSpeed, other.focusTransitionSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.previewWidth, other.previewWidth) && SlateCamPigeonPigeonUtils.deepEquals(this.previewHeight, other.previewHeight) && SlateCamPigeonPigeonUtils.deepEquals(this.previewOutputWidth, other.previewOutputWidth) && SlateCamPigeonPigeonUtils.deepEquals(this.previewOutputHeight, other.previewOutputHeight) && SlateCamPigeonPigeonUtils.deepEquals(this.previewQuality, other.previewQuality) && SlateCamPigeonPigeonUtils.deepEquals(this.previewRotationDegrees, other.previewRotationDegrees) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingOrientationHint, other.recordingOrientationHint) && SlateCamPigeonPigeonUtils.deepEquals(this.previewQuarterTurns, other.previewQuarterTurns) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomRatio, other.zoomRatio) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomMin, other.zoomMin) && SlateCamPigeonPigeonUtils.deepEquals(this.zoomMax, other.zoomMax) && SlateCamPigeonPigeonUtils.deepEquals(this.lenses, other.lenses) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingMode, other.recordingMode) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingModes, other.recordingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.shootMode, other.shootMode) && SlateCamPigeonPigeonUtils.deepEquals(this.shootLenses, other.shootLenses) && SlateCamPigeonPigeonUtils.deepEquals(this.shootProfiles, other.shootProfiles) && SlateCamPigeonPigeonUtils.deepEquals(this.activeShootProfile, other.activeShootProfile) && SlateCamPigeonPigeonUtils.deepEquals(this.tenBit, other.tenBit) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgAvailable, other.hlgAvailable) && SlateCamPigeonPigeonUtils.deepEquals(this.hlgReason, other.hlgReason) && SlateCamPigeonPigeonUtils.deepEquals(this.isRecording, other.isRecording) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingSeconds, other.recordingSeconds) && SlateCamPigeonPigeonUtils.deepEquals(this.clipPath, other.clipPath) && SlateCamPigeonPigeonUtils.deepEquals(this.recordingError, other.recordingError) && SlateCamPigeonPigeonUtils.deepEquals(this.shutterAngle, other.shutterAngle) && SlateCamPigeonPigeonUtils.deepEquals(this.frameRate, other.frameRate) && SlateCamPigeonPigeonUtils.deepEquals(this.gyroSampleCount, other.gyroSampleCount) && SlateCamPigeonPigeonUtils.deepEquals(this.profile, other.profile) && SlateCamPigeonPigeonUtils.deepEquals(this.pictureProfiles, other.pictureProfiles) && SlateCamPigeonPigeonUtils.deepEquals(this.profileSettings, other.profileSettings) && SlateCamPigeonPigeonUtils.deepEquals(this.creativeLut, other.creativeLut) && SlateCamPigeonPigeonUtils.deepEquals(this.creativeLuts, other.creativeLuts) && SlateCamPigeonPigeonUtils.deepEquals(this.zebra, other.zebra) && SlateCamPigeonPigeonUtils.deepEquals(this.falseColor, other.falseColor) && SlateCamPigeonPigeonUtils.deepEquals(this.peaking, other.peaking) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingSensitivity, other.peakingSensitivity) && SlateCamPigeonPigeonUtils.deepEquals(this.peakingStrength, other.peakingStrength) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeMode, other.edgeMode) && SlateCamPigeonPigeonUtils.deepEquals(this.edgeModes, other.edgeModes) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReduction, other.noiseReduction) && SlateCamPigeonPigeonUtils.deepEquals(this.noiseReductionModes, other.noiseReductionModes) && SlateCamPigeonPigeonUtils.deepEquals(this.antibanding, other.antibanding) && SlateCamPigeonPigeonUtils.deepEquals(this.antibandingModes, other.antibandingModes) && SlateCamPigeonPigeonUtils.deepEquals(this.shadingCorrection, other.shadingCorrection) && SlateCamPigeonPigeonUtils.deepEquals(this.shadingSupported, other.shadingSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.oisSupported, other.oisSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.oisEnabled, other.oisEnabled) && SlateCamPigeonPigeonUtils.deepEquals(this.eisSupported, other.eisSupported) && SlateCamPigeonPigeonUtils.deepEquals(this.eisEnabled, other.eisEnabled) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureMode, other.exposureMode) && SlateCamPigeonPigeonUtils.deepEquals(this.exposureModes, other.exposureModes) && SlateCamPigeonPigeonUtils.deepEquals(this.meteringMode, other.meteringMode) && SlateCamPigeonPigeonUtils.deepEquals(this.meteringModes, other.meteringModes) && SlateCamPigeonPigeonUtils.deepEquals(this.meteringSpeed, other.meteringSpeed) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceKey, other.deviceKey) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceQuirks, other.deviceQuirks) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceCalibrationActive, other.deviceCalibrationActive) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceCalibrationSource, other.deviceCalibrationSource) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceDatabaseVersion, other.deviceDatabaseVersion) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportOptIn, other.deviceReportOptIn) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportRunning, other.deviceReportRunning) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportPath, other.deviceReportPath) && SlateCamPigeonPigeonUtils.deepEquals(this.deviceReportError, other.deviceReportError) && SlateCamPigeonPigeonUtils.deepEquals(this.audioInputs, other.audioInputs) && SlateCamPigeonPigeonUtils.deepEquals(this.audioInputKey, other.audioInputKey) && SlateCamPigeonPigeonUtils.deepEquals(this.audioGainDb, other.audioGainDb) && SlateCamPigeonPigeonUtils.deepEquals(this.audioPermissionGranted, other.audioPermissionGranted) && SlateCamPigeonPigeonUtils.deepEquals(this.audioAvailable, other.audioAvailable) && SlateCamPigeonPigeonUtils.deepEquals(this.audioError, other.audioError) && SlateCamPigeonPigeonUtils.deepEquals(this.audioSource, other.audioSource) && SlateCamPigeonPigeonUtils.deepEquals(this.audioSampleRate, other.audioSampleRate) && SlateCamPigeonPigeonUtils.deepEquals(this.audioChannels, other.audioChannels) && SlateCamPigeonPigeonUtils.deepEquals(this.histogram, other.histogram) && SlateCamPigeonPigeonUtils.deepEquals(this.waveform, other.waveform) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformColumns, other.waveformColumns) && SlateCamPigeonPigeonUtils.deepEquals(this.waveformBins, other.waveformBins)
   }
 
   override fun hashCode(): Int {
@@ -1303,6 +1307,7 @@ data class CameraState (
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.previewQuality)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.previewRotationDegrees)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.recordingOrientationHint)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.previewQuarterTurns)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.zoomRatio)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.zoomMin)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.zoomMax)
@@ -1375,7 +1380,7 @@ data class CameraState (
     return result
   }
   override fun toString(): String {
-    return "CameraState(isOpen=$isOpen, error=$error, cameraId=$cameraId, activePhysicalCameraId=$activePhysicalCameraId, cameraIds=$cameraIds, cameraLabels=$cameraLabels, iso=$iso, isoMin=$isoMin, isoMax=$isoMax, shutterNs=$shutterNs, shutterMinNs=$shutterMinNs, shutterMaxNs=$shutterMaxNs, shutterStepNs=$shutterStepNs, focusDiopters=$focusDiopters, focusMin=$focusMin, focusMax=$focusMax, focusShiftSpeed=$focusShiftSpeed, whiteBalanceMode=$whiteBalanceMode, whiteBalanceModes=$whiteBalanceModes, whiteBalanceKelvin=$whiteBalanceKelvin, whiteBalanceTint=$whiteBalanceTint, manualWhiteBalanceSupported=$manualWhiteBalanceSupported, autoExposure=$autoExposure, autoFocus=$autoFocus, autoFocusSupported=$autoFocusSupported, focusMode=$focusMode, focusModes=$focusModes, focusScenario=$focusScenario, focusScenarios=$focusScenarios, focusShiftSensitivity=$focusShiftSensitivity, focusTransitionSpeed=$focusTransitionSpeed, previewWidth=$previewWidth, previewHeight=$previewHeight, previewOutputWidth=$previewOutputWidth, previewOutputHeight=$previewOutputHeight, previewQuality=$previewQuality, previewRotationDegrees=$previewRotationDegrees, recordingOrientationHint=$recordingOrientationHint, zoomRatio=$zoomRatio, zoomMin=$zoomMin, zoomMax=$zoomMax, lenses=$lenses, recordingMode=$recordingMode, recordingModes=$recordingModes, shootMode=$shootMode, shootLenses=$shootLenses, shootProfiles=$shootProfiles, activeShootProfile=$activeShootProfile, tenBit=$tenBit, hlgAvailable=$hlgAvailable, hlgReason=$hlgReason, isRecording=$isRecording, recordingSeconds=$recordingSeconds, clipPath=$clipPath, recordingError=$recordingError, shutterAngle=$shutterAngle, frameRate=$frameRate, gyroSampleCount=$gyroSampleCount, profile=$profile, pictureProfiles=$pictureProfiles, profileSettings=$profileSettings, creativeLut=$creativeLut, creativeLuts=$creativeLuts, zebra=$zebra, falseColor=$falseColor, peaking=$peaking, peakingSensitivity=$peakingSensitivity, peakingStrength=$peakingStrength, edgeMode=$edgeMode, edgeModes=$edgeModes, noiseReduction=$noiseReduction, noiseReductionModes=$noiseReductionModes, antibanding=$antibanding, antibandingModes=$antibandingModes, shadingCorrection=$shadingCorrection, shadingSupported=$shadingSupported, oisSupported=$oisSupported, oisEnabled=$oisEnabled, eisSupported=$eisSupported, eisEnabled=$eisEnabled, exposureMode=$exposureMode, exposureModes=$exposureModes, meteringMode=$meteringMode, meteringModes=$meteringModes, meteringSpeed=$meteringSpeed, deviceKey=$deviceKey, deviceQuirks=$deviceQuirks, deviceCalibrationActive=$deviceCalibrationActive, deviceCalibrationSource=$deviceCalibrationSource, deviceDatabaseVersion=$deviceDatabaseVersion, deviceReportOptIn=$deviceReportOptIn, deviceReportRunning=$deviceReportRunning, deviceReportPath=$deviceReportPath, deviceReportError=$deviceReportError, audioInputs=$audioInputs, audioInputKey=$audioInputKey, audioGainDb=$audioGainDb, audioPermissionGranted=$audioPermissionGranted, audioAvailable=$audioAvailable, audioError=$audioError, audioSource=$audioSource, audioSampleRate=$audioSampleRate, audioChannels=$audioChannels, histogram=$histogram, waveform=$waveform, waveformColumns=$waveformColumns, waveformBins=$waveformBins)"
+    return "CameraState(isOpen=$isOpen, error=$error, cameraId=$cameraId, activePhysicalCameraId=$activePhysicalCameraId, cameraIds=$cameraIds, cameraLabels=$cameraLabels, iso=$iso, isoMin=$isoMin, isoMax=$isoMax, shutterNs=$shutterNs, shutterMinNs=$shutterMinNs, shutterMaxNs=$shutterMaxNs, shutterStepNs=$shutterStepNs, focusDiopters=$focusDiopters, focusMin=$focusMin, focusMax=$focusMax, focusShiftSpeed=$focusShiftSpeed, whiteBalanceMode=$whiteBalanceMode, whiteBalanceModes=$whiteBalanceModes, whiteBalanceKelvin=$whiteBalanceKelvin, whiteBalanceTint=$whiteBalanceTint, manualWhiteBalanceSupported=$manualWhiteBalanceSupported, autoExposure=$autoExposure, autoFocus=$autoFocus, autoFocusSupported=$autoFocusSupported, focusMode=$focusMode, focusModes=$focusModes, focusScenario=$focusScenario, focusScenarios=$focusScenarios, focusShiftSensitivity=$focusShiftSensitivity, focusTransitionSpeed=$focusTransitionSpeed, previewWidth=$previewWidth, previewHeight=$previewHeight, previewOutputWidth=$previewOutputWidth, previewOutputHeight=$previewOutputHeight, previewQuality=$previewQuality, previewRotationDegrees=$previewRotationDegrees, recordingOrientationHint=$recordingOrientationHint, previewQuarterTurns=$previewQuarterTurns, zoomRatio=$zoomRatio, zoomMin=$zoomMin, zoomMax=$zoomMax, lenses=$lenses, recordingMode=$recordingMode, recordingModes=$recordingModes, shootMode=$shootMode, shootLenses=$shootLenses, shootProfiles=$shootProfiles, activeShootProfile=$activeShootProfile, tenBit=$tenBit, hlgAvailable=$hlgAvailable, hlgReason=$hlgReason, isRecording=$isRecording, recordingSeconds=$recordingSeconds, clipPath=$clipPath, recordingError=$recordingError, shutterAngle=$shutterAngle, frameRate=$frameRate, gyroSampleCount=$gyroSampleCount, profile=$profile, pictureProfiles=$pictureProfiles, profileSettings=$profileSettings, creativeLut=$creativeLut, creativeLuts=$creativeLuts, zebra=$zebra, falseColor=$falseColor, peaking=$peaking, peakingSensitivity=$peakingSensitivity, peakingStrength=$peakingStrength, edgeMode=$edgeMode, edgeModes=$edgeModes, noiseReduction=$noiseReduction, noiseReductionModes=$noiseReductionModes, antibanding=$antibanding, antibandingModes=$antibandingModes, shadingCorrection=$shadingCorrection, shadingSupported=$shadingSupported, oisSupported=$oisSupported, oisEnabled=$oisEnabled, eisSupported=$eisSupported, eisEnabled=$eisEnabled, exposureMode=$exposureMode, exposureModes=$exposureModes, meteringMode=$meteringMode, meteringModes=$meteringModes, meteringSpeed=$meteringSpeed, deviceKey=$deviceKey, deviceQuirks=$deviceQuirks, deviceCalibrationActive=$deviceCalibrationActive, deviceCalibrationSource=$deviceCalibrationSource, deviceDatabaseVersion=$deviceDatabaseVersion, deviceReportOptIn=$deviceReportOptIn, deviceReportRunning=$deviceReportRunning, deviceReportPath=$deviceReportPath, deviceReportError=$deviceReportError, audioInputs=$audioInputs, audioInputKey=$audioInputKey, audioGainDb=$audioGainDb, audioPermissionGranted=$audioPermissionGranted, audioAvailable=$audioAvailable, audioError=$audioError, audioSource=$audioSource, audioSampleRate=$audioSampleRate, audioChannels=$audioChannels, histogram=$histogram, waveform=$waveform, waveformColumns=$waveformColumns, waveformBins=$waveformBins)"
   }
 }
 

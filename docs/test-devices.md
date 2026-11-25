@@ -1509,3 +1509,17 @@ POCO X6 Pro: in portrait, both 1440×1080 4:3 and 1920×1080 16:9 fill the
 viewfinder width with no black side bars; vertical overflow is cropped. Focus
 taps use the cropped mapping before the GL transform. Landscape still shows the
 complete frame beside the console.
+
+## Orientation-aware aspect ratios (build 2186)
+
+POCO X6 Pro, portrait:
+
+| Selection | UI size | Encoded stream | MP4 hint | Playback |
+|---|---|---|---|---|
+| 3:4 | 1080×1440 | 1440×1080 | `-90` | 1080×1440 |
+| 9:16 | 1080×1920 | 1920×1080 | `-90` | 1080×1920 |
+
+The viewfinder composition matches the auto-rotated playback frame in both
+cases. Landscape labels and dimensions remain `4:3` (1440×1080) and `16:9`
+(1920×1080). This follows the standard Camera2 approach: sensors emit landscape
+frames, and the MP4 orientation hint carries the take orientation.
