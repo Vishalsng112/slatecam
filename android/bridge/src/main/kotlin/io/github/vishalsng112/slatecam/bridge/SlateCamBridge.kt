@@ -257,6 +257,10 @@ class SlateCamBridge private constructor(
                 savedScenario.transitionSpeed,
             ),
         )
+        controller.restoreFocusMode(
+            shootPrefs.getString(KEY_FOCUS_MODE, FocusMode.CONTINUOUS_VIDEO)
+                ?: FocusMode.CONTINUOUS_VIDEO,
+        )
         applyDeviceSnapshot(deviceSnapshot)
         refreshAudioOptions()
         runCatching {
@@ -380,14 +384,10 @@ class SlateCamBridge private constructor(
     }
 
     override fun setFocusDiopters(diopters: Double) {
-        // Dragging the manual slider leaves SAF; remember that choice so a
-        // restart/camera switch does not silently restore software focus.
-        shootPrefs.edit().putBoolean(KEY_FOCUS_SOFTWARE, false).apply()
+        // Manual focus is the `off` mode; moving the slider is an explicit
+        // mode choice and persists like any other.
+        shootPrefs.edit().putString(KEY_FOCUS_MODE, FocusMode.OFF).apply()
         controller.setFocusDiopters(diopters.toFloat())
-    }
-
-    override fun setFocusShiftSpeed(dioptersPerSecond: Double) {
-        controller.setFocusShiftSpeed(dioptersPerSecond.toFloat())
     }
 
     override fun setWhiteBalanceMode(mode: String) {
@@ -437,7 +437,7 @@ class SlateCamBridge private constructor(
             .putFloat(KEY_FOCUS_SENSITIVITY, selected.shiftSensitivity)
             .putFloat(KEY_FOCUS_SPEED, selected.transitionSpeed)
             .apply()
-        shootPrefs.edit().putBoolean(KEY_FOCUS_SOFTWARE, true).apply()
+        shootPrefs.edit().putString(KEY_FOCUS_MODE, FocusMode.SOFTWARE).apply()
         controller.setFocusScenario(selected.wireValue)
     }
 
@@ -621,9 +621,7 @@ class SlateCamBridge private constructor(
     }
 
     override fun setFocusMode(mode: String) {
-        shootPrefs.edit()
-            .putBoolean(KEY_FOCUS_SOFTWARE, mode == FocusMode.SOFTWARE)
-            .apply()
+        shootPrefs.edit().putString(KEY_FOCUS_MODE, mode).apply()
         controller.setFocusMode(mode)
     }
 
@@ -1211,15 +1209,6 @@ class SlateCamBridge private constructor(
             controller.setOis(enabledFor(KEY_OIS_OFF, state.cameraId))
             controller.setEis(enabledFor(KEY_EIS_OFF, state.cameraId))
             renderer.setFocusRoi(0.5f, 0.5f)
-        }
-        // Restore the software focus choice once the lens reports support.
-        if (state.focusMode != FocusMode.SOFTWARE &&
-            FocusMode.SOFTWARE in state.focusModes &&
-            // Software AF is the default on lenses with a focus range; the
-            // operator can switch to the camera's CAF/AF/MF at any time.
-            shootPrefs.getBoolean(KEY_FOCUS_SOFTWARE, true)
-        ) {
-            controller.setFocusMode(FocusMode.SOFTWARE)
         }
         renderer.setTenBitSource(state.isTenBit)
         renderer.setDisplayRotation(state.previewRotationDegrees)
@@ -2586,7 +2575,7 @@ class SlateCamBridge private constructor(
         private const val KEY_FOCUS_SCENARIO = "focus_scenario"
         private const val KEY_FOCUS_SENSITIVITY = "focus_shift_sensitivity"
         private const val KEY_FOCUS_SPEED = "focus_transition_speed"
-        private const val KEY_FOCUS_SOFTWARE = "focus_software"
+        private const val KEY_FOCUS_MODE = "focus_mode"
         private const val KEY_PREVIEW_QUALITY = "preview_quality"
         private const val KEY_CUSTOM_PROFILE = "custom_picture_profile"
         private const val KEY_PICTURE_PROFILE_IDS = "picture_profile_ids"

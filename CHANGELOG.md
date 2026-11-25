@@ -9,6 +9,24 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — One focus interface, CAF default (build 2174)
+- `FocusController` now owns every focus decision: the mode catalog, the
+  active/preferred mode, manual diopters, SAF presets and the AF/lens request
+  fields. `setFocusMode`, `setFocusDiopters` and `setFocusScenario` funnel into
+  one `selectMode` switch instead of each mutating separate state.
+- The catalog includes every HAL focus mode the active lens reports
+  (`CAF`, `CAF-P`, `AF`, `MACRO`, `EDOF`, `MF`) plus the app's `SAF`, in that
+  operator order. Unknown HAL values are dropped instead of showing a chip that
+  would silently become `off`.
+- Camera2 continuous-video AF (`CONTINUOUS_VIDEO`) is the default. SAF is no
+  longer forced on lenses with a focus range; it is selected explicitly by the
+  mode chip or a shooting scenario. The operator's mode choice persists and is
+  restored when a capable lens is active.
+- The unused raw `setFocusShiftSpeed` command is removed from the Pigeon
+  contract; transition speed remains a SAF preset value.
+- Shooting-scenario chips are highlighted only while SAF is active, so a saved
+  preset never looks like the current HAL focus mode.
+
 ### Fixed — Aspect-ratio switching after the first mode change (build 2172)
 - The bridge tracked "camera open" in one flag that the state listener cleared
   on every transient session close. Since `applyMode` resized the preview

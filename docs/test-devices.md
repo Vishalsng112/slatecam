@@ -1458,3 +1458,20 @@ Recording started after the 4K switch (`REC 00:02`, red frame border), so the
 stale `opened` flag no longer blocks the recorder. The regression was the
 single lifecycle flag being cleared by transient session closes; the fix splits
 pipeline readiness from live-session state.
+
+## Unified focus interface (build 2174)
+
+POCO X6 Pro, logical camera `4` (all HAL modes plus SAF):
+
+| Action | Result | Persisted `focus_mode` |
+|---|---|---|
+| Fresh launch | CAF selected; CAF-P, AF, MACRO, MF, SAF listed | `continuous_video` |
+| Tap SAF | SAF selected, Wedding scenario highlighted, software engine active | `software` |
+| Tap MF | MF selected, manual slider shows 1.88 D | `off` |
+| Tap CAF | CAF selected, scenario chips unhighlighted | `continuous_video` |
+| Tap Wedding while CAF | switches to SAF and applies the Wedding preset | `software` |
+| Restart | SAF and Wedding restored from the persisted preference | `software` |
+
+Pad 3: fresh launch selects CAF and lists CAF, CAF-P, AF, MACRO, EDOF, MF and
+SAF. The Wedding preset is not highlighted while CAF is active, confirming that
+a scenario only describes SAF. Choosing SAF highlights the selected scenario.

@@ -582,7 +582,6 @@ abstract class SlateCamHostApi {
 
   void setFocusDiopters(double diopters);
 
-  void setFocusShiftSpeed(double dioptersPerSecond);
 
   void setWhiteBalanceMode(String mode);
 

@@ -1668,7 +1668,6 @@ interface SlateCamHostApi {
   fun setShutterNs(nanoseconds: Long)
   fun setShutterAngle(degrees: Double)
   fun setFocusDiopters(diopters: Double)
-  fun setFocusShiftSpeed(dioptersPerSecond: Double)
   fun setWhiteBalanceMode(mode: String)
   /** Sets the manual colour temperature and tint; switches to manual WB. */
   fun setManualWhiteBalance(kelvin: Long, tint: Long)
@@ -1910,24 +1909,6 @@ interface SlateCamHostApi {
             val dioptersArg = args[0] as Double
             val wrapped: List<Any?> = try {
               api.setFocusDiopters(dioptersArg)
-              listOf(null)
-            } catch (exception: Throwable) {
-              SlateCamPigeonPigeonUtils.wrapError(exception)
-            }
-            reply.reply(wrapped)
-          }
-        } else {
-          channel.setMessageHandler(null)
-        }
-      }
-      run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.setFocusShiftSpeed$separatedMessageChannelSuffix", codec)
-        if (api != null) {
-          channel.setMessageHandler { message, reply ->
-            val args = message as List<Any?>
-            val dioptersPerSecondArg = args[0] as Double
-            val wrapped: List<Any?> = try {
-              api.setFocusShiftSpeed(dioptersPerSecondArg)
               listOf(null)
             } catch (exception: Throwable) {
               SlateCamPigeonPigeonUtils.wrapError(exception)

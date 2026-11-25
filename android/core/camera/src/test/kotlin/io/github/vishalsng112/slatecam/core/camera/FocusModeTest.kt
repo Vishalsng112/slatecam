@@ -56,5 +56,51 @@ class FocusModeTest {
     fun `manual is not automatic`() {
         assertFalse(FocusMode.isAutomatic(FocusMode.OFF))
         assertTrue(FocusMode.isAutomatic(FocusMode.CONTINUOUS_VIDEO))
+        assertFalse(FocusMode.isAutomatic(FocusMode.SOFTWARE))
+    }
+
+    @Test
+    fun `options include every reported HAL mode plus software`() {
+        assertEquals(
+            listOf(
+                FocusMode.CONTINUOUS_VIDEO,
+                FocusMode.CONTINUOUS_PICTURE,
+                FocusMode.AUTO,
+                FocusMode.MACRO,
+                FocusMode.EDOF,
+                FocusMode.OFF,
+                FocusMode.SOFTWARE,
+            ),
+            FocusMode.options(
+                listOf("edof", "off", "macro", "auto", "continuous_picture", "continuous_video"),
+                hasSoftware = true,
+            ),
+        )
+        assertEquals(
+            listOf(FocusMode.CONTINUOUS_VIDEO, FocusMode.OFF),
+            FocusMode.options(listOf("continuous_video", "off"), hasSoftware = false),
+        )
+    }
+
+    @Test
+    fun `HAL names round-trip`() {
+        for (mode in FocusMode.options(
+            listOf("continuous_video", "continuous_picture", "auto", "macro", "edof", "off"),
+            hasSoftware = false,
+        )) {
+            val value = FocusMode.toHal(mode)
+            assertTrue(value != null)
+            assertEquals(mode, FocusMode.fromHal(value!!))
+            assertTrue(FocusMode.isKnown(mode))
+        }
+        assertEquals(null, FocusMode.toHal(FocusMode.SOFTWARE))
+        assertFalse(FocusMode.isKnown("mode_99"))
+    }
+
+    @Test
+    fun `continuous covers both camera video modes`() {
+        assertTrue(FocusMode.isContinuous(FocusMode.CONTINUOUS_VIDEO))
+        assertTrue(FocusMode.isContinuous(FocusMode.CONTINUOUS_PICTURE))
+        assertFalse(FocusMode.isContinuous(FocusMode.AUTO))
     }
 }

@@ -2095,7 +2095,9 @@ class _ControlDeckState extends State<ControlDeck> {
                   _modeChip(
                     label: _scenarioLabel(scenario),
                     tooltip: _scenarioTooltip(scenario),
-                    selected: state.focusScenario == scenario,
+                    selected:
+                        state.focusMode == 'software' &&
+                        state.focusScenario == scenario,
                     onTap: () => widget.host.setFocusScenario(scenario),
                   ),
               ],

@@ -292,7 +292,7 @@ The card sits after Exposure in the primary column.
 
 | Element | Native call | Status |
 |---|---|---|
-| Focus mode (`MF`, `AF`, `CAF`, `CAF-P`, `MACRO`, `EDOF`, `SAF`) | `setFocusMode` | Current |
+| Focus mode (`CAF`, `CAF-P`, `AF`, `MACRO`, `EDOF`, `MF`, `SAF`) | `setFocusMode` | Current |
 | Manual focus slider (only when `MF`) | `setFocusDiopters` | Current |
 | Shooting scenario (`Interview`, `Vlogging`, `Wedding`, `Cinematic`) | `setFocusScenario` | Current |
 | Shift sensitivity (0–100%) | `setFocusShiftSensitivity` | Current |
@@ -308,10 +308,12 @@ fixed-focus front camera) shows `MF` alone. Continuous-video AF is the default
 when available.
 
 **SAF** is the software contrast autofocus. It is shown only when the lens
-reports a focus range (`LENS_INFO_MINIMUM_FOCUS_DISTANCE > 0`) and is the
-default mode on those lenses; the camera's CAF/AF/MF remain one tap away.
-Selecting a scenario activates SAF and applies the scenario's two normalized
-values; the sliders can then be fine-tuned. The card shows a hint when a
+reports a focus range (`LENS_INFO_MINIMUM_FOCUS_DISTANCE > 0`). CAF is the
+default on every lens that reports it; SAF is selected explicitly, either by
+tapping it or by choosing a shooting scenario. Selecting a scenario activates
+SAF and applies the scenario's two normalized values; the sliders can then be
+fine-tuned. A scenario chip is highlighted only while SAF is active, so a saved
+preset cannot look like the current hardware mode. The card shows a hint when a
 hardware focus mode is active, because shift sensitivity and transition speed
 only affect SAF. The scenario/settings and the focus choice persist across
 restarts. There is no face or eye tracking.

@@ -61,7 +61,8 @@ root is `android/`, not the repository root.
 | Luma grid for metering | `:core:gpu` | `FrameAnalysis.kt`, `GlPreviewRenderer.runAnalysis` |
 | Lens-shading / vignette correction | `:core:camera` | `ShadingCorrection.kt`, `CameraController.applyControls` |
 | Focus mode policy | `:core:camera` | `FocusMode.kt` |
-| Software focus engine / scenarios | `:core:camera` | `SoftwareFocus.kt`, `CameraController.submitFocus` |
+| Focus interface, modes, CAF default | `:core:camera` | `FocusController.kt`, `FocusMode.kt` |
+| Software focus engine / scenarios | `:core:camera` | `SoftwareFocus.kt`, `FocusController.onSharpness` |
 | Focus sharpness score | `:core:gpu` | `FrameAnalysis.focusScore`, `GlPreviewRenderer.focusScore` |
 | FP16 encoder intermediate | `:core:gpu` | `GlPreviewRenderer.renderEncoder`, `ensureIntermediate` |
 | Scene-linear shader / output routing | `:core:gpu` | `GlPreviewRenderer.ShaderSource.FRAGMENT` |

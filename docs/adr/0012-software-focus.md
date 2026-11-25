@@ -4,6 +4,7 @@
 - **Date:** 2026-11-24
 - **Phase:** 5 (advanced capture)
 - **Depends on:** ADR 0010 (focus modes), ADR 0011 (metering)
+- **Updated by:** ADR 0031 (CAF default, single focus interface)
 
 ## Context
 
@@ -55,8 +56,9 @@ that peaks when the lens is focused.
    | Cinematic | 0.20 | 0.15 |
 
    Selecting a scenario switches to SAF and applies both values; the sliders can
-   then be fine-tuned. SAF is the default on lenses with a focus range (the
-   camera's CAF/AF/MF remain one tap away). Settings persist across restarts.
+   then be fine-tuned. SAF is never implicit: CAF is the default on every lens
+   that reports it, and the scenario/SAF choice is explicit (ADR 0031). Settings
+   and the operator's mode preference persist across restarts.
 6. **Metering and focus do not fight.** P-mode AE compensation is throttled to
    5 Hz with a 0.10 EV dead band and at most one compensation step per update,
    because the HAL AE and the bias are in the same feedback path. The analysis

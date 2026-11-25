@@ -4,6 +4,7 @@
 - **Date:** 2026-11-24
 - **Phase:** 5.5 (shoot profiles) / 3 (recording correctness)
 - **Depends on:** ADR 0006 (aspect), ADR 0009 (lens shading)
+- **Updated by:** ADR 0031 (one focus interface, CAF default)
 
 ## Context
 
@@ -32,10 +33,12 @@ the probe rule.
 3. **Both preferences persist per camera ID.** The bridge stores disabled IDs in
    `shoot-profile` prefs, the same mechanism as lens-shading correction. A
    different lens restores its own state.
-4. **Focus mode is the camera's own enum.** The UI lists only modes the active
-   camera reports, labelled for operators: `MF`, `AF`, `CAF`, `CAF-P`, `MACRO`,
-   `EDOF`. Continuous video AF is the default when available; otherwise the
-   policy falls back to continuous picture, then single AF, then manual.
+4. **Focus mode is the camera's own enum.** The UI lists every mode the active
+   camera reports, labelled for operators: `CAF`, `CAF-P`, `AF`, `MACRO`,
+   `EDOF`, `MF`, plus the app's `SAF` when the lens has a focus range
+   (ADR 0031). Continuous video AF is the default when available; otherwise the
+   policy falls back to continuous picture, single AF, macro, EDOF, then
+   manual.
 5. **Manual focus is a consequence, not a separate concept.** Selecting `MF`
    (`off`) reveals the focus-distance slider. Moving the slider also switches to
    `MF`. Automatic modes never send `LENS_FOCUS_DISTANCE`.
