@@ -9,6 +9,21 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Aspect-ratio switching after the first mode change (build 2172)
+- The bridge tracked "camera open" in one flag that the state listener cleared
+  on every transient session close. Since `applyMode` resized the preview
+  surface only while that flag was true, the first aspect change left it false
+  for the rest of the session, and later changes resized the camera stream but
+  kept the old preview/GL surface. 4:3 frames were then stretched into a 16:9
+  viewport, or the reverse.
+- The lifecycle is now split into `pipelineActive` (renderer + preview surface
+  started) and `sessionOpen()` (live camera session). Mode changes, the lens
+  fallback and the viewfinder-quality picker all resize through the same
+  `resizePreview` path whenever the pipeline exists, so repeated switches
+  letterbox correctly at both 1080 and 4K.
+- Recording also no longer reports "camera is not open" after a mode change;
+  the live-session check is shared.
+
 ### Fixed — Lens-handoff viewfinder jitter (build 2169)
 - `LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID` now travels on the lightweight
   telemetry channel instead of forcing a full `CameraState` rebuild at the

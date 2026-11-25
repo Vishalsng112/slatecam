@@ -1439,3 +1439,22 @@ The app cannot force which physical sensor the logical camera selects. The
 `activePhysicalCameraId` now travels on telemetry instead of forcing a full
 `CameraState` and preview rebuild at that transition, removing the app-side
 viewfinder remount jitter.
+
+## Aspect-ratio switching (POCO X6 Pro, build 2172)
+
+Tapped 16:9 ↔ 4:3 repeatedly at the 1080 and 4K families after a prior mode
+change, with the stream and preview headers read from the app.
+
+| Cycle | Stream | Preview surface | Result |
+|---|---|---|---|
+| 1080 16:9 → 4:3 | 1440×1080 | 1440×1080 | 4:3 letterboxed, no stretch |
+| 1080 4:3 → 16:9 | 1920×1080 | 1920×1080 | 16:9 fills the frame |
+| 1080 cycle ×2 | alternating | alternating | both directions correct |
+| 4K 16:9 → 4:3 | 2880×2160 | 2880×2160 | 4:3 letterboxed |
+| 4K 4:3 → 16:9 | 3840×2160 | 3840×2160 | 16:9 fills the frame |
+| 4K cycle ×2 | alternating | alternating | both directions correct |
+
+Recording started after the 4K switch (`REC 00:02`, red frame border), so the
+stale `opened` flag no longer blocks the recorder. The regression was the
+single lifecycle flag being cleared by transient session closes; the fix splits
+pipeline readiness from live-session state.

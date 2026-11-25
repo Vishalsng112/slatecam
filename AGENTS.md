@@ -17,6 +17,11 @@ Read these first, in order:
   second camera-to-encoder path a codec or AI extra.
 - **No legacy/backport.** Change the current architecture; do not add
   compatibility shims for superseded internal APIs.
+- **Reuse, never duplicate.** Extend the component that already owns the
+  concern (widget, catalog, controller, selector). Do not clone an existing
+  widget, helper or algorithm, and do not add a parallel path, flag or
+  one-off branch to patch a bug. A bug fix belongs in the shared component so
+  one code inspection covers every caller.
 - **Kotlin owns state.** Flutter renders Pigeon snapshots and sends commands.
 
 ## After a change

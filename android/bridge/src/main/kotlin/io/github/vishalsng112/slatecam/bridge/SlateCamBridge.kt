@@ -186,7 +186,8 @@ class SlateCamBridge private constructor(
     private var activeRecordingTenBit = false
 
     private var flutterApi: SlateCamFlutterApi? = null
-    private var opened = false
+    /** Renderer + preview surface are started; independent of a transient session reopen. */
+    private var pipelineActive = false
     private var resumeOnReturn = false
     private var lastState: CameraUiState? = null
 
@@ -302,7 +303,7 @@ class SlateCamBridge private constructor(
     }
 
     override fun openCamera(): Long {
-        if (!opened) {
+        if (!pipelineActive) {
             check(hasCameraPermission()) { "camera permission is not granted" }
             val mode = activeMode()
             controller.setFrameRate(mode.fps.toInt())
@@ -333,13 +334,13 @@ class SlateCamBridge private constructor(
                 // A failed attempt (denied permission, busy camera, bad mode)
                 // must not wedge the pipeline. Drop the half-open session and
                 // GL state so the next open starts from a clean slate.
-                opened = false
+                pipelineActive = false
                 resumeOnReturn = false
                 runCatching { controller.close() }
                 runCatching { renderer.reset() }
                 throw error
             }
-            opened = true
+            pipelineActive = true
         }
         refreshAudioOptions()
         startAudioMonitor()
@@ -362,7 +363,7 @@ class SlateCamBridge private constructor(
         stopSwitchPump()
         closeStandby()
         controller.close()
-        opened = false
+        pipelineActive = false
         stopAudioTicker()
     }
 
@@ -572,7 +573,7 @@ class SlateCamBridge private constructor(
                 return false
             }
             selectedModeId = fallback.id
-            if (opened) {
+            if (pipelineActive) {
                 resizePreview(fallback.width, fallback.height)
             }
             controller.configure(
@@ -605,7 +606,7 @@ class SlateCamBridge private constructor(
         previewQuality = normalized
         shootPrefs.edit().putString(KEY_PREVIEW_QUALITY, normalized).apply()
         val state = lastState
-        if (state != null && state.isOpen) {
+        if (pipelineActive && state != null) {
             resizePreview(state.previewWidth, state.previewHeight)
         }
         pushState()
@@ -840,12 +841,11 @@ class SlateCamBridge private constructor(
 
         deviceReportRunning = true
         deviceReportError = null
-        val reopen = opened
+        val reopen = pipelineActive
         if (recorder.isRecording) stopRecording()
         stopAudioMonitor()
         stopAudioTicker()
         controller.close()
-        opened = false
         pushState()
 
         Thread({
@@ -872,7 +872,7 @@ class SlateCamBridge private constructor(
         deviceSnapshot = snapshotFor(lastCameraId)
         deviceReportPath = deviceSnapshot.lastReportPath
         applyDeviceSnapshot(deviceSnapshot)
-        if (opened) reopenCamera()
+        if (pipelineActive) reopenCamera()
         pushState()
     }
 
@@ -938,7 +938,7 @@ class SlateCamBridge private constructor(
 
     override fun refreshAudioInputs() {
         refreshAudioOptions()
-        if (opened && !recorder.isRecording) restartAudioMonitor()
+        if (pipelineActive && !recorder.isRecording) restartAudioMonitor()
         pushState()
     }
 
@@ -981,12 +981,12 @@ class SlateCamBridge private constructor(
             audioInputKey = AudioInputs.DEFAULT_KEY
             shootPrefs.edit().putString(KEY_AUDIO_INPUT, audioInputKey).apply()
         }
-        if (opened && !recorder.isRecording) restartAudioMonitor()
+        if (pipelineActive && !recorder.isRecording) restartAudioMonitor()
         pushState()
     }
 
     private fun startAudioMonitor() {
-        if (!opened || recorder.isRecording) return
+        if (!pipelineActive || recorder.isRecording) return
         if (!AudioInputs.hasPermission(context)) {
             audioActive = false
             audioError = "Microphone permission is not granted."
@@ -1161,6 +1161,8 @@ class SlateCamBridge private constructor(
         renderer.setManualWhiteBalance(gains.red, gains.blue)
     }
 
+    private fun sessionOpen(): Boolean = lastState?.isOpen == true
+
     private fun handleControllerState(state: CameraUiState) {
         val previous = lastState
         val cameraChanged = state.cameraId != lastCameraId
@@ -1184,9 +1186,6 @@ class SlateCamBridge private constructor(
             )
         lastState = state
         if (!state.isOpen) {
-            // A failed logical-camera switch must not leave `opened` stale:
-            // the launch screen's Open camera action would otherwise be a no-op.
-            opened = false
             pendingZoom?.let { (id, _) ->
                 failedLogicalId = id
                 pendingZoom = null
@@ -1239,7 +1238,7 @@ class SlateCamBridge private constructor(
      * while recording; a switch swaps renderer source and controller ownership.
      */
     private fun maybeStartStandby() {
-        if (!opened || standbyController != null) return
+        if (!sessionOpen() || standbyController != null) return
         val state = lastState ?: return
         val activeId = state.cameraId
         val report = deviceSnapshot.probeReport ?: return
@@ -1399,7 +1398,7 @@ class SlateCamBridge private constructor(
             mode.height.toInt(),
             tenBit = mode.tenBit,
         )
-        opened = true
+        pipelineActive = true
         refreshAudioOptions()
         startAudioMonitor()
     }
@@ -1447,7 +1446,7 @@ class SlateCamBridge private constructor(
     }
 
     override fun startRecording() {
-        if (!opened) {
+        if (!sessionOpen()) {
             recordingError = "camera is not open"
             pushState()
             return
@@ -1537,7 +1536,7 @@ class SlateCamBridge private constructor(
             audioSource = null
             mainHandler.post {
                 closeStandby()
-                if (opened) startAudioMonitor()
+                if (pipelineActive) startAudioMonitor()
                 pushState()
             }
         }, "slatecam-finalize").start()
@@ -1715,18 +1714,18 @@ class SlateCamBridge private constructor(
 
     /** Releases the camera when the app leaves the foreground. */
     fun pause() {
-        resumeOnReturn = opened
+        resumeOnReturn = pipelineActive
         if (recorder.isRecording) stopRecording()
         closeStandby()
         stopAudioMonitor()
         stopAudioTicker()
         controller.close()
-        opened = false
+        pipelineActive = false
     }
 
     /** Reopens the camera if it was open before backgrounding. */
     fun resume() {
-        if (!resumeOnReturn || opened) return
+        if (!resumeOnReturn || pipelineActive) return
         resumeOnReturn = false
         reopenCamera()
     }
@@ -2004,7 +2003,11 @@ class SlateCamBridge private constructor(
     private fun applyMode(mode: RecordingMode) {
         val width = mode.width.toInt()
         val height = mode.height.toInt()
-        if (opened) {
+        // Resize the preview surface on every mode change. A configure posts a
+        // close/open on the camera thread, and `sessionOpen()` is false during
+        // that gap; gating this on the live session left the producer and GL
+        // window at the previous aspect ratio after the first switch.
+        if (pipelineActive) {
             resizePreview(width, height)
         }
         controller.configure(width, height, mode.fps.toInt(), mode.tenBit)
