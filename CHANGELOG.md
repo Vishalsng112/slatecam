@@ -9,6 +9,12 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — Bitrate in the mode card, aspect chips (build 2202)
+- The Recording mode card shows the selected mode's `Bitrate` (`9 Mbps`,
+  `12 Mbps`, …), and the top mode pill includes it.
+- Aspect selection uses the same chips as resolution/frame rate/bit depth
+  instead of circular buttons.
+
 ### Changed — One recording-mode model in core (build 2201)
 - Core `RecordingMode` now has explicit `resolution`, `aspect`, `fps`,
   `bitrate` and `bitDepth` elements; `width`/`height` are the derived Camera2

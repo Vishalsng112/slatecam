@@ -608,13 +608,15 @@ class _ControlDeckState extends State<ControlDeck> {
           ]),
           const SizedBox(height: 4),
           _modeRow('Aspect', [
-            _aspectCircle(
-              _portrait ? '9:16' : '16:9',
+            _modeChip(
+              label: _portrait ? '9:16' : '16:9',
+              tooltip: _portrait ? 'Vertical 9:16 video' : 'Widescreen 16:9',
               selected: wide,
               onTap: () => _selectAspect(true),
             ),
-            _aspectCircle(
-              '4:3',
+            _modeChip(
+              label: '4:3',
+              tooltip: 'Open-gate 4:3',
               selected: !wide,
               onTap: () => _selectAspect(false),
             ),
@@ -642,55 +644,37 @@ class _ControlDeckState extends State<ControlDeck> {
                   onTap: () => _selectBit(bits),
                 ),
           ]),
+          const SizedBox(height: 4),
+          _modeRow('Bitrate', [_modeValue(_formatBitrate(current.bitrate))]),
         ],
       ),
     );
   }
 
-  Widget _aspectCircle(
-    String label, {
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: 'aspect ratio $label',
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Center(
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? UiTokens.accent : UiTokens.surfaceRaised,
-                  border: Border.all(
-                    color: selected ? UiTokens.accent : UiTokens.border,
-                  ),
-                ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    color: selected ? UiTokens.background : UiTokens.text,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+  Widget _modeValue(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: UiTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: UiTokens.border),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
       ),
     );
+  }
+
+  String _formatBitrate(int bitsPerSecond) {
+    if (bitsPerSecond >= 1000000) {
+      final mbps = bitsPerSecond / 1000000;
+      final text = mbps == mbps.roundToDouble()
+          ? mbps.toStringAsFixed(0)
+          : mbps.toStringAsFixed(1);
+      return '$text Mbps';
+    }
+    return '${(bitsPerSecond / 1000).round()} kbps';
   }
 
   Widget _profileIcon(IconData icon, String tooltip, VoidCallback? onPressed) {
@@ -2489,7 +2473,8 @@ class _ControlDeckState extends State<ControlDeck> {
 
   String _modeShort(RecordingMode mode) =>
       '${_sizeLabel(mode)} ${mode.fps}p '
-      '${mode.bitDepth == 10 ? '10b' : '8b'}';
+      '${mode.bitDepth == 10 ? '10b' : '8b'} · '
+      '${_formatBitrate(mode.bitrate)}';
 
   Widget _infoRow(String label, String value) {
     return Padding(

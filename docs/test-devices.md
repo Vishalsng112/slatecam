@@ -1599,3 +1599,10 @@ Pad 3 the mode card was re-exercised: 1080 → 4K and 4:3 → 16:9 selected
 through the model fields, with the take becoming `2160×3840` for portrait
 4K 16:9. A 1440×1080 30p 10-bit clip recorded through the new `mode.bitrate`
 path; ffprobe reported 1440×1080, 30 fps. Flow/capability tests pass.
+
+## Mode bitrate and aspect chips (build 2202, Pad 3)
+
+The Recording mode card shows `Bitrate` for the selected mode: 9 Mbps for
+1080 4:3 30p 10-bit and 12 Mbps for 1080 16:9 30p 10-bit on Pad 3. The top mode
+pill also includes the bitrate. Aspect now uses the same choice chips as the
+other elements; tapping `9:16` and `4:3` switches the take as before.
