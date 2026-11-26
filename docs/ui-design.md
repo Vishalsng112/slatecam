@@ -270,18 +270,21 @@ manual diopter value.
 
 | Element | Native call | Status |
 |---|---|---|
-| P / S / M circles | `setExposureMode` | Current |
+| AE / P / S / M chips | `setExposureMode` | Current |
 | Metering pattern | `setMeteringMode` | Current |
 | Meter speed (0–100%) | `setMeteringSpeed` | Current |
-| ISO slider | `setIso` (manual M/S; auto in P/S) | Current |
+| ISO slider | `setIso` (manual M; auto in AE/P/S) | Current |
 | Shutter time slider | `setShutterNs` (S/M) | Current |
 | Shutter angle presets | `setShutterAngle` | Current |
-| AE auto / return to AE | `setAutoExposure` | Current |
+| Shutter cap indicator | core `ExposureLimits` (1/48 s) | Current |
 | Exposure compensation / EV wheel | not in the Pigeon contract | Future |
 | Zebra threshold for exposure | `setZebra` only takes on/off | Future |
 
 Metering is software over the GPU luma grid: P biases the HAL AE with exposure
-compensation, S drives ISO, and M leaves exposure manual. The speed slider is
+compensation, S drives ISO, and M leaves exposure manual. AE is the stock HAL
+auto-exposure and is the default; if HAL AE asks for an exposure slower than
+1/48 s, the controller takes over at the cap and lets the ISO loop hold the
+image. The speed slider is
 disabled in M because there is no automatic exposure to follow. Highlight is
 protect-only: it lowers exposure when the brightest 10% exceed 0.85 and never
 brightens a flat scene.

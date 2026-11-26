@@ -1627,3 +1627,11 @@ now keeps the 0° presentation/hint pair instead of the 180° pair that made the
 landscape preview wrong; landscape rear is unchanged. Physical landscape
 testing is the authority here because an adb-only rotation does not move the
 sensor relative to the scene.
+
+## Unified exposure and shutter cap (build 2208, Pad 3)
+
+The Exposure card shows `AE / P / S / M`; AE is selected on launch, ISO and
+shutter read `auto`, the shutter slider is disabled, and the 1/48 s cap is
+printed. S and M enable the shutter slider; its slowest value is 1/50 s on the
+50 Hz anti-banding grid, which is faster than the 1/48 s limit. A HAL AE result
+slower than the cap switches the take to software exposure at the cap.

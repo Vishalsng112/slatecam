@@ -1025,58 +1025,30 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
-  Widget _exposureCircle(String mode) {
-    final selected = state.exposureMode == mode;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: 'exposure mode $mode',
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: () => widget.host.setExposureMode(mode),
-          child: SizedBox(
-            width: 42,
-            height: 42,
-            child: Center(
-              child: Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? UiTokens.accent : UiTokens.surfaceRaised,
-                  border: Border.all(
-                    color: selected ? UiTokens.accent : UiTokens.border,
-                  ),
-                ),
-                child: Text(
-                  mode,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: selected ? UiTokens.background : UiTokens.text,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  String _exposureModeLabel(String mode) => switch (mode) {
+    'AE' => 'AE',
+    'P' => 'P',
+    'S' => 'S',
+    'M' => 'M',
+    _ => mode,
+  };
+
+  String _exposureModeTooltip(String mode) => switch (mode) {
+    'AE' => 'HAL auto exposure',
+    'P' => 'Program auto: HAL AE with software exposure bias',
+    'S' => 'Shutter priority: fixed shutter, automatic ISO',
+    'M' => 'Manual ISO and shutter',
+    _ => mode,
+  };
 
   Widget _exposureCard(BuildContext context) {
     final manualIso = state.exposureMode == 'M';
-    final manualShutter = state.exposureMode != 'P';
-    final isoValueLabel = state.exposureMode == 'S'
-        ? 'auto · ${state.iso}'
-        : '${state.iso}';
-    final shutterValueLabel = state.exposureMode == 'P'
-        ? 'auto · ${formatShutterSummary(state.shutterNs)}'
-        : formatShutterSummary(state.shutterNs);
+    final manualShutter =
+        state.exposureMode == 'S' || state.exposureMode == 'M';
+    final isoValueLabel = manualIso ? '${state.iso}' : 'auto · ${state.iso}';
+    final shutterValueLabel = manualShutter
+        ? formatShutterSummary(state.shutterNs)
+        : 'auto · ${formatShutterSummary(state.shutterNs)}';
     final shutterRange = _shutterRange(state);
     final bandLabel = state.antibanding == 'auto'
         ? 'auto'
@@ -1093,14 +1065,15 @@ class _ControlDeckState extends State<ControlDeck> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              for (final mode in state.exposureModes) ...[
-                _exposureCircle(mode),
-                const SizedBox(width: 6),
-              ],
-            ],
-          ),
+          _modeRow('Mode', [
+            for (final mode in state.exposureModes)
+              _modeChip(
+                label: _exposureModeLabel(mode),
+                tooltip: _exposureModeTooltip(mode),
+                selected: state.exposureMode == mode,
+                onTap: () => widget.host.setExposureMode(mode),
+              ),
+          ]),
           const SizedBox(height: 2),
           _modeRow('Metering', [
             for (final mode in state.meteringModes)
@@ -1117,7 +1090,7 @@ class _ControlDeckState extends State<ControlDeck> {
             value: _meterSpeed,
             min: 0,
             max: 1,
-            enabled: state.exposureMode != 'M',
+            enabled: state.exposureMode == 'P' || state.exposureMode == 'S',
             onChanged: (value) => setState(() => _meterSpeedDraft = value),
             onChangeEnd: widget.host.setMeteringSpeed,
           ),
@@ -1151,6 +1124,14 @@ class _ControlDeckState extends State<ControlDeck> {
                     ?.copyWith(color: UiTokens.muted),
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              'Shutter capped at 1/48 s (48 fps) to avoid ghosting.',
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: UiTokens.muted),
+            ),
+          ),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -1171,22 +1152,6 @@ class _ControlDeckState extends State<ControlDeck> {
                       : null,
                 ),
             ],
-          ),
-          const SizedBox(height: 6),
-          TextButton.icon(
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-            ),
-            onPressed: () => widget.host.setAutoExposure(),
-            icon: Icon(
-              state.autoExposure ? Icons.check_circle_outline : Icons.exposure,
-              size: 15,
-            ),
-            label: Text(
-              state.autoExposure ? 'AE active' : 'Return to AE',
-              style: const TextStyle(fontSize: 11),
-            ),
           ),
         ],
       ),
@@ -2502,12 +2467,7 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
-  double _shutterCeiling(CameraState state) {
-    const oneFrameAt24 = 1000000000 / 24;
-    return state.shutterMaxNs < oneFrameAt24
-        ? state.shutterMaxNs.toDouble()
-        : oneFrameAt24.toDouble();
-  }
+  double _shutterCeiling(CameraState state) => state.shutterMaxNs.toDouble();
 
   /// Aligns the slider to the flicker-safe exposure grid Kotlin applies, so the
   /// handle lands on real values instead of a continuous range that would snap
@@ -2516,7 +2476,8 @@ class _ControlDeckState extends State<ControlDeck> {
     final ceilingNs = _shutterCeiling(state).round();
     // In P the HAL owns exposure; the disabled slider keeps its continuous
     // range and simply shows the readback.
-    final step = state.exposureMode == 'P' ? null : state.shutterStepNs;
+    final autoMode = state.exposureMode == 'AE' || state.exposureMode == 'P';
+    final step = autoMode ? null : state.shutterStepNs;
     if (step == null || step <= 0) {
       return (
         min: state.shutterMinNs.toDouble(),

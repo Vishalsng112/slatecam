@@ -9,26 +9,41 @@ import kotlin.math.roundToInt
  * Exposure modes exposed by the capture engine.
  *
  * Av (aperture priority) is deliberately absent: phone apertures are fixed and
- * Camera2 has no key for selecting one. The three modes that map to real
- * controls are P, S (Tv), and M.
+ * Camera2 has no key for selecting one. The four modes map to real controls:
+ * stock HAL AE, program auto, shutter priority and manual.
  */
-enum class ExposureMode(val wireValue: String) {
-    /** Stock HAL auto-exposure and auto-focus. */
-    PROGRAM("P"),
+enum class ExposureMode(val wireValue: String, val label: String) {
+    /** Pure HAL auto-exposure; this is the default. */
+    AE("AE", "AE"),
+
+    /** Program auto: HAL AE with the software exposure bias. */
+    PROGRAM("P", "P"),
 
     /** Shutter priority: the shutter is fixed and our loop drives ISO. */
-    SHUTTER_PRIORITY("S"),
+    SHUTTER_PRIORITY("S", "S"),
 
     /** Fully manual ISO and shutter. */
-    MANUAL("M"),
+    MANUAL("M", "M"),
     ;
 
     companion object {
         val wireValues: List<String> = entries.map { it.wireValue }
 
         fun fromWire(value: String): ExposureMode =
-            entries.firstOrNull { it.wireValue.equals(value, ignoreCase = true) } ?: PROGRAM
+            entries.firstOrNull { it.wireValue.equals(value, ignoreCase = true) } ?: AE
     }
+}
+
+/**
+ * Recording-safe exposure limits. A frame longer than 1/48 s introduces the
+ * low-frame-rate ghosting this camera must avoid, so app-controlled shutter
+ * values are capped here.
+ */
+object ExposureLimits {
+    const val MIN_FPS = 48
+    const val MAX_EXPOSURE_NS = 1_000_000_000L / MIN_FPS
+
+    fun clampExposure(ns: Long): Long = ns.coerceAtMost(MAX_EXPOSURE_NS)
 }
 
 /**

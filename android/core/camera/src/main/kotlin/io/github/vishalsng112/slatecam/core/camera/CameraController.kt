@@ -158,7 +158,7 @@ class CameraController(private val context: Context) {
     private var manualPreset = "daylight"
     private var manualPresetCct = 5500
     private var autoExposure = true
-    private var exposureMode = ExposureMode.PROGRAM
+    private var exposureMode = ExposureMode.AE
     private val exposureController = ExposureController()
     private var meteringMode = MeteringMode.MULTI
     private var meteringSpeed = 0.5f
@@ -359,13 +359,15 @@ class CameraController(private val context: Context) {
         val selected = ExposureMode.fromWire(mode)
         handler.post {
             exposureMode = selected
-            autoExposure = selected == ExposureMode.PROGRAM
+            autoExposure = selected == ExposureMode.AE ||
+                selected == ExposureMode.PROGRAM
             lastMeteringNs = 0L
             // The HAL's last automatic exposure was not grid-aligned; snap it
             // before S or M starts holding it.
             if (!autoExposure) shutterNs = snapShutter(shutterNs)
-            if (selected == ExposureMode.PROGRAM) {
-                // Start from a neutral bias; the meter takes over from there.
+            if (selected == ExposureMode.AE || selected == ExposureMode.PROGRAM) {
+                // Start from a neutral bias; in P the meter takes over from
+                // there, while AE stays pure HAL.
                 aeCompensationSteps = 0
                 aeCompensationAccumulator = 0f
             }
@@ -507,6 +509,9 @@ class CameraController(private val context: Context) {
         handler.post {
             if (session == null || builder == null) return@post
             if (exposureMode == ExposureMode.MANUAL) return@post
+            // Pure HAL AE gets no software loop until the shutter cap forces
+            // the controller into software exposure.
+            if (exposureMode == ExposureMode.AE && autoExposure) return@post
             val sample = ExposureMeter.measure(
                 meteringMode,
                 lumaGrid,
@@ -534,8 +539,8 @@ class CameraController(private val context: Context) {
                 )
             }
 
-            if (exposureMode == ExposureMode.PROGRAM) {
-                if (!autoExposure || aeCompensationMax <= aeCompensationMin ||
+            if (exposureMode == ExposureMode.PROGRAM && autoExposure) {
+                if (aeCompensationMax <= aeCompensationMin ||
                     aeCompensationStepEv <= 0f
                 ) {
                     return@post
@@ -776,8 +781,10 @@ class CameraController(private val context: Context) {
 
     fun setAutoExposure() {
         handler.post {
-            exposureMode = ExposureMode.PROGRAM
+            exposureMode = ExposureMode.AE
             autoExposure = true
+            aeCompensationSteps = 0
+            aeCompensationAccumulator = 0f
             lastMeteringNs = 0L
             aeCompensationSteps = 0
             aeCompensationAccumulator = 0f
@@ -974,7 +981,11 @@ class CameraController(private val context: Context) {
 
         val exposure = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
         shutterMinNs = exposure?.lower ?: 1_000L
-        shutterMaxNs = exposure?.upper ?: 1_000_000_000L
+        // Cap the slowest allowed exposure so a low-light take cannot fall
+        // below 48 fps worth of shutter and introduce ghosting.
+        shutterMaxNs = ExposureLimits.clampExposure(
+            exposure?.upper ?: 1_000_000_000L,
+        )
 
         // P-mode metering is applied as an EV bias on top of the HAL AE. The
         // range and step are per device.
@@ -1539,7 +1550,16 @@ class CameraController(private val context: Context) {
             // the last manual value (which may be minutes old).
             if (autoExposure) {
                 result.get(CaptureResult.SENSOR_EXPOSURE_TIME)?.let {
-                    shutterNs = it.coerceIn(shutterMinNs, shutterMaxNs)
+                    if (it > ExposureLimits.MAX_EXPOSURE_NS + 1_000_000L) {
+                        // HAL AE wants a slower shutter than the recording cap.
+                        // Take over exposure at the cap and let the ISO loop
+                        // keep the image exposed without ghosting.
+                        autoExposure = false
+                        shutterNs = snapShutter(ExposureLimits.MAX_EXPOSURE_NS)
+                        applyAndEmit()
+                    } else {
+                        shutterNs = it.coerceIn(shutterMinNs, shutterMaxNs)
+                    }
                 }
                 result.get(CaptureResult.SENSOR_SENSITIVITY)?.let {
                     iso = it.coerceIn(isoMin, isoMax)

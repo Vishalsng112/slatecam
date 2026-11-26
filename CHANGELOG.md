@@ -9,6 +9,16 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — Unified exposure modes and 48 fps shutter cap (build 2208)
+- Exposure is one interface with `AE`, `P`, `S` and `M` chips; `AE` is the
+  default and is stock HAL auto exposure. The separate return-to-AE button is
+  gone.
+- The slowest allowed exposure is 1/48 s (`ExposureLimits`). The shutter
+  slider, angle presets and S/M requests clamp to it. If HAL AE asks for a
+  longer exposure, the controller takes over at the cap and lets the ISO loop
+  hold the image, so AE/P do not silently break the cap.
+- The Exposure card shows the cap and disables the shutter slider in AE/P.
+
 ### Fixed — Front camera landscape orientation (build 2206)
 - The portrait front-camera half-turn is no longer applied in landscape. The
   landscape GL frame is already upright for both facings, so front landscape
