@@ -9,6 +9,12 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Front camera landscape orientation (build 2206)
+- The portrait front-camera half-turn is no longer applied in landscape. The
+  landscape GL frame is already upright for both facings, so front landscape
+  keeps the same 0° presentation/hint as the rear camera. Portrait keeps the
+  90° correction that fixed the upside-down preview.
+
 ### Fixed — Front camera preview upright (build 2205)
 - The front camera's texture origin needs half a revolution relative to the
   back-camera formula. Portrait front preview now reads top-to-bottom correctly

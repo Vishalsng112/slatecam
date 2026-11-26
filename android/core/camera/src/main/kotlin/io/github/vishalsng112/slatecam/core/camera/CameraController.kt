@@ -1119,8 +1119,6 @@ class CameraController(private val context: Context) {
         val displayTurns = (recordingHintFor(characteristics) / 90) % 4
         val displayPortrait = currentDisplayRotation() == Surface.ROTATION_0 ||
             currentDisplayRotation() == Surface.ROTATION_180
-        val front = characteristics.get(CameraCharacteristics.LENS_FACING) ==
-            CameraCharacteristics.LENS_FACING_FRONT
         // In portrait every family is delivered upright: the GL frame is the
         // sensor landscape image, the MP4 hint carries the quarter turn, and
         // the UI keeps the familiar 9:16 / 4:3 labels. In landscape the back
@@ -1130,8 +1128,10 @@ class CameraController(private val context: Context) {
             recordingOrientationHint = displayTurns * 90
             previewQuarterTurns = displayTurns
         } else {
-            recordingOrientationHint = if (front) 180 else 0
-            previewQuarterTurns = if (front) 2 else 0
+            // In landscape the GL frame is already upright for both facings;
+            // the front portrait correction must not be applied here.
+            recordingOrientationHint = 0
+            previewQuarterTurns = 0
         }
         encoderRotationDegrees = glRotationDegrees
         android.util.Log.i(

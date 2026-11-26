@@ -1619,3 +1619,11 @@ Front camera in portrait: the presenter is upright (head at top) after the
 half-revolution correction; before it was inverted. Switching back to the rear
 camera leaves the rear orientation unchanged. In landscape the front take uses
 a 180° presentation/hint pair so the preview and clip agree.
+
+## Front camera landscape (build 2206, Pad 3)
+
+Portrait front keeps the 90° correction (upright presenter). Landscape front
+now keeps the 0° presentation/hint pair instead of the 180° pair that made the
+landscape preview wrong; landscape rear is unchanged. Physical landscape
+testing is the authority here because an adb-only rotation does not move the
+sensor relative to the scene.
