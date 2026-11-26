@@ -55,6 +55,7 @@ root is `android/`, not the repository root.
 | Zoom target and smooth ramp | `:core:camera` | `SmoothZoom.kt`, `CameraController.setZoomRatio` |
 | Per-camera capabilities | `:core:camera` | `CameraCapabilities.kt` |
 | Recording modes / common mode | `:core:camera` | `RecordingModeCatalog.kt`, `RecordingMode` (resolution/aspect/fps/bitrate/bitDepth), `RecordingBitrate` |
+| Lens set rules | `:core:camera` | `LensSet.kt` (`LensSetMode`, `LensSet`, `LensSetModes`) |
 | Exposure P/S/M | `:core:camera` | `ExposureEngine.kt` |
 | Manual white balance | `:core:camera`, `:core:gpu` | `ManualWhiteBalance.kt`, `CameraController.applyControls`, `GlPreviewRenderer.setManualWhiteBalance` |
 | Metering patterns and response speed | `:core:camera` | `Metering.kt`, `ExposureEngine.kt` |
@@ -183,7 +184,7 @@ on camera change`
 - **User picture profiles:** ADR 0025.
 - **Media library and playback:** ADR 0026.
 - **Manual white balance:** ADR 0021.
-- **Shoot profiles/movie mode:** ADR 0007.
+- **Shoot profiles / lens set:** ADR 0007, renamed and unified in ADR 0035.
 
 ## Keeping docs current
 

@@ -9,6 +9,18 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — Lens set replaces Movie/Vlog (build 2210)
+- The multi-camera feature is now **Lens set** (`Single lens` / `Lens set`).
+  Core owns the rules in `LensSetMode`, `LensSet` and `LensSetModes`, reusing
+  the recording-mode catalog for the shared mode.
+- A set requires at least two lenses. Switching to it with fewer is rejected;
+  deselecting below two is rejected instead of silently falling back.
+- Selecting/deselecting lenses in set mode re-resolves the recording mode from
+  their common capabilities. Pigeon exposes `lensSetMode`, `lensSetLenses`,
+  `setLensSetMode` and `setLensInSet`.
+- The card is `Lens set & profiles` with Single lens/Lens set chips; the
+  console uses S and L.
+
 ### Changed — Unified exposure modes and 48 fps shutter cap (build 2208)
 - Exposure is one interface with `AE`, `P`, `S` and `M` chips; `AE` is the
   default and is stock HAL auto exposure. The separate return-to-AE button is

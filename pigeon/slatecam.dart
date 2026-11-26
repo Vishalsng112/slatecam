@@ -74,7 +74,7 @@ class RecordingMode {
   String reason;
 }
 
-/// A named lens set for Movie/Vlog mode.
+/// A named stored lens selection and its profile.
 class ShootProfile {
   ShootProfile({
     required this.id,
@@ -87,9 +87,9 @@ class ShootProfile {
   int lensCount;
 }
 
-/// A lens the user can include in the Movie/Vlog shoot set.
-class ShootLens {
-  ShootLens({
+/// A lens the user can include in the lens set.
+class LensSetLens {
+  LensSetLens({
     required this.id,
     required this.label,
     required this.facing,
@@ -292,8 +292,8 @@ class CameraState {
     required this.lenses,
     required this.recordingMode,
     required this.recordingModes,
-    required this.shootMode,
-    required this.shootLenses,
+    required this.lensSetMode,
+    required this.lensSetLenses,
     required this.shootProfiles,
     required this.activeShootProfile,
     required this.tenBit,
@@ -422,10 +422,11 @@ class CameraState {
   String recordingMode;
   /// Modes available for the active camera.
   List<RecordingMode> recordingModes;
-  /// single | movie — movie uses the common mode of all selected lenses.
-  String shootMode;
+  /// single | set — set uses the common mode of at least two selected lenses.
+  /// single | set — set uses the common mode of at least two lenses.
+  String lensSetMode;
   /// Probe-visible, openable lenses with their shoot-set selection.
-  List<ShootLens> shootLenses;
+  List<LensSetLens> lensSetLenses;
   /// Named shoot profiles for this device.
   List<ShootProfile> shootProfiles;
   /// Currently active shoot profile id.
@@ -644,11 +645,11 @@ abstract class SlateCamHostApi {
   /// Switches recording mode: size, frame rate and bit depth.
   void selectRecordingMode(String id);
 
-  /// Selects single-camera or movie/vlog multi-camera mode.
-  void setShootMode(String mode);
+  /// Selects a single lens or a multi-lens set (at least two lenses).
+  void setLensSetMode(String mode);
 
-  /// Includes/excludes a lens from the persisted Movie/Vlog shoot set.
-  void setShootLens(String id, bool selected);
+  /// Includes/excludes a lens from the persisted lens set.
+  void setLensInSet(String id, bool selected);
 
   /// Saves the current lens set as a named profile (updates a same-name profile).
   void saveShootProfile(String name);

@@ -267,7 +267,7 @@ class _ControlDeckState extends State<ControlDeck> {
               const SizedBox(width: 6),
               _shootCircle('single', 'S'),
               const SizedBox(width: 4),
-              _shootCircle('movie', 'M'),
+              _shootCircle('set', 'L'),
               const SizedBox(width: 8),
               Expanded(
                 child: SingleChildScrollView(
@@ -302,7 +302,7 @@ class _ControlDeckState extends State<ControlDeck> {
             children: [
               Expanded(
                 child: Text(
-                  '${state.shootMode == 'movie' ? 'MOVIE' : 'SINGLE'} · '
+                  '${state.lensSetMode == 'set' ? 'LENS SET' : 'SINGLE LENS'} · '
                   '$_displayWidth×$_displayHeight · '
                   '${state.frameRate}p · '
                   '${state.tenBit ? '10b HLG' : '8b SDR'}',
@@ -376,19 +376,19 @@ class _ControlDeckState extends State<ControlDeck> {
   }
 
   Widget _shootCircle(String mode, String letter) {
-    final selected = state.shootMode == mode;
+    final selected = state.lensSetMode == mode;
     return Semantics(
       button: true,
       selected: selected,
-      label: mode == 'movie' ? 'shoot mode movie' : 'shoot mode single',
+      label: mode == 'set' ? 'lens set mode' : 'single lens mode',
       child: Tooltip(
-        message: mode == 'movie' ? 'Movie / Vlog' : 'Single camera',
+        message: mode == 'set' ? 'Lens set (multi-camera)' : 'Single lens',
         child: Material(
           color: Colors.transparent,
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
-            onTap: () => widget.host.setShootMode(mode),
+            onTap: () => widget.host.setLensSetMode(mode),
             child: SizedBox(
               width: 44,
               height: 44,
@@ -469,7 +469,7 @@ class _ControlDeckState extends State<ControlDeck> {
 
   String _lensBadge(String id) {
     var facing = '';
-    for (final lens in state.shootLenses) {
+    for (final lens in state.lensSetLenses) {
       if (lens.id == id) {
         facing = lens.facing;
         break;
@@ -856,7 +856,7 @@ class _ControlDeckState extends State<ControlDeck> {
   /// Lens badges use the 35 mm-equivalent focal length, e.g. `16mm`, because
   /// that is how the operator picks a lens on set. Facing is added only when
   /// two lenses share the same value.
-  Widget _shootLensRow(List<ShootLens> lenses, bool editable) {
+  Widget _shootLensRow(List<LensSetLens> lenses, bool editable) {
     final focalCounts = <String, int>{};
     for (final lens in lenses) {
       final focal = _focalLabel(lens);
@@ -872,7 +872,7 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
-  Widget _shootLensCircle(ShootLens lens, bool editable, bool withFacing) {
+  Widget _shootLensCircle(LensSetLens lens, bool editable, bool withFacing) {
     final focal = _focalLabel(lens);
     final facing = switch (lens.facing) {
       'front' => 'F',
@@ -892,7 +892,7 @@ class _ControlDeckState extends State<ControlDeck> {
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: editable
-                ? () => widget.host.setShootLens(lens.id, !lens.selected)
+                ? () => widget.host.setLensInSet(lens.id, !lens.selected)
                 : null,
             child: SizedBox(
               width: 50,
@@ -932,7 +932,7 @@ class _ControlDeckState extends State<ControlDeck> {
     );
   }
 
-  String _focalLabel(ShootLens lens) {
+  String _focalLabel(LensSetLens lens) {
     final match = RegExp(r'(\d+)mm').firstMatch(lens.label);
     if (match != null) return '${match.group(1)}mm';
     final digits = RegExp(r'\d+').firstMatch(lens.label)?.group(0);
@@ -940,7 +940,7 @@ class _ControlDeckState extends State<ControlDeck> {
   }
 
   Widget _shootSetCard(BuildContext context) {
-    final lenses = state.shootLenses;
+    final lenses = state.lensSetLenses;
     final profiles = state.shootProfiles;
     final active = profiles.firstWhere(
       (profile) => profile.id == state.activeShootProfile,
@@ -948,7 +948,7 @@ class _ControlDeckState extends State<ControlDeck> {
     );
     final editable = !state.isRecording;
     return DeckCard(
-      title: 'Shoot set & profiles',
+      title: 'Lens set & profiles',
       tint: UiTokens.cardShoot,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -961,11 +961,27 @@ class _ControlDeckState extends State<ControlDeck> {
           else
             _shootLensRow(lenses, editable),
           const SizedBox(height: 6),
+          _modeRow('Mode', [
+            _modeChip(
+              label: 'Single lens',
+              tooltip: 'Record with the active lens only',
+              selected: state.lensSetMode == 'single',
+              onTap: () => widget.host.setLensSetMode('single'),
+            ),
+            _modeChip(
+              label: 'Lens set',
+              tooltip: 'At least two lenses share one recording mode',
+              selected: state.lensSetMode == 'set',
+              onTap: () => widget.host.setLensSetMode('set'),
+            ),
+          ]),
+          const SizedBox(height: 4),
           Text(
             state.isRecording
-                ? 'Stop recording to edit the shoot set or profiles.'
-                : 'Movie mode uses the common mode of the selected lenses. '
-                      'Macro lenses are never included.',
+                ? 'Stop recording to edit the lens set or profiles.'
+                : 'Lens set uses the common recording mode of at least two '
+                      'selected lenses; the mode follows their shared '
+                      'capabilities. Macro lenses are never included.',
             style: Theme.of(context).textTheme.bodySmall
                 ?.copyWith(fontSize: 10),
           ),

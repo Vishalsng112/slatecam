@@ -35,7 +35,7 @@ module owns the data.
 | Group | Purpose | Primary location |
 |---|---|---|
 | Status | What the camera is doing right now | Top status strip |
-| Record & lens | Record, lens, mode, shoot mode, shoot set | Fixed console header |
+| Record & lens | Record, lens, mode, lens set | Fixed console header |
 | Exposure | P/S/M, ISO, shutter time/angle, auto exposure | Bottom dock + console card |
 | Focus | Continuous AF by default; manual controls deferred | Kotlin default |
 | Colour | Profile, LUT, white balance, calibration | Console card |
@@ -248,8 +248,8 @@ keeps the other two where possible and falls back to the closest enabled
 combination. If no size in the family/aspect is enabled, the console reports the
 bridge reason and leaves the current mode alone.
 
-The shoot set lists lenses as focal-length circles (`16mm`, `25mm`, `26mm`).
-Tapping a circle includes or excludes that lens from the Movie/Vlog set; the
+The lens set lists lenses as focal-length circles (`16mm`, `25mm`, `26mm`).
+Tapping a circle includes or excludes that lens from the Lens set; the
 facing letter is prefixed only when two lenses share a focal length.
 
 ### 5.3.1 Viewfinder gestures
@@ -455,7 +455,7 @@ letterboxed.
 | Antibanding | `setAntibanding` | Current |
 | Output summary | preview size + frame rate from state | Current |
 | HLG gate status | current bit depth + probe reason | Current |
-| Shoot mode | Single vs Movie/Vlog common mode | **Current** |
+| Lens set | Single lens vs shared-mode set (at least two) | **Current** |
 | Recording mode | per-camera size/fps/bit-depth incl. 4K/1080p/720p, 16:9/4:3 and 4K 4:3 families, probe-gated | **Current** |
 | Resolution / frame-rate selector | replaced by the recording-mode catalog | **Current** |
 | Codec / bitrate selector | fixed HEVC, bitrate scales with mode | Future |
@@ -550,7 +550,7 @@ groups without adding chrome:
 | Section | Accent |
 |---|---|
 | Recording mode | amber `#E8B44A` |
-| Shoot set & profiles | green `#4CC38A` |
+| Lens set & profiles | green `#4CC38A` |
 | Exposure | blue `#6EA8FE` |
 | Picture profile | violet `#C084FC` |
 | Focus & stabilisation | cyan `#22D3EE` |

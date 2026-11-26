@@ -1635,3 +1635,12 @@ shutter read `auto`, the shutter slider is disabled, and the 1/48 s cap is
 printed. S and M enable the shutter slider; its slowest value is 1/50 s on the
 50 Hz anti-banding grid, which is faster than the 1/48 s limit. A HAL AE result
 slower than the cap switches the take to software exposure at the cap.
+
+## Lens set interface (build 2210, Pad 3)
+
+The card now reads `Lens set & profiles` with `Single lens` / `Lens set` chips.
+With two back lenses selected, switching to Lens set updates the header to
+`LENS SET` and keeps the shared 1080 4:3 30p 10-bit mode. Deselecting one lens
+in set mode is refused with “lens set needs at least two selected lenses” and
+the selection stays valid. In Single lens mode the same lens can be deselected.
+The console shows `S` and `L` for the two modes.
