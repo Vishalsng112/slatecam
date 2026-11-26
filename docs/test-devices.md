@@ -1564,3 +1564,12 @@ POCO X6 Pro portrait 4:3: while recording, the red border is visible on all
 four sides of the video frame, including the bottom edge below the dock. The
 border is drawn as a topmost overlay, so the transport, zoom rail and status
 pills cannot hide an edge.
+
+## Raw sensor feed diagnostic (build 2196, Pad 3)
+
+With `SENSOR FEED` enabled on Pad 3 in portrait, the camera's native frame is a
+landscape buffer in which the reference monitor text runs top-to-bottom. The
+upright `4:3`/`9:16` presentations rotate that buffer by a quarter turn, which
+is why they read left-to-right. This confirms that a true 4:3-wide take with
+left-to-right text requires either the upright 3:4 phone convention or a
+top/bottom crop of the rotated frame.

@@ -1119,10 +1119,10 @@ class CameraController(private val context: Context) {
         val displayTurns = (recordingHintFor(characteristics) / 90) % 4
         val displayPortrait = currentDisplayRotation() == Surface.ROTATION_0 ||
             currentDisplayRotation() == Surface.ROTATION_180
-        // A portrait take is always displayed and encoded upright: the GL
-        // frame is the sensor landscape image, the MP4 hint carries the
-        // quarter turn, and the UI labels the 16:9 family as 9:16 and the
-        // 4:3 family as 4:3 (standard phone-camera naming).
+        // In portrait every family is delivered upright: the GL frame is the
+        // sensor landscape image, the MP4 hint carries the quarter turn, and
+        // the UI keeps the familiar 9:16 / 4:3 labels. This keeps monitor text
+        // left-to-right for both selections.
         val verticalTake = displayPortrait
         recordingOrientationHint = if (verticalTake) displayTurns * 90 else 0
         previewQuarterTurns = if (verticalTake) displayTurns else 0

@@ -9,6 +9,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Added — Raw sensor feed diagnostic (build 2197)
+- The viewfinder-quality menu can show the unrotated, uncropped camera frame
+  with a `SENSOR FEED` pill. This exposes the sensor's native landscape frame
+  so orientation/crop issues can be compared against the upright presentation.
+
 ### Fixed — Recording border always on all four sides (build 2192)
 - The red take border is now a topmost viewfinder overlay sized to the exact
   video frame. The dock, zoom rail and status pills can no longer cover its

@@ -35,6 +35,7 @@ class _CaptureScreenState extends State<CaptureScreen>
   bool _showGuides = false;
   bool _showHistogram = false;
   bool _showWaveform = false;
+  bool _sensorPreview = false;
   final ValueNotifier<CameraTelemetry?> _telemetry =
       ValueNotifier<CameraTelemetry?>(null);
   final ValueNotifier<AudioTelemetry?> _audio = ValueNotifier<AudioTelemetry?>(
@@ -529,7 +530,13 @@ class _CaptureScreenState extends State<CaptureScreen>
           PopupMenuButton<String>(
             tooltip: 'Viewfinder resolution · preview $output',
             color: UiTokens.surfaceRaised,
-            onSelected: _host.setPreviewQuality,
+            onSelected: (value) {
+              if (value == 'sensor') {
+                setState(() => _sensorPreview = !_sensorPreview);
+              } else {
+                _host.setPreviewQuality(value);
+              }
+            },
             itemBuilder: (context) => [
               _qualityItem(
                 'full',
@@ -671,7 +678,7 @@ class _CaptureScreenState extends State<CaptureScreen>
     final outputHeight = state.previewOutputHeight > 0
         ? state.previewOutputHeight
         : state.previewHeight;
-    final turns = state.previewQuarterTurns % 4;
+    final turns = _sensorPreview ? 0 : state.previewQuarterTurns % 4;
     final rotated = turns.isOdd;
     final imageAspect = rotated
         ? outputHeight / outputWidth
@@ -769,7 +776,7 @@ class _CaptureScreenState extends State<CaptureScreen>
     final outputHeight = state.previewOutputHeight > 0
         ? state.previewOutputHeight
         : state.previewHeight;
-    final turns = state.previewQuarterTurns % 4;
+    final turns = _sensorPreview ? 0 : state.previewQuarterTurns % 4;
     final aspect = turns.isOdd
         ? outputHeight / outputWidth
         : outputWidth / outputHeight;
@@ -845,6 +852,19 @@ class _CaptureScreenState extends State<CaptureScreen>
                 ),
               ),
             ),
+            if (_sensorPreview)
+              const StatusPill(
+                color: UiTokens.info,
+                icon: Icons.sensors,
+                child: Text(
+                  'SENSOR FEED',
+                  style: TextStyle(
+                    color: UiTokens.info,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             if (recording)
               StatusPill(
                 color: UiTokens.danger,

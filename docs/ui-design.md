@@ -345,7 +345,11 @@ The same widgets serve both orientations; nothing is duplicated per layout.
   during a take applies after the clip is finalized: a recording never changes
   orientation mid-stream.
 - A circular rotate control beside the viewfinder-quality pill flips the app
-  between portrait and landscape without reopening the camera. Its icon shows
+  between portrait and landscape without reopening the camera.
+- **Sensor feed (diagnostic):** the viewfinder-quality menu can bypass display
+  rotation and crop to show the camera's native frame, marked by a
+  `SENSOR FEED` pill. This is used to compare raw sensor orientation with the
+  presented take. Its icon shows
   the destination orientation, and it uses the same bridge rotation path as a
   physical turn.
 
