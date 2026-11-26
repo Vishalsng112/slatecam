@@ -53,8 +53,10 @@ hint; the latter keeps one encoder path and one GL frame.
   columns below the viewfinder; rotation during idle is live.
 - Portrait offers `9:16` and `4:3` as family labels. Both are upright takes:
   the sensor frame plus the quarter turn, delivered as `1080×1920` and
-  `1080×1440` respectively. Naming follows phone-camera convention rather than
-  rotating the label with the device.
+  `1080×1440` respectively. This is the chosen option after inspecting the raw
+  sensor feed: the native frame is landscape and sideways in portrait, so
+  upright text requires the quarter turn, and 4:3 stays the familiar family
+  label rather than becoming 3:4. Naming follows phone-camera convention.
 - The viewfinder never crops: the red recording border wraps the actual frame
   for both families, all four sides.
 - Mid-take rotation does not rotate the clip; the operator sees the live

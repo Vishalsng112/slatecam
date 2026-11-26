@@ -9,6 +9,14 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Portrait 4:3 locked to upright 3:4 (build 2197)
+- Decision: portrait `4:3` is the upright 3:4 take (`1080×1440`), labelled
+  `4:3` like standard phone cameras. The raw sensor frame is landscape and
+  sideways in portrait, so this is what keeps reference text left-to-right
+  without a top/bottom crop. `9:16` is the vertical take.
+- Pad 3 verified: both portrait options read left-to-right, and the red take
+  border is on all four sides (pixel-verified) because it is a topmost overlay.
+
 ### Added — Raw sensor feed diagnostic (build 2197)
 - The viewfinder-quality menu can show the unrotated, uncropped camera frame
   with a `SENSOR FEED` pill. This exposes the sensor's native landscape frame

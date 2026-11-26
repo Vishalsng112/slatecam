@@ -1573,3 +1573,13 @@ upright `4:3`/`9:16` presentations rotate that buffer by a quarter turn, which
 is why they read left-to-right. This confirms that a true 4:3-wide take with
 left-to-right text requires either the upright 3:4 phone convention or a
 top/bottom crop of the rotated frame.
+
+## Pad 3 final portrait decision (build 2197)
+
+Chosen behaviour: upright 3:4 take labelled `4:3`. With the monitor as the
+reference, Pad 3 portrait shows left-to-right text for both `9:16` and `4:3`.
+During recording the red border is a topmost overlay and is present on all four
+sides; pixel scan found the border rows/columns at the frame edges (105–2440
+and 324–2075 in the 2400×3392 capture). The raw `SENSOR FEED` diagnostic
+confirmed the native frame is landscape/sideways, which is why the quarter turn
+is required.
