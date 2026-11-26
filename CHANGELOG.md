@@ -9,7 +9,17 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
-### Fixed — Portrait aspect families: 9:16 video, 4:3 open gate (build 2190)
+### Fixed — Portrait aspect labels and upright text (build 2191)
+- Portrait keeps the standard phone-camera naming: `9:16` and `4:3`. The `4:3`
+  family is delivered as an upright `1080×1440` take (the sensor 4:3 mode plus
+  the quarter-turn hint), so monitor text reads left to right instead of
+  top to bottom.
+- Removed the short-lived 4:3 open-gate-in-portrait behaviour: it kept a
+  landscape frame that appeared rotated when the phone was upright.
+- The red recording border is drawn on the actual frame, all four sides, for
+  both `9:16` and `4:3`.
+
+### Added — Portrait aspect families: 9:16 video, 4:3 open gate (build 2190)
 - Portrait now offers `9:16` and `4:3`, matching the reference camera layout.
   `9:16` records the vertical video take (`1080×1920`, 16:9 sensor frame plus
   the MP4 quarter turn). `4:3` is the sensor open gate and stays `4:3`

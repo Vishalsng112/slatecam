@@ -1119,11 +1119,11 @@ class CameraController(private val context: Context) {
         val displayTurns = (recordingHintFor(characteristics) / 90) % 4
         val displayPortrait = currentDisplayRotation() == Surface.ROTATION_0 ||
             currentDisplayRotation() == Surface.ROTATION_180
-        // 16:9 is the vertical-video family: in portrait it is delivered as
-        // 9:16. 4:3 is the sensor's open gate and keeps its landscape frame
-        // even when the phone is upright. This mirrors cinema-camera aspect
-        // behaviour instead of flipping every ratio with the device.
-        val verticalTake = displayPortrait && isWideStream()
+        // A portrait take is always displayed and encoded upright: the GL
+        // frame is the sensor landscape image, the MP4 hint carries the
+        // quarter turn, and the UI labels the 16:9 family as 9:16 and the
+        // 4:3 family as 4:3 (standard phone-camera naming).
+        val verticalTake = displayPortrait
         recordingOrientationHint = if (verticalTake) displayTurns * 90 else 0
         previewQuarterTurns = if (verticalTake) displayTurns else 0
         encoderRotationDegrees = glRotationDegrees
@@ -1163,10 +1163,6 @@ class CameraController(private val context: Context) {
         val sensor = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
         return sensor % 360
     }
-
-    /** True for the 16:9 video family, false for the 4:3 open gate. */
-    private fun isWideStream(): Boolean =
-        previewSize.width * 9 == previewSize.height * 16
 
     private fun currentDisplayRotation(): Int = runCatching {
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager

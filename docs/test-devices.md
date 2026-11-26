@@ -1544,3 +1544,16 @@ POCO X6 Pro portrait:
 The red recording border wraps the actual frame in both cases, with all four
 corners visible. The 4:3 open gate is no longer mislabelled or converted to
 3:4; 9:16 remains the vertical video mode.
+
+## Portrait 9:16 and 4:3 upright text (build 2191)
+
+POCO X6 Pro, monitor with left-to-right text in front of the camera:
+
+| Selection | UI size | Preview | Clip | Text |
+|---|---|---|---|---|
+| 9:16 | 1080×1920 | tall, full frame | 1920×1080 + `-90` | left to right |
+| 4:3 | 1080×1440 | tall, full frame | 1440×1080 + `-90` | left to right |
+
+The red recording border wraps the frame on all four sides for both. The
+previous `4:3` open-gate behaviour made upright text run top to bottom and was
+removed.
