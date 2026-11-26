@@ -50,16 +50,18 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * Native orientation switch. Fixed SCREEN_ORIENTATION_* values work even
-     * when the user has auto-rotate off, unlike sensor-landscape requests.
+     * Native orientation switch. The sensor variants pick the landscape side
+     * the device is actually held in (90 or 270), so a tablet is never flipped
+     * upside down relative to the user. They keep working with auto-rotate off
+     * and are not a fixed single-direction landscape request.
      */
     private fun toggleOrientation() {
         val portrait =
             resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         requestedOrientation = if (portrait) {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         } else {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
         }
     }
 
