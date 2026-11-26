@@ -1612,3 +1612,10 @@ other elements; tapping `9:16` and `4:3` switches the take as before.
 Tapping the camera-swap control in portrait switched `cameraId` from `0` (back)
 to `1` (front) and back again; the deck's B0/F1 selection followed and the
 preview changed immediately.
+
+## Front camera orientation (build 2205, Pad 3)
+
+Front camera in portrait: the presenter is upright (head at top) after the
+half-revolution correction; before it was inverted. Switching back to the rear
+camera leaves the rear orientation unchanged. In landscape the front take uses
+a 180° presentation/hint pair so the preview and clip agree.

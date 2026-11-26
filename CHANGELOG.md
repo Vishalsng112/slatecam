@@ -9,6 +9,13 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Front camera preview upright (build 2205)
+- The front camera's texture origin needs half a revolution relative to the
+  back-camera formula. Portrait front preview now reads top-to-bottom correctly
+  (head at top) instead of upside down.
+- Landscape front takes use the same correction (MP4 hint 180° / two quarter
+  turns) so preview and playback stay aligned.
+
 ### Added — One-tap front/back camera switch (build 2203)
 - A camera-swap button in the viewfinder's top-right controls toggles between
   the exposed front and back cameras using the same `setCameraId` path as the

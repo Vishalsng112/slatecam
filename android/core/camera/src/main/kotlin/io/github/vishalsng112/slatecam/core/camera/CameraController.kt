@@ -1119,13 +1119,20 @@ class CameraController(private val context: Context) {
         val displayTurns = (recordingHintFor(characteristics) / 90) % 4
         val displayPortrait = currentDisplayRotation() == Surface.ROTATION_0 ||
             currentDisplayRotation() == Surface.ROTATION_180
+        val front = characteristics.get(CameraCharacteristics.LENS_FACING) ==
+            CameraCharacteristics.LENS_FACING_FRONT
         // In portrait every family is delivered upright: the GL frame is the
         // sensor landscape image, the MP4 hint carries the quarter turn, and
-        // the UI keeps the familiar 9:16 / 4:3 labels. This keeps monitor text
-        // left-to-right for both selections.
-        val verticalTake = displayPortrait
-        recordingOrientationHint = if (verticalTake) displayTurns * 90 else 0
-        previewQuarterTurns = if (verticalTake) displayTurns else 0
+        // the UI keeps the familiar 9:16 / 4:3 labels. In landscape the back
+        // camera is already upright; the front camera's texture origin needs
+        // half a revolution.
+        if (displayPortrait) {
+            recordingOrientationHint = displayTurns * 90
+            previewQuarterTurns = displayTurns
+        } else {
+            recordingOrientationHint = if (front) 180 else 0
+            previewQuarterTurns = if (front) 2 else 0
+        }
         encoderRotationDegrees = glRotationDegrees
         android.util.Log.i(
             "SlateCam",
@@ -1147,7 +1154,10 @@ class CameraController(private val context: Context) {
             else -> 0
         }
         return if (facing == CameraCharacteristics.LENS_FACING_FRONT) {
-            (sensor + display) % 360
+            // The GL path samples the front camera's texture with an inverted
+            // origin, so the display-relative turn is half a revolution from
+            // the back-camera formula.
+            (sensor + display + 180) % 360
         } else {
             (sensor - display + 360) % 360
         }
