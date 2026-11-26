@@ -1,20 +1,75 @@
 package io.github.vishalsng112.slatecam.core.camera
 
+/** Resolution family offered by the recording-mode catalog. */
+enum class RecordingResolution(val label: String, val minHeight: Int) {
+    UHD_4K("4K", 2160),
+    FHD_1080("1080", 1080),
+    HD_720("720", 720),
+    ;
+
+    companion object {
+        fun forHeight(height: Int): RecordingResolution = when {
+            height >= UHD_4K.minHeight -> UHD_4K
+            height >= FHD_1080.minHeight -> FHD_1080
+            else -> HD_720
+        }
+    }
+}
+
+/** Sensor aspect family; portrait presentation is a UI concern. */
+enum class RecordingAspect(val label: String) {
+    WIDE_16_9("16:9"),
+    OPEN_4_3("4:3"),
+    ;
+
+    companion object {
+        fun forSize(width: Int, height: Int): RecordingAspect =
+            if (width * 9 == height * 16) WIDE_16_9 else OPEN_4_3
+    }
+}
+
+enum class RecordingBitDepth(val bits: Int) {
+    EIGHT(8),
+    TEN(10),
+}
+
+/** Bitrate policy in one place so every consumer sees the same number. */
+object RecordingBitrate {
+    fun forPixels(width: Int, height: Int, fps: Int): Int {
+        val pixels = width.toLong() * height
+        val base = when {
+            pixels >= 3840L * 2160 -> 40_000_000
+            pixels >= 1920L * 1080 -> 12_000_000
+            else -> 9_000_000
+        }
+        return (base * fps.coerceAtLeast(1) / 30).coerceAtLeast(4_000_000)
+    }
+}
+
 /**
- * A recording mode that the UI can offer. A mode is valid only when the camera
- * actually exposes the size, can frame-lock the rate, and (for 10-bit) the probe
- * verified the same size and rate.
+ * The single recording-mode model.
+ *
+ * The operator-facing elements are [resolution], [aspect], [fps], [bitrate]
+ * and [bitDepth]. [width]/[height] are the concrete Camera2 stream size derived
+ * from the resolution and aspect; they stay for the session and encoder but no
+ * caller needs to infer the family or the aspect from them.
  */
-data class ShootMode(
+data class RecordingMode(
     val id: String,
-    val label: String,
+    val resolution: RecordingResolution,
+    val aspect: RecordingAspect,
+    val fps: Int,
+    val bitrate: Int,
+    val bitDepth: RecordingBitDepth,
     val width: Int,
     val height: Int,
-    val fps: Int,
-    val tenBit: Boolean,
     val enabled: Boolean,
     val reason: String,
-)
+) {
+    val label: String
+        get() = "$width×$height · ${fps}p · ${aspect.label} · " +
+            if (bitDepth == RecordingBitDepth.TEN) "10-bit HLG" else "8-bit SDR"
+}
 
 /**
  * Builds recording modes from live camera capabilities and probe verification.
@@ -26,18 +81,30 @@ data class ShootMode(
  */
 object RecordingModeCatalog {
 
-    private data class Canonical(val width: Int, val height: Int, val aspect: String)
+    private data class Canonical(
+        val width: Int,
+        val height: Int,
+        val resolution: RecordingResolution,
+        val aspect: RecordingAspect,
+    )
 
     private val canonicalSizes = listOf(
-        Canonical(3840, 2160, "16:9"),
-        Canonical(4096, 3072, "4:3"),
-        Canonical(3840, 2880, "4:3"),
-        Canonical(2880, 2160, "4:3"),
-        Canonical(1920, 1080, "16:9"),
-        Canonical(1920, 1440, "4:3"),
-        Canonical(1440, 1080, "4:3"),
-        Canonical(1280, 720, "16:9"),
-    )
+        3840 to 2160,
+        4096 to 3072,
+        3840 to 2880,
+        2880 to 2160,
+        1920 to 1080,
+        1920 to 1440,
+        1440 to 1080,
+        1280 to 720,
+    ).map { (width, height) ->
+        Canonical(
+            width = width,
+            height = height,
+            resolution = RecordingResolution.forHeight(height),
+            aspect = RecordingAspect.forSize(width, height),
+        )
+    }
 
     private val frameRates = listOf(24, 25, 30)
 
@@ -47,22 +114,22 @@ object RecordingModeCatalog {
     fun modesFor(
         capabilities: CameraCapabilities,
         tenBitVerifier: TenBitVerifier,
-    ): List<ShootMode> = evaluate(
+    ): List<RecordingMode> = evaluate(
         cameras = listOf(capabilities to tenBitVerifier),
     )
 
     /** Only modes enabled for every camera in the set. */
     fun commonModes(
         cameras: List<Pair<CameraCapabilities, TenBitVerifier>>,
-    ): List<ShootMode> {
+    ): List<RecordingMode> {
         if (cameras.isEmpty()) return emptyList()
         return evaluate(cameras)
     }
 
     private fun evaluate(
         cameras: List<Pair<CameraCapabilities, TenBitVerifier>>,
-    ): List<ShootMode> {
-        val modes = mutableListOf<ShootMode>()
+    ): List<RecordingMode> {
+        val modes = mutableListOf<RecordingMode>()
 
         canonicalSizes.forEach { size ->
             frameRates.forEach { fps ->
@@ -77,14 +144,17 @@ object RecordingModeCatalog {
                         cameras.size == 1 -> reasons.first().substringAfter(": ")
                         else -> reasons.joinToString("; ")
                     }
-                    modes += ShootMode(
+                    val bitDepth =
+                        if (tenBit) RecordingBitDepth.TEN else RecordingBitDepth.EIGHT
+                    modes += RecordingMode(
                         id = id(size.width, size.height, fps, tenBit),
-                        label = "${size.width}×${size.height} · ${fps}p · " +
-                            "${size.aspect} · ${if (tenBit) "10-bit HLG" else "8-bit SDR"}",
+                        resolution = size.resolution,
+                        aspect = size.aspect,
+                        fps = fps,
+                        bitrate = RecordingBitrate.forPixels(size.width, size.height, fps),
+                        bitDepth = bitDepth,
                         width = size.width,
                         height = size.height,
-                        fps = fps,
-                        tenBit = tenBit,
                         enabled = reasons.isEmpty(),
                         reason = reason,
                     )
@@ -93,10 +163,10 @@ object RecordingModeCatalog {
         }
 
         return modes.sortedWith(
-            compareByDescending<ShootMode> { it.enabled }
+            compareByDescending<RecordingMode> { it.enabled }
                 .thenByDescending { it.width * it.height }
                 .thenBy { it.fps }
-                .thenByDescending { it.tenBit },
+                .thenByDescending { it.bitDepth.bits },
         )
     }
 

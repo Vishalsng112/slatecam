@@ -54,7 +54,7 @@ root is `android/`, not the repository root.
 | Camera state, session, repeating request | `:core:camera` | `CameraController.kt` |
 | Zoom target and smooth ramp | `:core:camera` | `SmoothZoom.kt`, `CameraController.setZoomRatio` |
 | Per-camera capabilities | `:core:camera` | `CameraCapabilities.kt` |
-| Recording modes / common mode | `:core:camera` | `RecordingModeCatalog.kt` |
+| Recording modes / common mode | `:core:camera` | `RecordingModeCatalog.kt`, `RecordingMode` (resolution/aspect/fps/bitrate/bitDepth), `RecordingBitrate` |
 | Exposure P/S/M | `:core:camera` | `ExposureEngine.kt` |
 | Manual white balance | `:core:camera`, `:core:gpu` | `ManualWhiteBalance.kt`, `CameraController.applyControls`, `GlPreviewRenderer.setManualWhiteBalance` |
 | Metering patterns and response speed | `:core:camera` | `Metering.kt`, `ExposureEngine.kt` |

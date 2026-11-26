@@ -303,11 +303,17 @@ data class LensOption (
 data class RecordingMode (
   val id: String,
   val label: String,
+  /** 4K | 1080 | 720 */
+  val resolution: String,
+  /** 16:9 | 4:3 */
+  val aspect: String,
   val width: Long,
   val height: Long,
   val fps: Long,
-  /** True when the mode records 10-bit HLG. */
-  val tenBit: Boolean,
+  /** Encoder bitrate in bits per second. */
+  val bitrate: Long,
+  /** 8 or 10. */
+  val bitDepth: Long,
   val enabled: Boolean,
   /** Why the mode is disabled; empty when enabled. */
   val reason: String
@@ -317,23 +323,29 @@ data class RecordingMode (
     fun fromList(pigeonVar_list: List<Any?>): RecordingMode {
       val id = pigeonVar_list[0] as String
       val label = pigeonVar_list[1] as String
-      val width = pigeonVar_list[2] as Long
-      val height = pigeonVar_list[3] as Long
-      val fps = pigeonVar_list[4] as Long
-      val tenBit = pigeonVar_list[5] as Boolean
-      val enabled = pigeonVar_list[6] as Boolean
-      val reason = pigeonVar_list[7] as String
-      return RecordingMode(id, label, width, height, fps, tenBit, enabled, reason)
+      val resolution = pigeonVar_list[2] as String
+      val aspect = pigeonVar_list[3] as String
+      val width = pigeonVar_list[4] as Long
+      val height = pigeonVar_list[5] as Long
+      val fps = pigeonVar_list[6] as Long
+      val bitrate = pigeonVar_list[7] as Long
+      val bitDepth = pigeonVar_list[8] as Long
+      val enabled = pigeonVar_list[9] as Boolean
+      val reason = pigeonVar_list[10] as String
+      return RecordingMode(id, label, resolution, aspect, width, height, fps, bitrate, bitDepth, enabled, reason)
     }
   }
   fun toList(): List<Any?> {
     return listOf(
       id,
       label,
+      resolution,
+      aspect,
       width,
       height,
       fps,
-      tenBit,
+      bitrate,
+      bitDepth,
       enabled,
       reason,
     )
@@ -346,23 +358,26 @@ data class RecordingMode (
       return true
     }
     val other = other as RecordingMode
-    return SlateCamPigeonPigeonUtils.deepEquals(this.id, other.id) && SlateCamPigeonPigeonUtils.deepEquals(this.label, other.label) && SlateCamPigeonPigeonUtils.deepEquals(this.width, other.width) && SlateCamPigeonPigeonUtils.deepEquals(this.height, other.height) && SlateCamPigeonPigeonUtils.deepEquals(this.fps, other.fps) && SlateCamPigeonPigeonUtils.deepEquals(this.tenBit, other.tenBit) && SlateCamPigeonPigeonUtils.deepEquals(this.enabled, other.enabled) && SlateCamPigeonPigeonUtils.deepEquals(this.reason, other.reason)
+    return SlateCamPigeonPigeonUtils.deepEquals(this.id, other.id) && SlateCamPigeonPigeonUtils.deepEquals(this.label, other.label) && SlateCamPigeonPigeonUtils.deepEquals(this.resolution, other.resolution) && SlateCamPigeonPigeonUtils.deepEquals(this.aspect, other.aspect) && SlateCamPigeonPigeonUtils.deepEquals(this.width, other.width) && SlateCamPigeonPigeonUtils.deepEquals(this.height, other.height) && SlateCamPigeonPigeonUtils.deepEquals(this.fps, other.fps) && SlateCamPigeonPigeonUtils.deepEquals(this.bitrate, other.bitrate) && SlateCamPigeonPigeonUtils.deepEquals(this.bitDepth, other.bitDepth) && SlateCamPigeonPigeonUtils.deepEquals(this.enabled, other.enabled) && SlateCamPigeonPigeonUtils.deepEquals(this.reason, other.reason)
   }
 
   override fun hashCode(): Int {
     var result = javaClass.hashCode()
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.id)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.label)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.resolution)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.aspect)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.width)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.height)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.fps)
-    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.tenBit)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.bitrate)
+    result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.bitDepth)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.enabled)
     result = 31 * result + SlateCamPigeonPigeonUtils.deepHash(this.reason)
     return result
   }
   override fun toString(): String {
-    return "RecordingMode(id=$id, label=$label, width=$width, height=$height, fps=$fps, tenBit=$tenBit, enabled=$enabled, reason=$reason)"
+    return "RecordingMode(id=$id, label=$label, resolution=$resolution, aspect=$aspect, width=$width, height=$height, fps=$fps, bitrate=$bitrate, bitDepth=$bitDepth, enabled=$enabled, reason=$reason)"
   }
 }
 

@@ -1591,3 +1591,11 @@ Tapping the rotate control while in portrait moved the display to
 `ROTATION_0` (portrait). The button now uses the activity's fixed requested
 orientation, so it does not depend on the sensor or auto-rotate. The device's
 `ignore-orientation-request` test flag was reset to false.
+
+## Recording-mode interface (build 2201, Pad 3)
+
+The core model now owns resolution, aspect, fps, bitrate and bit depth. On
+Pad 3 the mode card was re-exercised: 1080 → 4K and 4:3 → 16:9 selected
+through the model fields, with the take becoming `2160×3840` for portrait
+4K 16:9. A 1440×1080 30p 10-bit clip recorded through the new `mode.bitrate`
+path; ffprobe reported 1440×1080, 30 fps. Flow/capability tests pass.

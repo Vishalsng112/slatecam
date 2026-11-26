@@ -219,10 +219,13 @@ class RecordingMode {
   RecordingMode({
     required this.id,
     required this.label,
+    required this.resolution,
+    required this.aspect,
     required this.width,
     required this.height,
     required this.fps,
-    required this.tenBit,
+    required this.bitrate,
+    required this.bitDepth,
     required this.enabled,
     required this.reason,
   });
@@ -231,14 +234,23 @@ class RecordingMode {
 
   String label;
 
+  /// 4K | 1080 | 720
+  String resolution;
+
+  /// 16:9 | 4:3
+  String aspect;
+
   int width;
 
   int height;
 
   int fps;
 
-  /// True when the mode records 10-bit HLG.
-  bool tenBit;
+  /// Encoder bitrate in bits per second.
+  int bitrate;
+
+  /// 8 or 10.
+  int bitDepth;
 
   bool enabled;
 
@@ -249,10 +261,13 @@ class RecordingMode {
     return <Object?>[
       id,
       label,
+      resolution,
+      aspect,
       width,
       height,
       fps,
-      tenBit,
+      bitrate,
+      bitDepth,
       enabled,
       reason,
     ];
@@ -266,12 +281,15 @@ class RecordingMode {
     return RecordingMode(
       id: result[0]! as String,
       label: result[1]! as String,
-      width: result[2]! as int,
-      height: result[3]! as int,
-      fps: result[4]! as int,
-      tenBit: result[5]! as bool,
-      enabled: result[6]! as bool,
-      reason: result[7]! as String,
+      resolution: result[2]! as String,
+      aspect: result[3]! as String,
+      width: result[4]! as int,
+      height: result[5]! as int,
+      fps: result[6]! as int,
+      bitrate: result[7]! as int,
+      bitDepth: result[8]! as int,
+      enabled: result[9]! as bool,
+      reason: result[10]! as String,
     );
   }
 
@@ -284,7 +302,7 @@ class RecordingMode {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(id, other.id) && _deepEquals(label, other.label) && _deepEquals(width, other.width) && _deepEquals(height, other.height) && _deepEquals(fps, other.fps) && _deepEquals(tenBit, other.tenBit) && _deepEquals(enabled, other.enabled) && _deepEquals(reason, other.reason);
+    return _deepEquals(id, other.id) && _deepEquals(label, other.label) && _deepEquals(resolution, other.resolution) && _deepEquals(aspect, other.aspect) && _deepEquals(width, other.width) && _deepEquals(height, other.height) && _deepEquals(fps, other.fps) && _deepEquals(bitrate, other.bitrate) && _deepEquals(bitDepth, other.bitDepth) && _deepEquals(enabled, other.enabled) && _deepEquals(reason, other.reason);
   }
 
   @override
@@ -293,7 +311,7 @@ class RecordingMode {
 
   @override
   String toString() {
-    return 'RecordingMode(id: $id, label: $label, width: $width, height: $height, fps: $fps, tenBit: $tenBit, enabled: $enabled, reason: $reason)';
+    return 'RecordingMode(id: $id, label: $label, resolution: $resolution, aspect: $aspect, width: $width, height: $height, fps: $fps, bitrate: $bitrate, bitDepth: $bitDepth, enabled: $enabled, reason: $reason)';
   }
 }
 

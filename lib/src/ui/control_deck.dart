@@ -556,32 +556,34 @@ class _ControlDeckState extends State<ControlDeck> {
       );
     }
 
-    final family = _familyOf(current);
-    final is4k = family == '4K';
-    final is1080 = !is4k;
-    final wide = _isWideMode(current);
+    final resolution = current.resolution;
+    final wide = current.aspect == '16:9';
+    final is4k = resolution == '4K';
+    final is1080 = resolution == '1080';
 
     final rates =
         state.recordingModes
             .where(
-              (mode) => _familyOf(mode) == family && _isWideMode(mode) == wide,
+              (mode) =>
+                  mode.resolution == resolution &&
+                  (mode.aspect == '16:9') == wide,
             )
             .map((mode) => mode.fps.toInt())
             .toSet()
             .toList()
           ..sort();
 
-    // Only show depths that can actually be selected at this size/rate. A
-    // 4K 4:3 mode is 8-bit until the probe verifies its 10-bit preset.
+    // Only show depths that can actually be selected at this resolution,
+    // aspect and rate. A 4K 4:3 mode is 8-bit until the probe verifies it.
     final depths = state.recordingModes
         .where(
           (mode) =>
               mode.enabled &&
-              mode.width == current.width &&
-              mode.height == current.height &&
+              mode.resolution == resolution &&
+              mode.aspect == current.aspect &&
               mode.fps == current.fps,
         )
-        .map((mode) => mode.tenBit)
+        .map((mode) => mode.bitDepth)
         .toSet();
 
     return DeckCard(
@@ -629,15 +631,15 @@ class _ControlDeckState extends State<ControlDeck> {
           ]),
           const SizedBox(height: 4),
           _modeRow('Bit depth', [
-            for (final tenBit in [true, false])
-              if (depths.contains(tenBit))
+            for (final bits in [10, 8])
+              if (depths.contains(bits))
                 _modeChip(
-                  label: tenBit ? '10-bit' : '8-bit',
-                  tooltip: tenBit
+                  label: '$bits-bit',
+                  tooltip: bits == 10
                       ? '10-bit HLG where probe-verified'
                       : '8-bit SDR',
-                  selected: current.tenBit == tenBit,
-                  onTap: () => _selectBit(tenBit),
+                  selected: current.bitDepth == bits,
+                  onTap: () => _selectBit(bits),
                 ),
           ]),
         ],
@@ -749,130 +751,104 @@ class _ControlDeckState extends State<ControlDeck> {
     return null;
   }
 
-  bool _isWideMode(RecordingMode mode) => mode.width * 9 == mode.height * 16;
-
-  /// A mode's resolution family. 4K means a 2160-or-taller frame; the exact
-  /// size then follows the aspect (e.g. 3840x2160 for 16:9 and 4096x3072 or
-  /// 2880x2160 for 4:3). This is why changing aspect no longer drops to 1080.
-  String _familyOf(RecordingMode mode) => mode.height >= 2160 ? '4K' : '1080';
-
-  /// Candidate sizes in preference order for a family and aspect.
-  List<(int, int)> _sizesFor(String family, bool wide) {
-    if (family == '4K') {
-      if (wide) return [(3840, 2160)];
-      return [(3840, 2880), (4096, 3072), (2880, 2160)];
-    }
-    if (wide) return [(1920, 1080)];
-    // 1440x1080 is the probe-verified 4:3 mode; 1920x1440 is a fallback.
-    return [(1440, 1080), (1920, 1440)];
-  }
-
-  void _selectResolution(String label) {
+  void _selectResolution(String resolution) {
     final current = _currentMode;
-    final fps = current?.fps.toInt() ?? 30;
-    final tenBit = current?.tenBit ?? true;
-    final wide = current == null ? false : _isWideMode(current);
-    _chooseFromSizes(_sizesFor(label, wide), fps, tenBit);
+    _chooseMode(
+      resolution,
+      current?.aspect ?? '4:3',
+      current?.fps.toInt() ?? 30,
+      current?.bitDepth ?? 10,
+    );
   }
 
   void _selectAspect(bool wide) {
     final current = _currentMode;
-    final fps = current?.fps.toInt() ?? 30;
-    final tenBit = current?.tenBit ?? true;
-    final family = current == null ? '1080' : _familyOf(current);
-    _chooseFromSizes(_sizesFor(family, wide), fps, tenBit);
+    _chooseMode(
+      current?.resolution ?? '1080',
+      wide ? '16:9' : '4:3',
+      current?.fps.toInt() ?? 30,
+      current?.bitDepth ?? 10,
+    );
   }
 
   void _selectFps(int fps) {
     final current = _currentMode;
     if (current == null) return;
-    _chooseFromSizes(
-      _sizesFor(_familyOf(current), _isWideMode(current)),
-      fps,
-      current.tenBit,
-    );
+    _chooseMode(current.resolution, current.aspect, fps, current.bitDepth);
   }
 
-  void _selectBit(bool tenBit) {
+  void _selectBit(int bits) {
     final current = _currentMode;
     if (current == null) return;
-    _chooseFromSizes(
-      _sizesFor(_familyOf(current), _isWideMode(current)),
-      current.fps.toInt(),
-      tenBit,
-    );
+    _chooseMode(current.resolution, current.aspect, current.fps.toInt(), bits);
   }
 
-  /// Tries each candidate size until one has an enabled combination, keeping
-  /// the requested rate and bit depth where possible. If none is enabled, asks
-  /// the bridge for the first candidate's reason instead of silently changing
-  /// resolution or aspect.
-  void _chooseFromSizes(List<(int, int)> sizes, int fps, bool tenBit) {
-    for (final (width, height) in sizes) {
-      final mode = _bestMode(width, height, fps, tenBit);
-      if (mode != null) {
-        widget.host.selectRecordingMode(mode.id);
-        return;
-      }
-    }
-    for (final (width, height) in sizes) {
-      for (final mode in state.recordingModes) {
-        if (mode.width == width && mode.height == height) {
-          widget.host.selectRecordingMode(mode.id);
-          return;
-        }
-      }
-    }
-  }
-
-  RecordingMode? _bestMode(int width, int height, int fps, bool tenBit) {
-    RecordingMode? enabled(int desiredFps, bool desiredBit) {
+  /// Chooses a mode by the core's recording-mode elements. It keeps the
+  /// requested rate and depth where possible, then falls back within the same
+  /// resolution/aspect, and finally asks for the first mode at that
+  /// resolution/aspect so its disabled reason is shown.
+  void _chooseMode(String resolution, String aspect, int fps, int bitDepth) {
+    RecordingMode? exact(int rate, int depth) {
       for (final mode in state.recordingModes) {
         if (mode.enabled &&
-            mode.width == width &&
-            mode.height == height &&
-            mode.fps == desiredFps &&
-            mode.tenBit == desiredBit) {
+            mode.resolution == resolution &&
+            mode.aspect == aspect &&
+            mode.fps == rate &&
+            mode.bitDepth == depth) {
           return mode;
         }
       }
       return null;
     }
 
-    return enabled(fps, tenBit) ??
-        enabled(fps, !tenBit) ??
-        _nearestRate(width, height, fps, tenBit) ??
-        _nearestRate(width, height, fps, !tenBit) ??
-        _firstEnabledAt(width, height);
-  }
-
-  RecordingMode? _nearestRate(int width, int height, int fps, bool tenBit) {
-    RecordingMode? best;
-    var bestDelta = 1 << 30;
-    for (final mode in state.recordingModes) {
-      if (!mode.enabled ||
-          mode.width != width ||
-          mode.height != height ||
-          mode.tenBit != tenBit) {
-        continue;
+    RecordingMode? nearestRate(int depth) {
+      RecordingMode? best;
+      var bestDelta = 1 << 30;
+      for (final mode in state.recordingModes) {
+        if (!mode.enabled ||
+            mode.resolution != resolution ||
+            mode.aspect != aspect ||
+            mode.bitDepth != depth) {
+          continue;
+        }
+        final delta = (mode.fps.toInt() - fps).abs();
+        if (delta < bestDelta ||
+            (delta == bestDelta && (best == null || mode.fps > best.fps))) {
+          best = mode;
+          bestDelta = delta;
+        }
       }
-      final delta = (mode.fps.toInt() - fps).abs();
-      if (delta < bestDelta ||
-          (delta == bestDelta && (best == null || mode.fps > best.fps))) {
-        best = mode;
-        bestDelta = delta;
-      }
+      return best;
     }
-    return best;
-  }
 
-  RecordingMode? _firstEnabledAt(int width, int height) {
-    for (final mode in state.recordingModes) {
-      if (mode.enabled && mode.width == width && mode.height == height) {
-        return mode;
+    RecordingMode? firstEnabled() {
+      for (final mode in state.recordingModes) {
+        if (mode.enabled &&
+            mode.resolution == resolution &&
+            mode.aspect == aspect) {
+          return mode;
+        }
       }
+      return null;
     }
-    return null;
+
+    RecordingMode? first() {
+      for (final mode in state.recordingModes) {
+        if (mode.resolution == resolution && mode.aspect == aspect) {
+          return mode;
+        }
+      }
+      return null;
+    }
+
+    final mode =
+        exact(fps, bitDepth) ??
+        exact(fps, bitDepth == 10 ? 8 : 10) ??
+        nearestRate(bitDepth) ??
+        nearestRate(bitDepth == 10 ? 8 : 10) ??
+        firstEnabled() ??
+        first();
+    if (mode != null) widget.host.selectRecordingMode(mode.id);
   }
 
   bool get _portrait =>
@@ -886,32 +862,11 @@ class _ControlDeckState extends State<ControlDeck> {
   int get _displayHeight =>
       _verticalFrame ? state.previewWidth : state.previewHeight;
 
-  String _sizeLabelFor(int width, int height) {
-    if (_portrait) {
-      return switch ((width, height)) {
-        // 16:9 becomes the vertical 9:16 take; 4:3 stays the open gate.
-        (3840, 2160) => '4K',
-        (4096, 3072) => '4K4:3',
-        (3840, 2880) => '4K4:3',
-        (2880, 2160) => '4K4:3',
-        (1920, 1080) => '1080p',
-        (1920, 1440) => '4:3',
-        (1440, 1080) => '4:3',
-        (1280, 720) => '720p',
-        _ => '$width×$height',
-      };
+  String _sizeLabel(RecordingMode mode) {
+    if (mode.aspect == '16:9') {
+      return mode.resolution == '4K' ? '4K' : '${mode.resolution}p';
     }
-    return switch ((width, height)) {
-      (3840, 2160) => '4K',
-      (4096, 3072) => '4K4:3',
-      (3840, 2880) => '4K4:3',
-      (2880, 2160) => '4K4:3',
-      (1920, 1080) => '1080p',
-      (1920, 1440) => '4:3',
-      (1440, 1080) => '4:3',
-      (1280, 720) => '720p',
-      _ => '$width×$height',
-    };
+    return mode.resolution == '4K' ? '4K4:3' : '4:3';
   }
 
   /// Lens badges use the 35 mm-equivalent focal length, e.g. `16mm`, because
@@ -2509,7 +2464,7 @@ class _ControlDeckState extends State<ControlDeck> {
 
   List<RecordingMode> get _enabledModes {
     final offered = state.recordingModes
-        .where((mode) => mode.enabled && mode.height != 720)
+        .where((mode) => mode.enabled && mode.resolution != '720')
         .toList();
     if (offered.isNotEmpty) return offered;
     final enabled = state.recordingModes.where((mode) => mode.enabled).toList();
@@ -2533,10 +2488,8 @@ class _ControlDeckState extends State<ControlDeck> {
   }
 
   String _modeShort(RecordingMode mode) =>
-      '${_sizeLabel(mode)} ${mode.fps}p ${mode.tenBit ? '10b' : '8b'}';
-
-  String _sizeLabel(RecordingMode mode) =>
-      _sizeLabelFor(mode.width.toInt(), mode.height.toInt());
+      '${_sizeLabel(mode)} ${mode.fps}p '
+      '${mode.bitDepth == 10 ? '10b' : '8b'}';
 
   Widget _infoRow(String label, String value) {
     return Padding(

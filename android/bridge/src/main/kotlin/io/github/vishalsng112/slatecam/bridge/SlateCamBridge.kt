@@ -42,6 +42,7 @@ import io.github.vishalsng112.slatecam.core.camera.FocusMode
 import io.github.vishalsng112.slatecam.core.camera.FocusScenario
 import io.github.vishalsng112.slatecam.core.camera.ManualWhiteBalance
 import io.github.vishalsng112.slatecam.core.camera.MeteringMode
+import io.github.vishalsng112.slatecam.core.camera.RecordingBitrate
 import io.github.vishalsng112.slatecam.core.camera.RecordingModeCatalog
 import io.github.vishalsng112.slatecam.core.codec.AudioInputs
 import io.github.vishalsng112.slatecam.core.codec.AudioLevel
@@ -335,7 +336,7 @@ class SlateCamBridge private constructor(
                     cameraSurface,
                     width,
                     height,
-                    tenBit = mode.tenBit,
+                    tenBit = mode.bitDepth == 10L,
                     cameraIdOverride = openingCameraId(),
                 )
             } catch (error: Throwable) {
@@ -559,7 +560,7 @@ class SlateCamBridge private constructor(
         if (compatible == null) {
             val fallback = targetModes.firstOrNull {
                 it.enabled && it.width == 1440 && it.height == 1080 &&
-                    it.fps == 30 && it.tenBit
+                    it.fps == 30 && it.bitDepth.bits == 10
             } ?: targetModes.firstOrNull {
                 it.enabled && it.width == 1440 && it.height == 1080 &&
                     it.fps == 30
@@ -567,7 +568,7 @@ class SlateCamBridge private constructor(
                 it.enabled && it.width == 1440 && it.height == 1080
             } ?: targetModes.firstOrNull {
                 it.enabled && it.width == 1920 && it.height == 1080 &&
-                    it.fps == 30 && it.tenBit
+                    it.fps == 30 && it.bitDepth.bits == 10
             } ?: targetModes.firstOrNull {
                 it.enabled && it.width == 1920 && it.height == 1080
             } ?: targetModes.firstOrNull { it.enabled }
@@ -584,7 +585,7 @@ class SlateCamBridge private constructor(
                 fallback.width,
                 fallback.height,
                 fallback.fps,
-                fallback.tenBit,
+                fallback.bitDepth.bits == 10,
                 cameraIdOverride = id,
             )
             recordingError = null
@@ -1282,7 +1283,7 @@ class SlateCamBridge private constructor(
             surface,
             mode.width.toInt(),
             mode.height.toInt(),
-            tenBit = mode.tenBit,
+            tenBit = mode.bitDepth == 10L,
             cameraIdOverride = targetId,
         )
         standby.setFrameRate(mode.fps.toInt())
@@ -1396,7 +1397,7 @@ class SlateCamBridge private constructor(
             surface,
             mode.width.toInt(),
             mode.height.toInt(),
-            tenBit = mode.tenBit,
+            tenBit = mode.bitDepth == 10L,
         )
         pipelineActive = true
         refreshAudioOptions()
@@ -1585,8 +1586,8 @@ class SlateCamBridge private constructor(
     )
 
     private fun startRecorder(name: String, mode: RecordingMode): StartedRecorder {
-        var tenBitHlg = mode.tenBit && controller.isTenBitActive
-        val bitrate = bitrateFor(mode)
+        var tenBitHlg = mode.bitDepth == 10L && controller.isTenBitActive
+        val bitrate = mode.bitrate.toInt()
         var destination = openDestination(name)
         // Camera2 sensors produce landscape frames. The take orientation is
         // the MP4 hint; portrait playback swaps the effective axes.
@@ -1626,16 +1627,6 @@ class SlateCamBridge private constructor(
         }
 
         return StartedRecorder(surface, destination, tenBitHlg)
-    }
-
-    private fun bitrateFor(mode: RecordingMode): Int {
-        val pixels = mode.width * mode.height
-        val base = when {
-            pixels >= 3840L * 2160 -> 40_000_000
-            pixels >= 1920L * 1080 -> 12_000_000
-            else -> 9_000_000
-        }
-        return (base * mode.fps.toInt() / 30).coerceAtLeast(4_000_000)
     }
 
     /** MediaStore first so clips appear in galleries; app storage as a fallback. */
@@ -2029,7 +2020,7 @@ class SlateCamBridge private constructor(
         if (pipelineActive) {
             resizePreview(width, height)
         }
-        controller.configure(width, height, mode.fps.toInt(), mode.tenBit)
+        controller.configure(width, height, mode.fps.toInt(), mode.bitDepth == 10L)
     }
 
     /**
@@ -2106,10 +2097,13 @@ class SlateCamBridge private constructor(
             RecordingMode(
                 id = mode.id,
                 label = mode.label,
+                resolution = mode.resolution.label,
+                aspect = mode.aspect.label,
                 width = mode.width.toLong(),
                 height = mode.height.toLong(),
                 fps = mode.fps.toLong(),
-                tenBit = mode.tenBit,
+                bitrate = mode.bitrate.toLong(),
+                bitDepth = mode.bitDepth.bits.toLong(),
                 enabled = mode.enabled,
                 reason = mode.reason,
             )
@@ -2348,7 +2342,8 @@ class SlateCamBridge private constructor(
         fun pick(width: Long, height: Long, tenBit: Boolean? = null) =
             modes.firstOrNull {
                 it.enabled && it.width == width && it.height == height &&
-                    it.fps == 30L && (tenBit == null || it.tenBit == tenBit)
+                    it.fps == 30L &&
+                    (tenBit == null || it.bitDepth == if (tenBit) 10L else 8L)
             }
 
         return pick(1440, 1080, tenBit = true)
@@ -2366,10 +2361,13 @@ class SlateCamBridge private constructor(
             ?: RecordingMode(
                 id = RecordingModeCatalog.id(1920, 1080, 30, false),
                 label = "1920×1080 · 30p · 16:9 · 8-bit SDR",
+                resolution = "1080",
+                aspect = "16:9",
                 width = 1920L,
                 height = 1080L,
                 fps = 30L,
-                tenBit = false,
+                bitrate = RecordingBitrate.forPixels(1920, 1080, 30).toLong(),
+                bitDepth = 8L,
                 enabled = true,
                 reason = "",
             )

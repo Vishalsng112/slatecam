@@ -9,6 +9,16 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — One recording-mode model in core (build 2201)
+- Core `RecordingMode` now has explicit `resolution`, `aspect`, `fps`,
+  `bitrate` and `bitDepth` elements; `width`/`height` are the derived Camera2
+  size. `RecordingModeCatalog` and `RecordingBitrate` are the single policy
+  owners.
+- Pigeon exposes those five elements. The bridge no longer computes bitrate,
+  and Flutter no longer infers the family, aspect or size ladder from pixels.
+- The UI selects modes by the model fields (`4K`/`1080`, `16:9`/`4:3`,
+  24/25/30, 8/10-bit) with the same fallbacks as before.
+
 ### Fixed — Rotation button uses the activity's requested orientation (build 2200)
 - The one-tap rotation now calls a native bridge command that sets
   `ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE` / `PORTRAIT` on the activity,

@@ -45,21 +45,30 @@ class RecordingMode {
   RecordingMode({
     required this.id,
     required this.label,
+    required this.resolution,
+    required this.aspect,
     required this.width,
     required this.height,
     required this.fps,
-    required this.tenBit,
+    required this.bitrate,
+    required this.bitDepth,
     required this.enabled,
     required this.reason,
   });
 
   String id;
   String label;
+  /// 4K | 1080 | 720
+  String resolution;
+  /// 16:9 | 4:3
+  String aspect;
   int width;
   int height;
   int fps;
-  /// True when the mode records 10-bit HLG.
-  bool tenBit;
+  /// Encoder bitrate in bits per second.
+  int bitrate;
+  /// 8 or 10.
+  int bitDepth;
   bool enabled;
   /// Why the mode is disabled; empty when enabled.
   String reason;

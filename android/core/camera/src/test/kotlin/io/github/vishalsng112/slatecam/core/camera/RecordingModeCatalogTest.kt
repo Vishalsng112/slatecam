@@ -1,5 +1,6 @@
 package io.github.vishalsng112.slatecam.core.camera
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -35,6 +36,13 @@ class RecordingModeCatalogTest {
         assertTrue(fullHd30.enabled)
         assertFalse(fullHd24.enabled)
         assertTrue(fullHd24.reason.contains("24 fps"))
+        assertEquals(RecordingResolution.FHD_1080, fullHd30.resolution)
+        assertEquals(RecordingAspect.WIDE_16_9, fullHd30.aspect)
+        assertEquals(RecordingBitDepth.EIGHT, fullHd30.bitDepth)
+        assertEquals(
+            RecordingBitrate.forPixels(1920, 1080, 30),
+            fullHd30.bitrate,
+        )
     }
 
     @Test
@@ -60,6 +68,10 @@ class RecordingModeCatalogTest {
         assertTrue(phone4k.enabled)
         assertTrue(dci.label.contains("4:3"))
         assertTrue(phone4k.label.contains("4:3"))
+        assertEquals(RecordingResolution.UHD_4K, dci.resolution)
+        assertEquals(RecordingAspect.OPEN_4_3, dci.aspect)
+        assertEquals(RecordingResolution.UHD_4K, phone4k.resolution)
+        assertEquals(RecordingAspect.OPEN_4_3, phone4k.aspect)
     }
 
     @Test
@@ -71,6 +83,7 @@ class RecordingModeCatalogTest {
         val tenBit = modes.first { it.id == "1920x1080@30/10" }
         assertFalse(tenBit.enabled)
         assertTrue(tenBit.reason.contains("not verified"))
+        assertEquals(RecordingBitDepth.TEN, tenBit.bitDepth)
     }
 
     @Test
