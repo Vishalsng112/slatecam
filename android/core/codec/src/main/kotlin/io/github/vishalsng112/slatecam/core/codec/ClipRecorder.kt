@@ -7,6 +7,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.view.Surface
@@ -95,6 +96,32 @@ class ClipRecorder(private val context: Context) {
     val isRecording: Boolean get() = running
 
     /**
+     * CBR is only requested when this encoder advertises it; otherwise the
+     * take falls back to the system VBR mode at the same target so recording
+     * never fails over a rate-control preference.
+     */
+    private fun rateControlMode(format: MediaFormat, constantBitrate: Boolean): Int {
+        val vbr = MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
+        if (!constantBitrate) return vbr
+        val cbr = MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
+        val supported = runCatching {
+            val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+            val name = codecs.findEncoderForFormat(format) ?: return@runCatching false
+            val info = codecs.codecInfos.firstOrNull { it.name == name }
+                ?: return@runCatching false
+            info.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_HEVC)
+                .encoderCapabilities?.isBitrateModeSupported(cbr) ?: false
+        }.getOrDefault(false)
+        if (!supported) {
+            android.util.Log.w(
+                "SlateCam",
+                "encoder does not advertise CBR; falling back to VBR",
+            )
+        }
+        return if (supported) cbr else vbr
+    }
+
+    /**
      * Starts recording and returns the surface the renderer must draw into.
      */
     fun start(
@@ -106,6 +133,7 @@ class ClipRecorder(private val context: Context) {
         muxer: MediaMuxer,
         orientationHint: Int = 0,
         audio: AudioConfig = AudioConfig(),
+        constantBitrate: Boolean = false,
     ): Surface {
         check(!running) { "already recording" }
         lastError = null
@@ -139,12 +167,12 @@ class ClipRecorder(private val context: Context) {
             setInteger(MediaFormat.KEY_FRAME_RATE, fps)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
             // MediaTek encoders otherwise default to a quality mode that ignores
-            // KEY_BIT_RATE and produces ~150 Mbps at 1080p. Omit it for the HLG
-            // path: it appears to force an 8-bit Main stream.
+            // KEY_BIT_RATE and produces ~150 Mbps at 1080p. Omit the mode for the
+            // HLG path: setting it appears to force an 8-bit Main stream.
             if (!tenBitHlg) {
                 setInteger(
                     MediaFormat.KEY_BITRATE_MODE,
-                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR,
+                    rateControlMode(this, constantBitrate),
                 )
             }
             if (tenBitHlg) {

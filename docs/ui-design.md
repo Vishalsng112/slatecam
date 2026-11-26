@@ -235,18 +235,27 @@ position without opening a menu.
 | Aspect | 16:9, 4:3 circles | `selectRecordingMode` |
 | Frame rate | 24, 25, 30 (whatever the size exposes) | `selectRecordingMode` |
 | Bit depth | 10-bit, 8-bit (when the combination exists) | `selectRecordingMode` |
+| Bitrate | VBR (system) or CBR 20/40/60/80/100 Mbps | `setRecordingBitrate` |
 
 A resolution is a family, not a fixed size. 4K 16:9 is 3840×2160; 4K 4:3 picks
 the first enabled size from 3840×2880, 4096×3072 and 2880×2160. 1080 4:3 is
 1440×1080 (with 1920×1440 as a fallback). Changing aspect therefore keeps the
 resolution family instead of dropping 4K to 1080.
 
-The initial selection is **4:3 · 1080 · 30 fps**, preferring a probe-verified
-10-bit path and falling back to the closest enabled combination (16:9 1080p,
-then any enabled mode) when a camera does not offer 1440×1080. Changing a row
-keeps the other two where possible and falls back to the closest enabled
-combination. If no size in the family/aspect is enabled, the console reports the
-bridge reason and leaves the current mode alone.
+The initial selection is **4:3 · 1080 · 30 fps**, preferring the 8-bit SDR
+path and falling back to the closest enabled combination (16:9 1080p, then any
+enabled mode) when a camera does not offer 1440×1080. Changing a row keeps the
+other two where possible and falls back to the closest enabled combination. If
+no size in the family/aspect is enabled, the console reports the bridge reason
+and leaves the current mode alone.
+
+Bitrate is independent of size, rate and depth. **VBR** uses the system
+variable-bitrate mode with the catalog's per-mode target (12 Mbps at 1080p,
+40 Mbps at 4K, scaled by frame rate). **CBR** pins one of the fixed 20/40/60/80/
+100 Mbps targets for predictable vlog and movie file sizes; 20–40 Mbps suits
+1080p, 60–100 Mbps suits 4K. The choice persists across takes. 10-bit HLG keeps
+the encoder's default rate control because setting an explicit mode forces an
+8-bit Main stream on tested MediaTek encoders.
 
 The lens set lists lenses as focal-length circles (`16mm`, `25mm`, `26mm`).
 Tapping a circle includes or excludes that lens from the Lens set; the
@@ -458,7 +467,7 @@ letterboxed.
 | Lens set | Single lens vs shared-mode set (at least two) | **Current** |
 | Recording mode | per-camera size/fps/bit-depth incl. 4K/1080p/720p, 16:9/4:3 and 4K 4:3 families, probe-gated | **Current** |
 | Resolution / frame-rate selector | replaced by the recording-mode catalog | **Current** |
-| Codec / bitrate selector | fixed HEVC, bitrate scales with mode | Future |
+| Codec / bitrate selector | fixed HEVC; VBR (system) or fixed CBR targets | **Current** |
 | Audio source and level | Audio card: input, source, gain, stereo meter | **Current** (ADR 0028) |
 | Stabilisation / OIS / EIS | per-sensor toggles in Focus & stabilisation card | **Current** |
 | RAW / DNG burst | Camera2 still capture not implemented | Future |

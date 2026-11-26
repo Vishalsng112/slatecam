@@ -9,6 +9,27 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Changed — VBR/CBR bitrate control (build 2212)
+- The Bitrate row is now selectable: **VBR** keeps the system variable-bitrate
+  mode with the catalog's per-mode target, and **CBR** pins 20/40/60/80/100
+  Mbps for predictable vlog and movie file sizes.
+- `RecordingBitrate` owns the presets and the effective-target rule in
+  `:core:camera`; `ClipRecorder` requests CBR only when the selected encoder
+  advertises it, otherwise it keeps VBR at the same target instead of failing
+  the take.
+- The choice persists in shoot preferences and is exposed through
+  `CameraState.bitrateMode`/`bitrateTarget`/`bitratePresets` and
+  `setRecordingBitrate`.
+- 10-bit HLG keeps the encoder default rate control: setting an explicit mode
+  forces 8-bit Main on tested MediaTek encoders.
+
+### Changed — 8-bit is the default bit depth (build 2211)
+- A fresh open still picks **4:3 · 1080 · 30 fps** but now prefers the 8-bit
+  SDR path instead of probe-verified 10-bit HLG, so recording starts without the
+  HLG gate. 10-bit stays one tap away where the probe verifies it.
+- The same preference applies when a lens switch has to fall back to a new mode,
+  and the Flutter mode selectors default an unknown depth to 8-bit.
+
 ### Changed — Lens set replaces Movie/Vlog (build 2210)
 - The multi-camera feature is now **Lens set** (`Single lens` / `Lens set`).
   Core owns the rules in `LensSetMode`, `LensSet` and `LensSetModes`, reusing

@@ -33,8 +33,29 @@ enum class RecordingBitDepth(val bits: Int) {
     TEN(10),
 }
 
+/** How the encoder spends the bitrate target. */
+enum class BitrateControl(val wireValue: String) {
+    /** System variable bitrate: quality scales with the scene, target as a guide. */
+    VBR("vbr"),
+
+    /** Constant bitrate: fixed target, predictable file size for takes. */
+    CBR("cbr"),
+    ;
+
+    companion object {
+        fun fromWire(value: String): BitrateControl =
+            entries.firstOrNull { it.wireValue == value } ?: VBR
+    }
+}
+
 /** Bitrate policy in one place so every consumer sees the same number. */
 object RecordingBitrate {
+    /**
+     * Fixed CBR targets for vlog and movie takes. 20–40 Mbps covers 1080p
+     * vlogging, 60–100 Mbps covers 4K movie work with headroom for grain.
+     */
+    val cbrPresets: List<Int> = listOf(20, 40, 60, 80, 100).map { it * 1_000_000 }
+
     fun forPixels(width: Int, height: Int, fps: Int): Int {
         val pixels = width.toLong() * height
         val base = when {
@@ -44,6 +65,14 @@ object RecordingBitrate {
         }
         return (base * fps.coerceAtLeast(1) / 30).coerceAtLeast(4_000_000)
     }
+
+    /** Snap a request to a supported preset; unknown values fall back to 20 Mbps. */
+    fun cbrTarget(requestedBps: Int): Int =
+        cbrPresets.firstOrNull { it == requestedBps } ?: cbrPresets.first()
+
+    /** Target handed to the encoder for the next take. */
+    fun effectiveBps(control: BitrateControl, cbrBps: Int, modeBps: Int): Int =
+        if (control == BitrateControl.CBR) cbrBps else modeBps
 }
 
 /**

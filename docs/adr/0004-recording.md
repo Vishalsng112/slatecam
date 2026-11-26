@@ -24,7 +24,8 @@ buffers.
 3. **Audio is optional.** Without `RECORD_AUDIO` the recorder produces a
    video-only file rather than failing.
 4. **Bitrate mode is explicit** (`BITRATE_MODE_VBR`). Relying on `KEY_BIT_RATE`
-   alone produced 150 Mbps on this MediaTek encoder.
+   alone produced 150 Mbps on this MediaTek encoder. (Selectable VBR/CBR added
+   in ADR 0036.)
 5. **The EGL config requests `EGL_RECORDABLE_ANDROID`**, falling back if the
    driver rejects it. This is required for correct encoder input on some GPUs.
 6. **Output goes to MediaStore** (`Movies/SlateCam/`) with `IS_PENDING` set

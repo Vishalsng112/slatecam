@@ -103,4 +103,24 @@ class RecordingModeCatalogTest {
         assertFalse(hd24ten.enabled)
         assertTrue(hd24ten.reason.contains("does not advertise 10-bit"))
     }
+
+    @Test
+    fun `bitrate control uses presets for CBR and the mode target for VBR`() {
+        val modeBitrate = RecordingBitrate.forPixels(1920, 1080, 30)
+
+        assertEquals(modeBitrate, RecordingBitrate.effectiveBps(
+            BitrateControl.VBR,
+            RecordingBitrate.cbrPresets.first(),
+            modeBitrate,
+        ))
+        assertEquals(60_000_000, RecordingBitrate.effectiveBps(
+            BitrateControl.CBR,
+            60_000_000,
+            modeBitrate,
+        ))
+        assertEquals(20_000_000, RecordingBitrate.cbrTarget(21_000_000))
+        assertEquals(100_000_000, RecordingBitrate.cbrTarget(100_000_000))
+        assertEquals(BitrateControl.CBR, BitrateControl.fromWire("cbr"))
+        assertEquals(BitrateControl.VBR, BitrateControl.fromWire("unknown"))
+    }
 }

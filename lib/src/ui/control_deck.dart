@@ -645,7 +645,24 @@ class _ControlDeckState extends State<ControlDeck> {
                 ),
           ]),
           const SizedBox(height: 4),
-          _modeRow('Bitrate', [_modeValue(_formatBitrate(current.bitrate))]),
+          _modeRow('Bitrate', [
+            _modeChip(
+              label: 'VBR',
+              tooltip: 'System variable bitrate · '
+                  '${_formatBitrate(current.bitrate)}',
+              selected: state.bitrateMode == 'vbr',
+              onTap: () => widget.host.setRecordingBitrate('vbr', 0),
+            ),
+            for (final bps in state.bitratePresets)
+              _modeChip(
+                label: '${bps ~/ 1000000}M',
+                tooltip: 'Constant bitrate · ${_formatBitrate(bps)}',
+                selected:
+                    state.bitrateMode == 'cbr' && state.bitrateTarget == bps,
+                onTap: () => widget.host.setRecordingBitrate('cbr', bps),
+              ),
+            _modeValue(_formatBitrate(state.bitrateTarget)),
+          ]),
         ],
       ),
     );
@@ -741,7 +758,7 @@ class _ControlDeckState extends State<ControlDeck> {
       resolution,
       current?.aspect ?? '4:3',
       current?.fps.toInt() ?? 30,
-      current?.bitDepth ?? 10,
+      current?.bitDepth ?? 8,
     );
   }
 
@@ -751,7 +768,7 @@ class _ControlDeckState extends State<ControlDeck> {
       current?.resolution ?? '1080',
       wide ? '16:9' : '4:3',
       current?.fps.toInt() ?? 30,
-      current?.bitDepth ?? 10,
+      current?.bitDepth ?? 8,
     );
   }
 

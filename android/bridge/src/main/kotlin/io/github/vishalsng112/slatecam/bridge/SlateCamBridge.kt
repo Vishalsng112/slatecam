@@ -38,6 +38,7 @@ import io.github.vishalsng112.slatecam.bridge.pigeon.SlateCamHostApi
 import io.github.vishalsng112.slatecam.core.camera.CameraCapabilitiesReader
 import io.github.vishalsng112.slatecam.core.camera.CameraController
 import io.github.vishalsng112.slatecam.core.camera.CameraUiState
+import io.github.vishalsng112.slatecam.core.camera.BitrateControl
 import io.github.vishalsng112.slatecam.core.camera.FocusMode
 import io.github.vishalsng112.slatecam.core.camera.FocusScenario
 import io.github.vishalsng112.slatecam.core.camera.ManualWhiteBalance
@@ -177,6 +178,13 @@ class SlateCamBridge private constructor(
             ?: AudioInputs.DEFAULT_KEY
     private var audioGainDb: Float = shootPrefs.getFloat(KEY_AUDIO_GAIN, 0f)
     private var previewQuality = shootPrefs.getString(KEY_PREVIEW_QUALITY, "full") ?: "full"
+    private var bitrateControl = BitrateControl.fromWire(
+        shootPrefs.getString(KEY_BITRATE_MODE, BitrateControl.VBR.wireValue)
+            ?: BitrateControl.VBR.wireValue,
+    )
+    private var bitrateCbrBps = RecordingBitrate.cbrTarget(
+        shootPrefs.getInt(KEY_BITRATE_CBR, RecordingBitrate.cbrPresets.first()),
+    )
     private var previewOutputWidth = 0
     private var previewOutputHeight = 0
     private val pictureProfiles = loadPictureProfiles()
@@ -563,7 +571,7 @@ class SlateCamBridge private constructor(
         if (compatible == null) {
             val fallback = targetModes.firstOrNull {
                 it.enabled && it.width == 1440 && it.height == 1080 &&
-                    it.fps == 30 && it.bitDepth.bits == 10
+                    it.fps == 30 && it.bitDepth.bits == 8
             } ?: targetModes.firstOrNull {
                 it.enabled && it.width == 1440 && it.height == 1080 &&
                     it.fps == 30
@@ -571,7 +579,7 @@ class SlateCamBridge private constructor(
                 it.enabled && it.width == 1440 && it.height == 1080
             } ?: targetModes.firstOrNull {
                 it.enabled && it.width == 1920 && it.height == 1080 &&
-                    it.fps == 30 && it.bitDepth.bits == 10
+                    it.fps == 30 && it.bitDepth.bits == 8
             } ?: targetModes.firstOrNull {
                 it.enabled && it.width == 1920 && it.height == 1080
             } ?: targetModes.firstOrNull { it.enabled }
@@ -1590,7 +1598,12 @@ class SlateCamBridge private constructor(
 
     private fun startRecorder(name: String, mode: RecordingMode): StartedRecorder {
         var tenBitHlg = mode.bitDepth == 10L && controller.isTenBitActive
-        val bitrate = mode.bitrate.toInt()
+        val bitrate = RecordingBitrate.effectiveBps(
+            bitrateControl,
+            bitrateCbrBps,
+            mode.bitrate.toInt(),
+        )
+        val constantBitrate = bitrateControl == BitrateControl.CBR
         var destination = openDestination(name)
         // Camera2 sensors produce landscape frames. The take orientation is
         // the MP4 hint; portrait playback swaps the effective axes.
@@ -1606,6 +1619,7 @@ class SlateCamBridge private constructor(
                 destination.muxer,
                 orientationHint = orientationHint,
                 audio = ClipRecorder.AudioConfig(audioInputKey, audioGainDb),
+                constantBitrate = constantBitrate,
             )
         } catch (first: Throwable) {
             // Main10 configure can be refused; retry as 8-bit with a clean sink.
@@ -1622,6 +1636,7 @@ class SlateCamBridge private constructor(
                     destination.muxer,
                     orientationHint = orientationHint,
                     audio = ClipRecorder.AudioConfig(audioInputKey, audioGainDb),
+                    constantBitrate = constantBitrate,
                 )
             } catch (second: Throwable) {
                 abandon(destination)
@@ -1925,6 +1940,28 @@ class SlateCamBridge private constructor(
         if (recorder.isRecording) stopRecording()
         selectedModeId = mode.id
         applyMode(mode)
+        pushState()
+    }
+
+    override fun setRecordingBitrate(mode: String, targetBps: Long) {
+        if (recorder.isRecording) {
+            recordingError = "stop recording to change the bitrate"
+            pushState()
+            return
+        }
+        val control = BitrateControl.fromWire(mode)
+        val target = if (control == BitrateControl.CBR) {
+            RecordingBitrate.cbrTarget(targetBps.toInt())
+        } else {
+            bitrateCbrBps
+        }
+        bitrateControl = control
+        bitrateCbrBps = target
+        shootPrefs.edit()
+            .putString(KEY_BITRATE_MODE, control.wireValue)
+            .putInt(KEY_BITRATE_CBR, target)
+            .apply()
+        recordingError = null
         pushState()
     }
 
@@ -2345,9 +2382,11 @@ class SlateCamBridge private constructor(
         }
 
     /**
-     * The default shoot mode is 4:3 1080p at 30 fps, preferring a probe-verified
-     * 10-bit path. Every step below is capability-gated, so a camera that does
-     * not offer 1440×1080 still lands on an enabled mode instead of a guess.
+     * The default shoot mode is 4:3 1080p at 30 fps, preferring the 8-bit SDR
+     * path so a fresh open records without the HLG gate. 10-bit stays one tap
+     * away where the probe verifies it. Every step below is capability-gated,
+     * so a camera that does not offer 1440×1080 still lands on an enabled mode
+     * instead of a guess.
      */
     private fun preferredDefault(modes: List<RecordingMode>): RecordingMode? {
         fun pick(width: Long, height: Long, tenBit: Boolean? = null) =
@@ -2357,9 +2396,9 @@ class SlateCamBridge private constructor(
                     (tenBit == null || it.bitDepth == if (tenBit) 10L else 8L)
             }
 
-        return pick(1440, 1080, tenBit = true)
+        return pick(1440, 1080, tenBit = false)
             ?: pick(1440, 1080)
-            ?: pick(1920, 1080, tenBit = true)
+            ?: pick(1920, 1080, tenBit = false)
             ?: pick(1920, 1080)
             ?: pick(1920, 1440)
             ?: modes.firstOrNull { it.enabled }
@@ -2405,6 +2444,13 @@ class SlateCamBridge private constructor(
             lenses = lensOptions(),
             recordingMode = mode.id,
             recordingModes = recordingModes(),
+            bitrateMode = bitrateControl.wireValue,
+            bitrateTarget = RecordingBitrate.effectiveBps(
+                bitrateControl,
+                bitrateCbrBps,
+                mode.bitrate.toInt(),
+            ),
+            bitratePresets = RecordingBitrate.cbrPresets,
             lensSetMode = lensSetMode,
             lensSetLenses = lensSetLenses(),
             shootProfiles = profileInfos(),
@@ -2483,6 +2529,9 @@ class SlateCamBridge private constructor(
         lenses: List<LensOption>,
         recordingMode: String,
         recordingModes: List<RecordingMode>,
+        bitrateMode: String,
+        bitrateTarget: Int,
+        bitratePresets: List<Int>,
         lensSetMode: String,
         lensSetLenses: List<LensSetLens>,
         shootProfiles: List<ShootProfile>,
@@ -2533,6 +2582,9 @@ class SlateCamBridge private constructor(
         lenses = lenses,
         recordingMode = recordingMode,
         recordingModes = recordingModes,
+        bitrateMode = bitrateMode,
+        bitrateTarget = bitrateTarget.toLong(),
+        bitratePresets = bitratePresets.map { it.toLong() },
         lensSetMode = lensSetMode,
         lensSetLenses = lensSetLenses,
         shootProfiles = shootProfiles,
@@ -2618,6 +2670,8 @@ class SlateCamBridge private constructor(
         private const val KEY_FOCUS_SPEED = "focus_transition_speed"
         private const val KEY_FOCUS_MODE = "focus_mode"
         private const val KEY_PREVIEW_QUALITY = "preview_quality"
+        private const val KEY_BITRATE_MODE = "bitrate_mode"
+        private const val KEY_BITRATE_CBR = "bitrate_cbr_bps"
         private const val KEY_CUSTOM_PROFILE = "custom_picture_profile"
         private const val KEY_PICTURE_PROFILE_IDS = "picture_profile_ids"
         private const val KEY_CREATIVE_LUT = "creative_lut"

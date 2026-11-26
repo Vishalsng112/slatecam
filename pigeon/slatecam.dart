@@ -292,6 +292,12 @@ class CameraState {
     required this.lenses,
     required this.recordingMode,
     required this.recordingModes,
+    /// vbr (system variable) or cbr (fixed target).
+    required this.bitrateMode,
+    /// Encoder target for the next take, in bits per second.
+    required this.bitrateTarget,
+    /// Fixed CBR targets offered by the core, in bits per second.
+    required this.bitratePresets,
     required this.lensSetMode,
     required this.lensSetLenses,
     required this.shootProfiles,
@@ -422,6 +428,12 @@ class CameraState {
   String recordingMode;
   /// Modes available for the active camera.
   List<RecordingMode> recordingModes;
+  /// vbr (system variable) or cbr (fixed target).
+  String bitrateMode;
+  /// Encoder target for the next take, in bits per second.
+  int bitrateTarget;
+  /// Fixed CBR targets offered by the core, in bits per second.
+  List<int> bitratePresets;
   /// single | set — set uses the common mode of at least two selected lenses.
   /// single | set — set uses the common mode of at least two lenses.
   String lensSetMode;
@@ -644,6 +656,10 @@ abstract class SlateCamHostApi {
 
   /// Switches recording mode: size, frame rate and bit depth.
   void selectRecordingMode(String id);
+
+  /// vbr | cbr. CBR uses one of the fixed preset targets; persisted for the
+  /// next take. Ignored while recording.
+  void setRecordingBitrate(String mode, int targetBps);
 
   /// Selects a single lens or a multi-lens set (at least two lenses).
   void setLensSetMode(String mode);
