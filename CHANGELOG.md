@@ -9,6 +9,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Added — One-tap front/back camera switch (build 2203)
+- A camera-swap button in the viewfinder's top-right controls toggles between
+  the exposed front and back cameras using the same `setCameraId` path as the
+  lens circles. The button disables when the device exposes only one facing.
+
 ### Changed — Bitrate in the mode card, aspect chips (build 2202)
 - The Recording mode card shows the selected mode's `Bitrate` (`9 Mbps`,
   `12 Mbps`, …), and the top mode pill includes it.

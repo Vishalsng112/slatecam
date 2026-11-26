@@ -344,6 +344,8 @@ The same widgets serve both orientations; nothing is duplicated per layout.
 - Rotating while idle updates the preview immediately. Deciding to rotate
   during a take applies after the clip is finalized: a recording never changes
   orientation mid-stream.
+- A camera-swap control beside the rotate control toggles front ↔ back using
+  the exposed camera list; it disables when only one facing exists.
 - A circular rotate control beside the viewfinder-quality pill flips the app
   between portrait and landscape without reopening the camera.
 - **Sensor feed (diagnostic):** the viewfinder-quality menu can bypass display

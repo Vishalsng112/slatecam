@@ -524,6 +524,8 @@ class _CaptureScreenState extends State<CaptureScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          _cameraToggle(state),
+          const SizedBox(width: 6),
           _rotationToggle(),
           const SizedBox(width: 6),
           PopupMenuButton<String>(
@@ -592,6 +594,61 @@ class _CaptureScreenState extends State<CaptureScreen>
         ],
       ),
     );
+  }
+
+  /// One-tap front/back switch. Picks the exposed camera on the opposite
+  /// facing and uses the same setCameraId path as the lens circles.
+  Widget _cameraToggle(CameraState state) {
+    final target = _otherFacingCamera(state);
+    final label = target == null ? 'No second camera' : 'Switch camera';
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: Material(
+          color: UiTokens.surfaceGlass,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: target == null ? null : () => _host.setCameraId(target),
+            child: SizedBox(
+              width: 32,
+              height: 32,
+              child: Icon(
+                Icons.cameraswitch_outlined,
+                size: 16,
+                color: target == null ? UiTokens.border : UiTokens.muted,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _otherFacingCamera(CameraState state) {
+    final current = _facingOf(state, state.cameraId);
+    if (current.isEmpty) return null;
+    for (final id in state.cameraIds) {
+      if (id == state.cameraId) continue;
+      final facing = _facingOf(state, id);
+      if (facing.isNotEmpty && facing != current) return id;
+    }
+    return null;
+  }
+
+  String _facingOf(CameraState state, String id) {
+    for (final lens in state.lenses) {
+      if (lens.id == id && lens.facing.isNotEmpty) return lens.facing;
+    }
+    final index = state.cameraIds.indexOf(id);
+    final label = index >= 0 && index < state.cameraLabels.length
+        ? state.cameraLabels[index].toLowerCase()
+        : '';
+    if (label.contains('front')) return 'front';
+    if (label.contains('back')) return 'back';
+    return '';
   }
 
   /// One-tap orientation switch. The activity stays alive; the bridge
