@@ -486,6 +486,7 @@ class _CaptureScreenState extends State<CaptureScreen>
             valueListenable: _telemetry,
             builder: (context, _, _) => _bottomDock(state),
           ),
+          _recordingFrame(state),
         ],
       ),
     );
@@ -754,22 +755,42 @@ class _CaptureScreenState extends State<CaptureScreen>
                 ),
               ),
             ),
-          ValueListenableBuilder<CameraTelemetry?>(
-            valueListenable: _telemetry,
-            builder: (context, telemetry, _) {
-              final recording = telemetry?.isRecording ?? state.isRecording;
-              if (!recording) return const SizedBox.shrink();
-              return IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: UiTokens.danger, width: 3),
-                  ),
-                ),
-              );
-            },
-          ),
         ],
       ),
+    );
+  }
+
+  /// Red take border. Drawn above the dock and zoom rail so no control can
+  /// hide an edge, and sized to the exact video frame (never the letterbox).
+  Widget _recordingFrame(CameraState state) {
+    final outputWidth = state.previewOutputWidth > 0
+        ? state.previewOutputWidth
+        : state.previewWidth;
+    final outputHeight = state.previewOutputHeight > 0
+        ? state.previewOutputHeight
+        : state.previewHeight;
+    final turns = state.previewQuarterTurns % 4;
+    final aspect = turns.isOdd
+        ? outputHeight / outputWidth
+        : outputWidth / outputHeight;
+    return ValueListenableBuilder<CameraTelemetry?>(
+      valueListenable: _telemetry,
+      builder: (context, telemetry, _) {
+        final recording = telemetry?.isRecording ?? state.isRecording;
+        if (!recording) return const SizedBox.shrink();
+        return IgnorePointer(
+          child: Center(
+            child: AspectRatio(
+              aspectRatio: aspect,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: UiTokens.danger, width: 3),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

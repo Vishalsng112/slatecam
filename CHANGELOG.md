@@ -9,6 +9,11 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Recording border always on all four sides (build 2192)
+- The red take border is now a topmost viewfinder overlay sized to the exact
+  video frame. The dock, zoom rail and status pills can no longer cover its
+  bottom or right edge, including the portrait 4:3 take.
+
 ### Fixed — Portrait aspect labels and upright text (build 2191)
 - Portrait keeps the standard phone-camera naming: `9:16` and `4:3`. The `4:3`
   family is delivered as an upright `1080×1440` take (the sensor 4:3 mode plus

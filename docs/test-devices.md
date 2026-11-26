@@ -1557,3 +1557,10 @@ POCO X6 Pro, monitor with left-to-right text in front of the camera:
 The red recording border wraps the frame on all four sides for both. The
 previous `4:3` open-gate behaviour made upright text run top to bottom and was
 removed.
+
+## Recording border above controls (build 2192)
+
+POCO X6 Pro portrait 4:3: while recording, the red border is visible on all
+four sides of the video frame, including the bottom edge below the dock. The
+border is drawn as a topmost overlay, so the transport, zoom rail and status
+pills cannot hide an edge.
