@@ -629,6 +629,9 @@ abstract class SlateCamHostApi {
   /// full | 1080 | 720. The recording stream stays at its mode size.
   void setPreviewQuality(String quality);
 
+  /// Flips the activity between portrait and landscape.
+  void toggleOrientation();
+
   /// Switches recording mode: size, frame rate and bit depth.
   void selectRecordingMode(String id);
 

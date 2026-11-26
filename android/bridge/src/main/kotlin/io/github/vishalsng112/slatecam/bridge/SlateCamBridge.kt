@@ -218,6 +218,9 @@ class SlateCamBridge private constructor(
      */
     var permissionRequester: (() -> Unit)? = null
 
+    /** Set by the activity: it owns the window and can change requestedOrientation. */
+    var orientationToggler: (() -> Unit)? = null
+
 
     private var histogramBins: List<Int> = emptyList()
     private var waveformBins: List<Int> = emptyList()
@@ -611,6 +614,10 @@ class SlateCamBridge private constructor(
             resizePreview(state.previewWidth, state.previewHeight)
         }
         pushState()
+    }
+
+    override fun toggleOrientation() {
+        mainHandler.post { orientationToggler?.invoke() }
     }
 
     override fun setFocusPoint(x: Double, y: Double) {

@@ -1709,6 +1709,8 @@ interface SlateCamHostApi {
   fun setFocusPoint(x: Double, y: Double)
   /** full | 1080 | 720. The recording stream stays at its mode size. */
   fun setPreviewQuality(quality: String)
+  /** Flips the activity between portrait and landscape. */
+  fun toggleOrientation()
   /** Switches recording mode: size, frame rate and bit depth. */
   fun selectRecordingMode(id: String)
   /** Selects single-camera or movie/vlog multi-camera mode. */
@@ -2154,6 +2156,22 @@ interface SlateCamHostApi {
             val qualityArg = args[0] as String
             val wrapped: List<Any?> = try {
               api.setPreviewQuality(qualityArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              SlateCamPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.slatecam.SlateCamHostApi.toggleOrientation$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              api.toggleOrientation()
               listOf(null)
             } catch (exception: Throwable) {
               SlateCamPigeonPigeonUtils.wrapError(exception)
@@ -2977,7 +2995,7 @@ class SlateCamFlutterApi(private val binaryMessenger: BinaryMessenger, private v
           }
         } else {
           continuation.resumeWithException(SlateCamPigeonPigeonUtils.createConnectionError(channelName))
-        }
+        } 
       }
     }
   }
@@ -2997,7 +3015,7 @@ class SlateCamFlutterApi(private val binaryMessenger: BinaryMessenger, private v
           }
         } else {
           continuation.resumeWithException(SlateCamPigeonPigeonUtils.createConnectionError(channelName))
-        }
+        } 
       }
     }
   }

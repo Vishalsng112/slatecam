@@ -1583,3 +1583,11 @@ sides; pixel scan found the border rows/columns at the frame edges (105–2440
 and 324–2075 in the 2400×3392 capture). The raw `SENSOR FEED` diagnostic
 confirmed the native frame is landscape/sideways, which is why the quarter turn
 is required.
+
+## Rotation button on Pad 3 (build 2200)
+
+Tapping the rotate control while in portrait moved the display to
+`ROTATION_90` (landscape); tapping the landscape control returned to
+`ROTATION_0` (portrait). The button now uses the activity's fixed requested
+orientation, so it does not depend on the sensor or auto-rotate. The device's
+`ignore-orientation-request` test flag was reset to false.

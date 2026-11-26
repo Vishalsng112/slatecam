@@ -9,6 +9,14 @@ pre-1.0; build numbers are the debug APK `versionCode` used during device tests.
 
 ## [Unreleased]
 
+### Fixed — Rotation button uses the activity's requested orientation (build 2200)
+- The one-tap rotation now calls a native bridge command that sets
+  `ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE` / `PORTRAIT` on the activity,
+  instead of a sensor-landscape Flutter request. This works with auto-rotate
+  off and on tablets.
+- Pad 3 verified portrait ↔ landscape both ways. The earlier failure was the
+  device's `ignore-orientation-request` test flag left enabled; it is reset.
+
 ### Fixed — Portrait 4:3 locked to upright 3:4 (build 2197)
 - Decision: portrait `4:3` is the upright 3:4 take (`1080×1440`), labelled
   `4:3` like standard phone cameras. The raw sensor frame is landscape and

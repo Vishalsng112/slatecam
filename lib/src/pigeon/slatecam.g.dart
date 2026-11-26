@@ -2172,6 +2172,24 @@ class SlateCamHostApi {
     ;
   }
 
+  /// Flips the activity between portrait and landscape.
+  Future<void> toggleOrientation() async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.toggleOrientation$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+    _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: true,
+    )
+    ;
+  }
+
   /// Switches recording mode: size, frame rate and bit depth.
   Future<void> selectRecordingMode(String id) async {
     final pigeonVar_channelName = 'dev.flutter.pigeon.slatecam.SlateCamHostApi.selectRecordingMode$pigeonVar_messageChannelSuffix';

@@ -1,6 +1,7 @@
 package io.github.vishalsng112.slatecam
 
 import android.Manifest
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Bundle
@@ -37,6 +38,7 @@ class MainActivity : FlutterActivity() {
         )
         installed.setProbeMode(intent?.getBooleanExtra(EXTRA_RUN_PROBE, false) == true)
         installed.permissionRequester = { requestCameraPermission() }
+        installed.orientationToggler = { toggleOrientation() }
         bridge = installed
     }
 
@@ -45,6 +47,20 @@ class MainActivity : FlutterActivity() {
         bridge?.dispose()
         bridge = null
         super.onDestroy()
+    }
+
+    /**
+     * Native orientation switch. Fixed SCREEN_ORIENTATION_* values work even
+     * when the user has auto-rotate off, unlike sensor-landscape requests.
+     */
+    private fun toggleOrientation() {
+        val portrait =
+            resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        requestedOrientation = if (portrait) {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

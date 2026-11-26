@@ -2,7 +2,6 @@ import 'dart:async' show Timer;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../pigeon/slatecam.g.dart';
 import 'control_deck.dart';
@@ -610,16 +609,7 @@ class _CaptureScreenState extends State<CaptureScreen>
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
-            onTap: () {
-              SystemChrome.setPreferredOrientations(
-                portrait
-                    ? const [
-                        DeviceOrientation.landscapeLeft,
-                        DeviceOrientation.landscapeRight,
-                      ]
-                    : const [DeviceOrientation.portraitUp],
-              );
-            },
+            onTap: _host.toggleOrientation,
             child: SizedBox(
               width: 32,
               height: 32,
